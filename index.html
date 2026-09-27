@@ -1711,8 +1711,19 @@ function detectStatementInfo(headerText){
   // "Statement Period December 13, 2025 through January 12, 2026"
   m = new RegExp('statement\\s*period[\\s\\S]{0,80}?('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})[\\s\\S]{0,60}?(?:through|thru|to|-|–)[\\s\\S]{0,60}?('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})','i').exec(headerText);
   if(m) return {month:monthNameToNum(m[3]), year:parseInt(m[4],10)};
+  // date range without "statement period" prefix, e.g. "December 13, 2025 - January 12, 2026" -> end date wins
+  m = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(?:-|–|—|through|thru|to)\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/i.exec(headerText);
+  if(m) return {month:parseInt(m[4],10), year:normYear2(m[6])};
+  m = new RegExp('('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})\\s*(?:-|–|—|through|thru|to)\\s*('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})','i').exec(headerText);
+  if(m) return {month:monthNameToNum(m[3]), year:parseInt(m[4],10)};
   // "January 13, 2026"
   m = new RegExp('('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+((?:19|20)\\d{2})','i').exec(headerText);
+  if(m) return {month:monthNameToNum(m[1]), year:parseInt(m[2],10)};
+  // month-year range without days, e.g. "December 2025 - January 2026" -> end wins
+  m = new RegExp('('+MONTH_NAMES_RE+')\\s+((?:19|20)\\d{2})\\s*(?:-|–|—|through|thru|to)\\s*('+MONTH_NAMES_RE+')\\s+((?:19|20)\\d{2})','i').exec(headerText);
+  if(m) return {month:monthNameToNum(m[3]), year:parseInt(m[4],10)};
+  // "January 2026"
+  m = new RegExp('('+MONTH_NAMES_RE+')\\s+((?:19|20)\\d{2})','i').exec(headerText);
   if(m) return {month:monthNameToNum(m[1]), year:parseInt(m[2],10)};
   // "01/2026"
   m = /(\d{1,2})[\/\-](20\d{2})/.exec(headerText);
@@ -1771,10 +1782,10 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
   lines.forEach(function(line){
     // Transaction lines take priority: a description may contain words
     // like "deposit" or "check" that also appear in section headers.
-    var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null;
+    var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null, explicitYear=false;
     if(m){
       mm=m[1].padStart(2,'0'); dd=m[2].padStart(2,'0');
-      if(m[3]){ var y2=parseInt(m[3],10); yy = m[3].length===2 ? (y2<50?2000+y2:1900+y2) : y2; }
+      if(m[3]){ var y2=parseInt(m[3],10); yy = m[3].length===2 ? (y2<50?2000+y2:1900+y2) : y2; explicitYear=true; }
       else if(stmtMonth){ yy = txnYearForMonth(parseInt(m[1],10), stmtMonth, year); }
       desc = m[4].trim();
       amtTok = m[5].trim().split(/\s+/)[0];
@@ -1801,7 +1812,8 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       lastTxn = {
         date: yy+'-'+mm+'-'+dd,
         description: desc, amount: Math.abs(Math.round(amt*100)/100),
-        txn_type: type, business_personal:'Personal', category:'', include:true
+        txn_type: type, business_personal:'Personal', category:'', include:true,
+        _defYear: !explicitYear
       };
       out.push(lastTxn);
       return;
@@ -1813,6 +1825,18 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       lastTxn.description += ' ' + line;
     }
   });
+  // Fallback year-boundary fix when the statement month wasn't detected:
+  // a Dec->Jan statement contains both months, and December belongs to the prior year.
+  if(!stmtMonth && year){
+    var hasDec=false, hasJan=false, k;
+    for(k=0;k<out.length;k++){ var _mo=out[k].date.slice(5,7); if(_mo==='12') hasDec=true; else if(_mo==='01') hasJan=true; }
+    if(hasDec && hasJan){
+      for(k=0;k<out.length;k++){
+        if(out[k].date.slice(5,7)==='12' && out[k]._defYear) out[k].date=(year-1)+out[k].date.slice(4);
+      }
+    }
+  }
+  for(var _j=0;_j<out.length;_j++){ delete out[_j]._defYear; }
   return out;
 }
 
