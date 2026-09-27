@@ -172,6 +172,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 .notice{background:var(--warn-soft); border:1px solid #ecd9ac; color:#6d4f14;
   border-radius:12px; padding:10px 14px; font-size:14px; margin-bottom:12px;}
 .notice.blue{background:var(--blue-soft); border-color:#c3d4f5; color:#1e3f8f;}
+.confbadge{display:inline-block;font-size:11px;font-weight:600;margin-left:6px;padding:1px 7px;border-radius:9px;white-space:nowrap;vertical-align:middle}
+.confbadge.high{background:#e6f4ea;color:#1e7e34}
+.confbadge.medium{background:#fef7e0;color:#b06000}
+.confbadge.low{background:#f1f3f4;color:#5f6368}
 .applyall{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0;}
 .applyall label{font-size:12px; color:var(--muted); font-weight:600;}
 
@@ -307,6 +311,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card" id="preview-card" hidden>
         <h2>Import preview <span class="muted" id="preview-count"></span></h2>
         <div id="preview-notices"></div>
+        <p class="muted" style="font-size:12px;margin:6px 0">Categories are auto-guessed — <span class="confbadge high">auto · high</span> is confident, <span class="confbadge medium">auto · med</span> deserves a glance, <span class="confbadge low">no guess</span> needs your pick. Nothing is forced: rows without a category import as Uncategorized.</p>
         <div class="applyall">
           <div><label for="aa-type">Set all: type</label>
             <select id="aa-type"><option value="">—</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
@@ -1011,6 +1016,66 @@ var importRows = []; // {date,description,amount,txn_type,business_personal,cate
 function expenseCategories(){
   return state.categories.filter(function(c){return c.kind!=='Business';}).map(function(c){return c.name;});
 }
+/* Auto-categorization: keyword rules, then learning from past transactions.
+   Rules only suggest categories that actually exist in the user's sheet. */
+var CAT_RULES = [
+  {re:/whole\s*foods?|trader\s*joe'?s|safeway|kroger|albertsons?|sprouts|food\s*maxx|grocery|supermarket/i,
+   cats:['Groceries','Grocery','Food'], conf:'high'},
+  {re:/costco/i, cats:['Groceries','Grocery','Shopping','Warehouse'], conf:'medium'},
+  {re:/starbucks|peet'?s|dunkin'?|coffee/i, cats:['Dining','Coffee','Restaurants'], conf:'medium'},
+  {re:/mcdonald'?s|chipotle|subway|taco\s*bell|wendy'?s|burger|pizza|sushi|taqueria|\brestaurant\b|\bgrill\b|\bdiner\b|\bcafe\b|bistro|\bpho\b|\bramen\b|doordash|grubhub|uber\s*eats|postmates/i,
+   cats:['Dining','Restaurants','Eating Out'], conf:'medium'},
+  {re:/pg&?e|pacific\s*gas|socal\s*gas|smud|\belectric\b|\bwater\b|\bsewer\b|garbage|waste\s*management|comcast|xfinity|at&t|verizon|t-mobile|spectrum|\binternet\b/i,
+   cats:['Utilities','Utility','Bills'], conf:'medium'},
+  {re:/chevron|\bshell\b|exxon|mobil|\barco\b|\b76\b|valero|\bgas\b|\bfuel\b/i, cats:['Gas','Fuel','Auto'], conf:'medium'},
+  {re:/state\s*farm|farmers|geico|progressive|allstate|\binsurance\b/i, cats:['Insurance'], conf:'high'},
+  {re:/\bmortgage\b|\brent\b|property\s*tax/i, cats:['Mortgage','Rent','Housing'], conf:'high'},
+  {re:/kaiser|\bdental\b|\bmedical\b|hospital|pharmacy|cvs|walgreens/i, cats:['Medical','Healthcare','Health'], conf:'medium'},
+  {re:/autozone|o'?reilly|firestone|jiffy\s*lube|mechanic|\bdmv\b|smog|\brepair\b/i, cats:['Auto','Car','Vehicle'], conf:'medium'},
+  {re:/amazon|target|best\s*buy/i, cats:['Shopping','Retail'], conf:'medium'},
+  {re:/home\s*depot|lowe'?s|harbor\s*freight|ace\s*hardware/i, cats:['Home Improvement','Home','Shopping'], conf:'medium'},
+  {re:/\bdelta\b|united|american\s*airlines|southwest|marriott|hilton|airbnb|\bhotel\b|enterprise|hertz|\bairfare\b/i,
+   cats:['Travel','Vacation'], conf:'medium'},
+  {re:/netflix|spotify|hulu|disney\+|apple\.com\/bill|prime\s*membership/i, cats:['Subscriptions','Entertainment','Memberships'], conf:'medium'},
+  {re:/cinema|\btheater\b|\btheatre\b|concert|ticketmaster/i, cats:['Entertainment'], conf:'medium'},
+  {re:/payroll|direct\s*deposit|paycheck|\bsalary\b/i, cats:['Income','Paycheck','Salary'], conf:'medium'}
+];
+function guessCategory(desc){
+  var cats = allCategories();
+  var d = String(desc||'');
+  var i, j;
+  for(i=0;i<CAT_RULES.length;i++){
+    var rule = CAT_RULES[i];
+    if(!rule.re.test(d)) continue;
+    for(j=0;j<rule.cats.length;j++){
+      if(cats.indexOf(rule.cats[j])!==-1)
+        return {category:rule.cats[j], confidence:rule.conf};
+    }
+  }
+  // Fall back to history: score categories by word overlap with past transactions
+  var words = d.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/)
+    .filter(function(w){return w.length>2 && /[a-z]/.test(w);});
+  if(words.length && state.transactions.length){
+    var scores = {};
+    state.transactions.forEach(function(t){
+      if(!t.category) return;
+      var hay = String(t.merchant||t.description||'').toLowerCase();
+      var s = 0, k;
+      for(k=0;k<words.length;k++){ if(hay.indexOf(words[k])!==-1) s++; }
+      if(s>0) scores[t.category]=(scores[t.category]||0)+s;
+    });
+    var best='', bestScore=0, second=0;
+    Object.keys(scores).forEach(function(c){
+      var v=scores[c];
+      if(v>bestScore){second=bestScore;bestScore=v;best=c;}
+      else if(v>second){second=v;}
+    });
+    if(best && bestScore>=2)
+      return {category:best, confidence:(bestScore>=4 && bestScore>=second*2)?'high':'medium'};
+  }
+  return {category:'', confidence:'low'};
+}
+
 function renderPreview(){
   var card = $('preview-card');
   if(!importRows.length){ card.hidden = true; return; }
@@ -1022,6 +1087,16 @@ function renderPreview(){
   catSel.innerHTML='';
   catSel.appendChild(el('option',{value:''},'—'));
   allCategories().forEach(function(c){ var o=el('option',{value:c},c); if(c===keepAa)o.selected=true; catSel.appendChild(o); });
+
+  // Auto-guess categories once per row (never overrides a manual choice)
+  importRows.forEach(function(r){
+    if(!r.category && !r._guessed){
+      var g = guessCategory(r.description);
+      r._guessed = true;
+      if(g.category){ r.category = g.category; r._conf = g.confidence; }
+      else r._conf = 'low';
+    }
+  });
 
   importRows.forEach(function(r, idx){
     var tr = el('tr', {class: r.include?'':'skip'});
@@ -1064,8 +1139,20 @@ function renderPreview(){
       var o=el('option',{value:c},c);
       if(r.category===c) o.selected=true; cSel.appendChild(o);
     });
-    cSel.addEventListener('change', function(){ r.category = cSel.value; });
+    cSel.addEventListener('change', function(){
+      r.category = cSel.value;
+      delete r._conf; // manual choice replaces any guess
+      var b = td6.querySelector('.confbadge');
+      if(b) b.remove();
+    });
     var td6 = el('td'); td6.appendChild(cSel); tr.appendChild(td6);
+    if(r._conf){
+      var cbLabel = !r.category ? 'no guess'
+        : r._conf==='high' ? 'auto · high'
+        : r._conf==='medium' ? 'auto · med' : 'auto · low';
+      var cb = el('span',{class:'confbadge '+r._conf, title:'Category was guessed automatically — change it if wrong.'},cbLabel);
+      td6.appendChild(cb);
+    }
 
     body.appendChild(tr);
   });
@@ -1186,8 +1273,9 @@ function wireImport(){
   $('preview-import').addEventListener('click', async function(){
     var rows = importRows.filter(function(r){return r.include;}).map(previewToTxn);
     if(!rows.length){ toast('Nothing selected.', true); return; }
-    var bad = rows.filter(function(r){return !r.date || !(r.amount>0) || !r.category;});
-    if(bad.length){ toast(bad.length+' row(s) are missing a date, amount, or category. Fix them in the preview.', true); return; }
+    var bad = rows.filter(function(r){return !r.date || !(r.amount>0);});
+    if(bad.length){ toast(bad.length+' row(s) are missing a date or amount. Fix them in the preview.', true); return; }
+    // Rows without a category import as Uncategorized — nothing is forced.
     var btn = $('preview-import');
     btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Importing…';
     try{
@@ -1215,7 +1303,7 @@ function wireImport(){
   });
   $('aa-cat').addEventListener('change', function(){
     var v=$('aa-cat').value; if(!v) return;
-    importRows.forEach(function(r){ if(r.include) r.category=v; });
+    importRows.forEach(function(r){ if(r.include){ r.category=v; delete r._conf; } });
     renderPreview(); $('aa-cat').value='';
   });
 }
