@@ -796,12 +796,18 @@ async function enterApp(){
   if(!$('f-month').value) $('f-month').value = monthLocal();
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
+  var instant = loadDashCache(); // render home page instantly from cache if available
   try{
     await loadAll();
     showScreen('dashboard');
   }catch(err){
-    toast('Could not load data: '+err.message, true);
-    showScreen('settings');
+    if(instant){
+      toast('Could not refresh data — showing your last saved view.', true);
+      showScreen('dashboard');
+    }else{
+      toast('Could not load data: '+err.message, true);
+      showScreen('settings');
+    }
   }
 }
 
@@ -998,6 +1004,41 @@ function renderDashboard(){
       bb.appendChild(wrap);
     });
   }
+  saveDashCache(); // persist filters + data so the home page restores instantly
+}
+
+/* ---- dashboard instant cache + filter persistence ----
+   The last dashboard state (filter settings, transactions, budgets) is saved
+   to localStorage, so the home page renders instantly on reload and then
+   refreshes from the Sheet in the background. */
+var DASH_CACHE_KEY = 'expenseTrackerDashV1';
+function saveDashCache(){
+  if(!state.transactions || !state.transactions.length) return;
+  try{
+    localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({
+      filters: {preset: $('dash-preset').value, from: $('dash-from').value,
+                to: $('dash-to').value, acct: $('dash-acct').value},
+      transactions: state.transactions,
+      budgets: state.budgets || [],
+      savedAt: Date.now()
+    }));
+  }catch(e){ /* storage full or unavailable: skip */ }
+}
+function loadDashCache(){
+  try{
+    var c = JSON.parse(localStorage.getItem(DASH_CACHE_KEY) || 'null');
+    if(!c || !c.transactions || !c.transactions.length) return false;
+    state.transactions = c.transactions;
+    state.budgets = c.budgets || [];
+    var f = c.filters || {};
+    if(f.preset) $('dash-preset').value = f.preset;
+    $('dash-custom').style.display = ($('dash-preset').value === 'custom') ? 'flex' : 'none';
+    if(f.from) $('dash-from').value = f.from;
+    if(f.to) $('dash-to').value = f.to;
+    if(f.acct) $('dash-acct').value = f.acct;
+    showScreen('dashboard'); // renders immediately from cached data
+    return true;
+  }catch(e){ return false; }
 }
 
 /* ================= transactions ================= */
