@@ -457,9 +457,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
           <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
-            <div style="display:flex;align-items:center;gap:6px">
-              <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="flex:1;min-width:0">
-              <select id="f-sort" aria-label="Sort transactions" style="flex:none;width:auto;max-width:36%;font-size:14px;padding:9px 6px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center">
+              <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                <select id="f-sort" aria-label="Sort transactions" style="flex:1;min-width:0;font-size:14px;padding:9px 6px">
                 <option value="date-desc" selected>Newest</option>
                 <option value="date-asc">Oldest</option>
                 <option value="amount-desc">Amount ↓</option>
@@ -469,6 +470,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               </select>
               <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
               <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
+              </div>
             </div></div>
         </div>
       </div>
