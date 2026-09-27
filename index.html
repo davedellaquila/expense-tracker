@@ -165,6 +165,12 @@ textarea{resize:vertical; min-height:64px;}
 .btn.small{width:auto; padding:8px 14px; font-size:14px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
+.reclist{max-height:38vh; overflow-y:auto; margin:10px 0; border:1px solid var(--border); border-radius:12px;}
+.recrow{display:flex; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid var(--border); font-size:13.5px; cursor:pointer;}
+.recrow:first-child{border-top:0;}
+.recrow input{width:auto; flex:none; margin:0;}
+.recrow .recmain{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.recrow .recamt{flex:none; font-weight:600;}
 .fab{
   position:fixed; right:18px; bottom:calc(var(--tabbar-h) + 20px + env(safe-area-inset-bottom));
   width:58px; height:58px; border-radius:50%; border:none; z-index:30;
@@ -287,8 +293,31 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <!-- DASHBOARD -->
     <section id="screen-dashboard" class="screen">
       <div class="card">
-        <label class="f" style="margin-top:0" for="dash-month">Month</label>
-        <input type="month" id="dash-month">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+          <div style="flex:1; min-width:150px">
+            <label class="f" style="margin-top:0" for="dash-preset">Period</label>
+            <select id="dash-preset">
+              <option value="month">This month</option>
+              <option value="last-month" selected>Last month</option>
+              <option value="last-3">Last 3 months</option>
+              <option value="ytd">Year to date</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+          <div id="dash-custom" style="display:none; gap:10px; flex:2; min-width:220px">
+            <div style="flex:1"><label class="f" style="margin-top:0" for="dash-from">From</label><input type="month" id="dash-from"></div>
+            <div style="flex:1"><label class="f" style="margin-top:0" for="dash-to">To</label><input type="month" id="dash-to"></div>
+          </div>
+          <div style="flex:1; min-width:130px">
+            <label class="f" style="margin-top:0" for="dash-acct">Account</label>
+            <select id="dash-acct">
+              <option value="all">All</option>
+              <option value="Personal">Personal</option>
+              <option value="Business">Business</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="stat-grid">
         <div class="stat"><div class="label">Income</div><div class="value pos" id="stat-income">$0</div><div class="split" id="stat-income-split"></div></div>
@@ -764,7 +793,6 @@ async function enterApp(){
   $('setup-screen').hidden = true;
   $('app').hidden = false;
   updateUserChip();
-  if(!$('dash-month').value) $('dash-month').value = prevMonthLocal();
   if(!$('f-month').value) $('f-month').value = monthLocal();
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
@@ -852,15 +880,53 @@ function wireSettings(){
 }
 
 /* ================= dashboard ================= */
+/* Shared period logic: the dashboard and Reports use the same Period/Account options. */
+function presetRange(presetSelId, fromSelId, toSelId){
+  var preset = $(presetSelId).value;
+  var now = monthLocal(), from, to;
+  if(preset==='month'){ from = to = now; }
+  else if(preset==='last-month'){ from = to = monthAdd(now,-1); }
+  else if(preset==='last-3'){ from = monthAdd(now,-2); to = now; }
+  else if(preset==='ytd'){ from = now.slice(0,4)+'-01'; to = now; }
+  else if(preset==='all'){ from = '2000-01'; to = now; }
+  else { from = $(fromSelId).value || now; to = $(toSelId).value || now; if(from>to){ var s=from; from=to; to=s; } }
+  return {from:from, to:to};
+}
+function txnsForRange(from, to, acct){
+  return state.transactions.filter(function(t){
+    var m = String(t.date||'').slice(0,7);
+    if(m<from || m>to) return false;
+    if(acct!=='all' && t.business_personal!==acct) return false;
+    return true;
+  });
+}
+function budgetsForRange(from, to){
+  var mlist = [];
+  for(var m=from; m<=to; m=monthAdd(m,1)) mlist.push(m);
+  var map = {};
+  state.budgets.forEach(function(b){
+    if(mlist.indexOf(String(b.month))>=0 && num(b.amount)>0) map[b.category] = (map[b.category]||0)+num(b.amount);
+  });
+  return map;
+}
 function txnsForMonth(ym){
   return state.transactions.filter(function(t){ return String(t.date||'').slice(0,7)===ym; });
 }
 function wireDashboard(){
-  $('dash-month').addEventListener('change', renderDashboard);
+  $('dash-preset').addEventListener('change', function(){
+    $('dash-custom').style.display = $('dash-preset').value==='custom' ? 'flex' : 'none';
+    renderDashboard();
+  });
+  $('dash-from').addEventListener('change', renderDashboard);
+  $('dash-to').addEventListener('change', renderDashboard);
+  $('dash-acct').addEventListener('change', renderDashboard);
 }
 function renderDashboard(){
-  var ym = $('dash-month').value || prevMonthLocal();
-  var rows = txnsForMonth(ym);
+  var range = presetRange('dash-preset','dash-from','dash-to');
+  var from = range.from, to = range.to, acct = $('dash-acct').value;
+  var bpVal = acct==='all' ? '' : acct;
+  var rows = txnsForRange(from, to, acct);
+  var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
   var byCat = {};
   rows.forEach(function(t){
@@ -879,7 +945,7 @@ function renderDashboard(){
   netEl.className = 'value '+(net>=0?'pos':'neg');
   $('stat-income-split').textContent = 'Biz '+money(incB)+' · Per '+money(incP);
   $('stat-expense-split').textContent = 'Biz '+money(expB)+' · Per '+money(expP);
-  $('stat-net-split').textContent = fmtMonthPretty(ym);
+  $('stat-net-split').textContent = rangeLabel + (acct==='all' ? '' : ' · '+acct);
 
   // best charts: category mix donut, top merchants, weekday pattern
   var byMerch = {}, byDay = [0,0,0,0,0,0,0]; // Mon..Sun
@@ -890,35 +956,38 @@ function renderDashboard(){
     var d = new Date((t.date||'')+'T12:00:00');
     if(!isNaN(d)) byDay[(d.getDay()+6)%7] += num(t.amount);
   });
-  var dashLabel = fmtMonthPretty(ym);
+  function dashDrill(extra){
+    var o = {type:'expense', bp:bpVal};
+    if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
+    for(var k in extra) o[k] = extra[k];
+    drillToTransactions(o);
+  }
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
   repDonut($('dash-donut'), cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
-    drillToTransactions({singleMonth: ym, type:'expense',
-      dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + dashLabel});
+    dashDrill({dispCats: (it.names && it.names.length ? it.names : [it.name]),
+      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
   });
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
-  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses this month.', function(it){
-    drillToTransactions({singleMonth: ym, type:'expense', q: it.name});
+  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
+    dashDrill({q: it.name});
   });
   repWeekday($('dash-week'), byDay, function(i){
-    drillToTransactions({singleMonth: ym, type:'expense', weekday:i,
-      label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+dashLabel});
+    dashDrill({weekday:i, label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
   });
 
-  // budgets progress
+  // budgets progress (aggregated across the selected period)
   var bb = $('dash-budgets'); bb.innerHTML='';
-  var bRows = state.budgets.filter(function(b){ return String(b.month)===ym && num(b.amount)>0; });
-  if(!bRows.length){ emptyInto(bb,'🎯','No budgets set for this month. Add some under Budget.'); }
+  var bMap = budgetsForRange(from, to);
+  var bCats = Object.keys(bMap).sort(function(a,b){ return a.localeCompare(b); });
+  if(!bCats.length){ emptyInto(bb,'🎯', from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.'); }
   else{
-    bRows.sort(function(a,b){return String(a.category).localeCompare(String(b.category));});
-    bRows.forEach(function(b){
+    bCats.forEach(function(bc){
       var spent = 0;
-      rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===b.category) spent += num(t.amount); });
-      var amt = num(b.amount), pct = amt>0?Math.min(100, spent/amt*100):0;
+      rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===bc) spent += num(t.amount); });
+      var amt = bMap[bc], pct = amt>0?Math.min(100, spent/amt*100):0;
       var wrap = el('div',{class:'barrow'});
       var top = el('div',{class:'top'});
-      top.appendChild(el('b',null,b.category));
+      top.appendChild(el('b',null,bc));
       var lbl = el('span',null,money(spent)+' of '+money(amt));
       if(spent>amt) lbl.className='neg';
       top.appendChild(lbl);
@@ -1052,17 +1121,88 @@ function categoryOptionsFor(sel, bpKind, current){
   });
   if(!list.length){
     sel.appendChild(el('option',{value:''},'— no categories —'));
-    return;
+  }else{
+    list.forEach(function(c){
+      var o = el('option',{value:c.name},c.name);
+      if(c.name===current) o.selected = true;
+      sel.appendChild(o);
+    });
   }
-  list.forEach(function(c){
-    var o = el('option',{value:c.name},c.name);
-    if(c.name===current) o.selected = true;
-    sel.appendChild(o);
-  });
+  var oNew = el('option',{value:'__new__'},'＋ New category…');
+  if(current==='__new__') oNew.selected = true;
+  sel.appendChild(oNew);
 }
 function defaultTaxFor(categoryName){
   var c = state.categories.find(function(x){ return x.name===categoryName; });
   return c ? (c.tax_category||'') : '';
+}
+
+/* bulk recategorize: review similar transactions before applying */
+function txnRowForUpdate(x, newCategory){
+  return {
+    id: x.id,
+    date: x.date||'',
+    merchant: x.merchant||'',
+    description: x.description||'',
+    amount: num(x.amount)||0,
+    txn_type: x.txn_type||'expense',
+    category: newCategory,
+    tax_category: x.tax_category||'',
+    business_personal: x.business_personal||'Personal',
+    payment_method: x.payment_method||'',
+    notes: x.notes||'',
+    entered_by: x.entered_by||'',
+    created_at: x.created_at||''
+  };
+}
+/* "Similar" = same merchant (or description), same type, currently in the
+   category being changed FROM. The edited transaction itself is excluded. */
+function findSimilarTxns(t, rowData){
+  var mkey = (rowData.merchant||rowData.description||'').trim().toLowerCase();
+  if(!mkey) return [];
+  var res = state.transactions.filter(function(x){
+    return x.id!==t.id &&
+      x.txn_type===rowData.txn_type &&
+      (x.category||'')===(t.category||'') &&
+      ((x.merchant||x.description||'').trim().toLowerCase()===mkey);
+  });
+  res.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return res;
+}
+function confirmBulkRecat(similar, oldCat, newCat, merchLabel){
+  return new Promise(function(resolve){
+    openSheet(function(sh, done){
+      sh.appendChild(el('h2',null,'Update similar too?'));
+      sh.appendChild(el('p',{class:'muted'},
+        similar.length+' other transaction'+(similar.length===1?'':'s')+' from "'+merchLabel+'" '+
+        (similar.length===1?'is':'are')+' currently "'+(oldCat||'Uncategorized')+'". '+
+        'Tick the ones to also move to "'+newCat+'".'));
+      var list = el('div',{class:'reclist'});
+      var boxes = similar.map(function(x){
+        var lab = el('label',{class:'recrow'});
+        var cb = el('input',{type:'checkbox'});
+        cb.checked = true;
+        lab.appendChild(cb);
+        lab.appendChild(el('span',{class:'recmain'}, (x.date||'????-??-??')+' · '+(x.merchant||x.description||'(no description)')));
+        lab.appendChild(el('span',{class:'recamt'}, money(num(x.amount))));
+        list.appendChild(lab);
+        return {cb:cb, id:x.id};
+      });
+      sh.appendChild(list);
+      var row = el('div',{class:'btnrow'});
+      var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+      var justOne = el('button',{class:'btn ghost',type:'button'},'Just this one');
+      var apply = el('button',{class:'btn',type:'button'},'Update selected');
+      cancel.onclick = function(){ done(); resolve(null); };
+      justOne.onclick = function(){ done(); resolve([]); };
+      apply.onclick = function(){
+        done();
+        resolve(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
+      };
+      row.appendChild(cancel); row.appendChild(justOne); row.appendChild(apply);
+      sh.appendChild(row);
+    });
+  });
 }
 
 function openTxnForm(t){
@@ -1101,6 +1241,9 @@ function openTxnForm(t){
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
     var inCat = field('Category', el('select'));
+    var inNewCat = el('input',{type:'text',placeholder:'New category name',autocomplete:'off',style:'display:none;margin-top:8px'});
+    sh.appendChild(inNewCat);
+    function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; }
     var inTax = field('Tax category', el('select'));
     var inPay = field('Payment method', el('select'));
     PAYMENT_METHODS.forEach(function(p){
@@ -1114,12 +1257,14 @@ function openTxnForm(t){
     function refreshCats(){
       var prev = inCat.value;
       categoryOptionsFor(inCat, curBp, prev || (t&&t.category) || '');
+      syncNewCat();
       if(!prev){
         var sug = defaultTaxFor(inCat.value);
         taxCategoryOptions(inTax, (t&&t.tax_category)||sug);
       }
     }
     inCat.addEventListener('change', function(){
+      syncNewCat();
       // auto-suggest tax category only if user hasn't manually changed it
       taxCategoryOptions(inTax, defaultTaxFor(inCat.value) || inTax.value);
     });
@@ -1154,32 +1299,55 @@ function openTxnForm(t){
       var amt = num(inAmt.value);
       if(!inDate.value){ toast('Pick a date.', true); return; }
       if(!(amt>0)){ toast('Enter an amount greater than zero.', true); return; }
-      if(!inCat.value){ toast('Choose a category.', true); return; }
+      var typedCat = inCat.value==='__new__' ? inNewCat.value.trim() : inCat.value;
+      if(!typedCat){ toast(inCat.value==='__new__' ? 'Type a name for the new category.' : 'Choose a category.', true); return; }
+      // fold case-only duplicates into the existing category name
+      var newCatName = typedCat;
+      var existCat = state.categories.find(function(c){ return c.name.toLowerCase()===typedCat.toLowerCase(); });
+      if(existCat) newCatName = existCat.name;
       var rowData = {
         date: inDate.value,
         merchant: inMerch.value.trim(),
         description: inDesc.value.trim(),
         amount: Math.round(amt*100)/100,
         txn_type: curType,
-        category: inCat.value,
+        category: newCatName,
         tax_category: inTax.value,
         business_personal: curBp,
         payment_method: inPay.value,
         notes: inNotes.value.trim(),
         entered_by: state.userName||''
       };
+      // changing a category: offer to update similar transactions too (review first)
+      var bulkIds = [];
+      if(isEdit && newCatName !== (t.category||'')){
+        var similar = findSimilarTxns(t, rowData);
+        if(similar.length){
+          var res = await confirmBulkRecat(similar, t.category||'', newCatName, rowData.merchant||rowData.description||'this merchant');
+          if(res===null) return; // user cancelled — leave the form as-is
+          bulkIds = res;
+        }
+      }
       save.disabled = true;
       save.innerHTML = '<span class="spin"></span> Saving…';
       try{
+        if(inCat.value==='__new__' && !existCat){
+          await apiPost({action:'append', tab:'Categories', row:{name:newCatName, kind:curBp, tax_category:inTax.value||''}});
+          state.categories.push({name:newCatName, kind:curBp, tax_category:inTax.value||''});
+        }
         if(isEdit){
           rowData.id = t.id;
           rowData.created_at = t.created_at||'';
           await apiPost({action:'update', tab:'Transactions', id:t.id, row:rowData});
-          toast('Saved.');
         }else{
           await apiPost({action:'append', tab:'Transactions', row:rowData});
-          toast('Added.');
         }
+        for(var bi=0; bi<bulkIds.length; bi++){
+          var bx = state.transactions.find(function(x){ return x.id===bulkIds[bi]; });
+          if(!bx) continue;
+          await apiPost({action:'update', tab:'Transactions', id:bx.id, row:txnRowForUpdate(bx, newCatName)});
+        }
+        toast(isEdit ? (bulkIds.length ? 'Saved. Updated '+(bulkIds.length+1)+' transactions.' : 'Saved.') : 'Added.');
         close();
         await loadAll();
         showScreen('transactions');
@@ -2180,21 +2348,10 @@ function wireReports(){
   $('rep-print').addEventListener('click', function(){ window.print(); });
 }
 function renderReports(){
-  var preset = $('rep-preset').value, acct = $('rep-acct').value;
+  var acct = $('rep-acct').value;
   var bpVal = acct==='all' ? '' : acct;
-  var now = monthLocal(), from, to;
-  if(preset==='month'){ from = to = now; }
-  else if(preset==='last-month'){ from = to = monthAdd(now,-1); }
-  else if(preset==='last-3'){ from = monthAdd(now,-2); to = now; }
-  else if(preset==='ytd'){ from = now.slice(0,4)+'-01'; to = now; }
-  else if(preset==='all'){ from = '2000-01'; to = now; }
-  else { from = $('rep-from').value || now; to = $('rep-to').value || now; if(from>to){ var s=from; from=to; to=s; } }
-  var rows = state.transactions.filter(function(t){
-    var m = (t.date||'').slice(0,7);
-    if(m<from || m>to) return false;
-    if(acct!=='all' && t.business_personal!==acct) return false;
-    return true;
-  });
+  var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
+  var rows = txnsForRange(from, to, acct);
   var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byMonth={}, byMerch={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
