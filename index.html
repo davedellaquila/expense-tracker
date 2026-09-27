@@ -171,6 +171,13 @@ textarea{resize:vertical; min-height:64px;}
 .btn.small{width:auto; padding:8px 14px; font-size:14px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
+.iconbtn{
+  flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
+  background:var(--card); color:var(--danger); cursor:pointer; margin:0;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.iconbtn:active{opacity:.7;}
+.iconbtn svg{width:20px; height:20px;}
 .reclist{max-height:38vh; overflow-y:auto; margin:10px 0; border:1px solid var(--border); border-radius:12px;}
 .recrow{display:flex; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid var(--border); font-size:13.5px; cursor:pointer;}
 .recrow:first-child{border-top:0;}
@@ -1492,8 +1499,9 @@ function openTxnForm(t){
     var save = el('button',{class:'btn',type:'button'}, isEdit?'Save':'Add');
     row.appendChild(cancel); row.appendChild(save);
     if(isEdit){
-      var del = el('button',{class:'btn danger',type:'button'},'Delete');
-      del.style.marginTop='10px';
+      var del = el('button',{class:'iconbtn',type:'button',title:'Delete transaction',
+        html:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>'});
+      del.setAttribute('aria-label','Delete transaction');
       del.onclick = async function(){
         var ok = await confirmDialog('Delete this transaction? This cannot be undone.');
         if(!ok) return;
@@ -1507,10 +1515,9 @@ function openTxnForm(t){
           }catch(err){ toast('Delete failed: '+err.message, true); }
         });
       };
-      sh.appendChild(row); sh.appendChild(del);
-    } else {
-      sh.appendChild(row);
+      row.appendChild(del);
     }
+    sh.appendChild(row);
 
     save.onclick = async function(){
       var amt = num(inAmt.value);
