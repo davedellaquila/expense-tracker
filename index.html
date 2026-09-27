@@ -171,6 +171,8 @@ textarea{resize:vertical; min-height:64px;}
 .btn.small{width:auto; padding:8px 14px; font-size:14px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
+.linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
+.linkbtn:active{opacity:.7;}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
   background:var(--card); color:var(--danger); cursor:pointer; margin:0;
@@ -352,6 +354,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <!-- TRANSACTIONS -->
     <section id="screen-transactions" class="screen" hidden>
       <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h2 style="margin:0">Filters</h2>
+          <button class="linkbtn" id="f-reset" type="button">Reset</button>
+        </div>
         <div class="filters">
           <div><label class="f" style="margin-top:0" for="f-preset">Period</label>
             <select id="f-preset">
@@ -1141,6 +1147,17 @@ function wireTransactions(){
   });
   $('f-preset').addEventListener('change', function(){
     $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
+  });
+  $('f-reset').addEventListener('click', function(){
+    $('f-preset').value = 'month';
+    $('f-custom').style.display = 'none';
+    $('f-from').value = ''; $('f-to').value = '';
+    $('f-type').value = '';
+    $('f-bp').value = '';
+    $('f-cat').value = '';
+    $('f-q').value = '';
+    txnDrill = null; // also clear any chart drill selection
+    renderTransactions();
   });
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
 }
