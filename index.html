@@ -1310,7 +1310,11 @@ function wireTransactions(){
   ['f-preset','f-from','f-to','f-type','f-bp','f-cat'].forEach(function(id){
     // a manual filter edit replaces any chart drill-down: the visible
     // filters are always the single source of truth (search composes)
-    $(id).addEventListener('change', function(){ txnDrill = null; renderTransactions(); });
+    $(id).addEventListener('change', function(){
+      txnDrill = null;
+      if(id==='f-preset'||id==='f-from'||id==='f-to') saveTxnPeriod();
+      renderTransactions();
+    });
   });
   $('f-q').addEventListener('input', renderTransactions);
   $('f-preset').addEventListener('change', function(){
@@ -1335,6 +1339,7 @@ function wireTransactions(){
     }, {threshold:0}).observe(origInput);
   }
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
+  restoreTxnPeriod(); // reopen on the period the user was last viewing
 }
 function txnVisible(t){
   var ty = $('f-type').value, bp = $('f-bp').value,
@@ -1374,11 +1379,35 @@ function renderDrillChip(){
   chip.appendChild(x);
   td.appendChild(chip);
 }
-/* Reset all transaction filters to their defaults (also used by the drill chip's ×). */
+/* The Transactions period filter is sticky: it survives the Reset button,
+   drill dismissal, and app restarts. Manual edits save it; chart drills set
+   the filter programmatically (no change event), so drills never overwrite it. */
+var TXN_PERIOD_KEY = 'expenseTracker.txnPeriod';
+function saveTxnPeriod(){
+  try{
+    localStorage.setItem(TXN_PERIOD_KEY, JSON.stringify({
+      preset: $('f-preset').value, from: $('f-from').value, to: $('f-to').value
+    }));
+  }catch(e){}
+}
+function restoreTxnPeriod(){
+  try{
+    var p = JSON.parse(localStorage.getItem(TXN_PERIOD_KEY)||'null');
+    if(!p || !p.preset) return false;
+    $('f-preset').value = p.preset;
+    $('f-custom').style.display = p.preset==='custom' ? 'flex' : 'none';
+    $('f-from').value = p.from||''; $('f-to').value = p.to||'';
+    return true;
+  }catch(e){ return false; }
+}
+/* Reset transaction filters, but keep the remembered period
+   (also used by the drill chip's ×). */
 function resetTxnFilters(){
-  $('f-preset').value = 'month';
-  $('f-custom').style.display = 'none';
-  $('f-from').value = ''; $('f-to').value = '';
+  if(!restoreTxnPeriod()){ // nothing remembered yet: fall back to this month
+    $('f-preset').value = 'month';
+    $('f-custom').style.display = 'none';
+    $('f-from').value = ''; $('f-to').value = '';
+  }
   $('f-type').value = '';
   $('f-bp').value = '';
   $('f-cat').value = '';
