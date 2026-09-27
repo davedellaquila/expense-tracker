@@ -337,12 +337,24 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <section id="screen-transactions" class="screen" hidden>
       <div class="card">
         <div class="filters">
-          <div><label class="f" style="margin-top:0" for="f-month">Month</label><input type="month" id="f-month"></div>
+          <div><label class="f" style="margin-top:0" for="f-preset">Period</label>
+            <select id="f-preset">
+              <option value="month" selected>This month</option>
+              <option value="last-month">Last month</option>
+              <option value="last-3">Last 3 months</option>
+              <option value="ytd">Year to date</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select></div>
           <div><label class="f" style="margin-top:0" for="f-type">Type</label>
             <select id="f-type"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
           <div><label class="f" style="margin-top:0" for="f-bp">Account</label>
             <select id="f-bp"><option value="">All</option><option>Business</option><option>Personal</option></select></div>
           <div><label class="f" style="margin-top:0" for="f-cat">Category</label><select id="f-cat"><option value="">All</option></select></div>
+          <div id="f-custom" class="full" style="display:none;gap:8px">
+            <div style="flex:1"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
+            <div style="flex:1"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
+          </div>
           <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
             <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off"></div>
         </div>
@@ -817,7 +829,6 @@ async function enterApp(){
   $('setup-screen').hidden = true;
   $('app').hidden = false;
   updateUserChip();
-  if(!$('f-month').value) $('f-month').value = monthLocal();
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var instant = loadDashCache(); // render home page instantly from cache if available
@@ -1073,18 +1084,24 @@ function allCategories(){
   return Object.keys(s).sort();
 }
 function wireTransactions(){
-  ['f-month','f-type','f-bp','f-cat','f-q'].forEach(function(id){
+  ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-q'].forEach(function(id){
     $(id).addEventListener(id==='f-q'?'input':'change', renderTransactions);
+  });
+  $('f-preset').addEventListener('change', function(){
+    $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
   });
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
 }
 function txnVisible(t){
-  var ym = $('f-month').value, ty = $('f-type').value, bp = $('f-bp').value,
+  var ty = $('f-type').value, bp = $('f-bp').value,
       cat = $('f-cat').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
   if(txnDrill && txnDrill.from){
     if(m < txnDrill.from || m > txnDrill.to) return false;
-  } else if(ym && m!==ym) return false;
+  } else {
+    var r = presetRange('f-preset','f-from','f-to');
+    if(m < r.from || m > r.to) return false;
+  }
   if(ty && t.txn_type!==ty) return false;
   if(bp && t.business_personal!==bp) return false;
   if(cat && t.category!==cat) return false;
@@ -1118,7 +1135,11 @@ function drillToTransactions(o){
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
        dispCats:o.dispCats||null, label:o.label||'Report selection'}
     : null;
-  $('f-month').value = o.singleMonth || '';
+  if(o.singleMonth){
+    $('f-preset').value = 'custom';
+    $('f-from').value = o.singleMonth; $('f-to').value = o.singleMonth;
+    $('f-custom').style.display = 'flex';
+  }
   $('f-type').value = o.type || '';
   $('f-bp').value = o.bp || '';
   $('f-cat').value = '';
