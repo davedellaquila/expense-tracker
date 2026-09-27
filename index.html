@@ -21,6 +21,7 @@
   --danger:#cf3f3f; --danger-soft:#fbecec;
   --warn:#9a6b1a; --warn-soft:#fdf3e0;
   --track:#edf0f3; --th-bg:#f0f3f6; --input-bg:#ffffff; --seg-bg:#edf0f3;
+  --tabbar-bg:rgba(255,255,255,.96);
   --radius:14px; --tabbar-h:64px;
 }
 [data-theme="dark"]{
@@ -30,6 +31,7 @@
   --danger:#e87a7a; --danger-soft:#3d1f1f;
   --warn:#d9a441; --warn-soft:#3a2c12;
   --track:#232c35; --th-bg:#1f2730; --input-bg:#141b22; --seg-bg:#232c35;
+  --tabbar-bg:rgba(24,32,40,.96);
 }
 [data-theme="dark"] .notice{ border-color:#6b5a26; color:#ecd9a0; }
 [data-theme="dark"] .notice.blue{ border-color:#31497a; color:#a9c3f5; }
@@ -167,7 +169,7 @@ textarea{resize:vertical; min-height:64px;}
   position:fixed; left:0; right:0; bottom:0; z-index:40;
   height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom:env(safe-area-inset-bottom);
-  background:rgba(255,255,255,.96); backdrop-filter:blur(8px);
+  background:var(--tabbar-bg); backdrop-filter:blur(8px);
   border-top:1px solid var(--border); display:flex;
 }
 .tabbar button{
