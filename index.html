@@ -1476,6 +1476,15 @@ function categoryOptionsFor(sel, bpKind, current){
       sel.appendChild(o);
     });
   }
+  // Fallback: the transaction's actual category may be missing from the list
+  // (different Personal/Business kind, or the category was deleted). Keep it
+  // selectable and selected — otherwise the form would display, and save,
+  // a different category than the transaction really has.
+  if(current && current!=='__new__' && !list.some(function(c){ return c.name===current; })){
+    var ox = el('option',{value:current},current);
+    ox.selected = true;
+    sel.appendChild(ox);
+  }
   var oNew = el('option',{value:'__new__'},'＋ New category…');
   if(current==='__new__') oNew.selected = true;
   sel.appendChild(oNew);
