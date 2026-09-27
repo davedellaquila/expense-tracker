@@ -157,6 +157,18 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   display:flex; align-items:center; justify-content:center; gap:8px;}
 .selbar #selbar-count{flex:none; font-weight:700; font-size:14.5px; color:var(--danger);}
 .selbar .btn{margin:0;}
+/* in-flight bulk jobs: one slim progress bar each, stacked above the selection bar */
+#jobbars{position:fixed; z-index:46; left:12px; right:12px;
+  bottom:calc(var(--tabbar-h) + 80px + env(safe-area-inset-bottom));
+  display:flex; flex-direction:column; gap:8px;}
+#jobbars:empty{display:none;}
+.jobbar{background:var(--card); border:1px solid var(--border); border-radius:14px;
+  box-shadow:0 10px 24px rgba(10,20,15,.18); padding:10px 12px;
+  display:flex; align-items:center; gap:10px;}
+.jobbar .jlabel{flex:1; min-width:0;}
+.jobbar .jtitle{font-size:14px; font-weight:700;}
+.jobbar .jsub{font-size:12.5px; color:var(--muted); margin-top:1px;}
+.jobbar .jstop{flex:none;}
 .txn.selrow.checked{background:var(--th-bg); border-color:var(--blue);}
 /* bulk-update result highlight: green once a row's update has landed */
 .txn.bulk-done{background:rgba(52,199,89,.16);}
@@ -557,6 +569,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
+      <div id="jobbars"></div>
       <div id="selbar" class="selbar" hidden>
         <span id="selbar-count">0 selected</span>
         <button class="btn small ghost" id="selbar-all" type="button">All</button>
@@ -1598,7 +1611,8 @@ function wireTransactions(){
 /* bulk selection + bulk update on the Transactions screen */
 var txnSelectMode = false;
 var txnSelected = {}; // id -> true
-var bulkUpdating = null; // {set:{id:true}, done:{}, failed:{}} while a bulk update runs
+var activeBulkJobs = []; // in-flight bulk jobs: {job, verb, title, running, doneIds, failIds, skipIds, stopRequested, stopped, barEl, subEl}
+var lastCompletedBulkJob = null; // most recent finished update job, for Undo
 var bulkDoneIds = {}; // ids tinted green after the last bulk update finished
 var bulkFailIds = {}; // ids tinted red after the last bulk update finished
 var bulkBars = {}; // id -> .bulkbar element, rebuilt on every renderTransactions
@@ -1621,17 +1635,53 @@ function updateSelbar(){
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
 /* live "Updated X of N (P%)" readout in the selection bar while a bulk job runs */
-function updateBulkProgress(){
-  if(!bulkUpdating) return;
-  var verb = bulkUpdating.verb || 'Updated';
-  var total = Object.keys(bulkUpdating.set).length;
-  var done = Object.keys(bulkUpdating.done).length;
-  var failed = Object.keys(bulkUpdating.failed).length;
-  var skipped = bulkUpdating.skipped ? Object.keys(bulkUpdating.skipped).length : 0;
+/* Row state across all in-flight bulk jobs: 'done' | 'failed' | 'pending' | null */
+function bulkJobRowState(id){
+  var pending = null;
+  for(var i=0;i<activeBulkJobs.length;i++){
+    var rec = activeBulkJobs[i];
+    if(rec.doneIds[id]) return 'done';
+    if(rec.failIds[id]) return 'failed';
+    if(rec.job.status && rec.job.status[id]!==undefined) pending = 'pending';
+  }
+  return pending;
+}
+/* One slim progress bar per in-flight bulk job, stacked above the selection bar.
+   Each bar carries its own Stop button; the selection bar stays fully usable. */
+function renderJobBars(){
+  var wrap = $('jobbars');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  activeBulkJobs.forEach(function(rec){
+    var bar = el('div',{class:'jobbar'});
+    bar.appendChild(el('span',{class:'spin'}));
+    var lab = el('div',{class:'jlabel'});
+    lab.appendChild(el('div',{class:'jtitle'}, rec.title));
+    rec.subEl = el('div',{class:'jsub'}, rec.running);
+    lab.appendChild(rec.subEl);
+    bar.appendChild(lab);
+    var stop = el('button',{class:'btn small ghost jstop',type:'button'},'Stop');
+    stop.addEventListener('click', function(){
+      rec.stopRequested = true;
+      stop.disabled = true;
+      if(rec.subEl) rec.subEl.textContent = 'Stopping…';
+    });
+    bar.appendChild(stop);
+    wrap.appendChild(bar);
+    rec.barEl = bar;
+    updateJobBar(rec);
+  });
+}
+function updateJobBar(rec){
+  if(!rec.subEl) return;
+  var total = rec.job.rows.length;
+  var done = Object.keys(rec.doneIds).length;
+  var failed = Object.keys(rec.failIds).length;
+  var skipped = Object.keys(rec.skipIds).length;
   var pct = total ? Math.round((done+failed+skipped)/total*100) : 0;
-  var c = $('selbar-count');
-  c.textContent = verb + ' ' + done + ' of ' + total + ' (' + pct + '%)';
-  c.style.display = '';
+  var txt = rec.running+' '+done+' of '+total+' ('+pct+'%)';
+  if(failed) txt += ' · '+failed+' failed';
+  rec.subEl.textContent = txt;
 }
 /* transaction list sorting (remembered across visits) */
 var TXN_SORT_KEY = 'expenseTracker.txnSort';
@@ -1835,8 +1885,9 @@ function renderTransactions(){
     }else{
       b.addEventListener('click', function(){ openTxnForm(t); });
     }
-    if(bulkUpdating && bulkUpdating.set[t.id]){
-      var bst = bulkUpdating.failed[t.id] ? 'fail' : (bulkUpdating.done[t.id] ? 'done' : 'pending');
+    var bjs = bulkJobRowState(t.id);
+    if(bjs){
+      var bst = bjs==='failed' ? 'fail' : (bjs==='done' ? 'done' : 'pending');
       var bbar = el('span',{class:'bulkbar '+bst});
       b.appendChild(bbar);
       bulkBars[t.id] = bbar;
@@ -2039,19 +2090,39 @@ function confirmBulkType(similar, fromType, toType){
 /* Bulk update: change chosen fields on a set of selected transactions.
    Only fields the user sets are touched; everything else stays as-is. */
 /* ============ bulk update jobs: resume after reload + undo ============ */
-var BULK_JOB_KEY = 'expenseTracker.bulkJob';
-function persistBulkJob(job){
-  try{ localStorage.setItem(BULK_JOB_KEY, JSON.stringify(job)); }catch(e){}
-}
-function loadBulkJob(){
+var BULK_JOB_KEY = 'expenseTracker.bulkJob'; // legacy single-job key (migrated on load)
+var BULK_JOBS_KEY = 'expenseTracker.bulkJobs'; // {active:[jobs], lastCompleted:job|null}
+function persistBulkState(){
   try{
-    var s = localStorage.getItem(BULK_JOB_KEY);
-    return s ? JSON.parse(s) : null;
-  }catch(e){ return null; }
+    localStorage.setItem(BULK_JOBS_KEY, JSON.stringify({
+      active: activeBulkJobs.map(function(rec){ return rec.job; }),
+      lastCompleted: lastCompletedBulkJob
+    }));
+  }catch(e){}
 }
-function clearBulkJob(){
-  try{ localStorage.removeItem(BULK_JOB_KEY); }catch(e){}
+function loadBulkState(){
+  try{
+    var s = localStorage.getItem(BULK_JOBS_KEY);
+    if(s){
+      var o = JSON.parse(s);
+      return {active:o.active||[], lastCompleted:o.lastCompleted||null};
+    }
+    // migrate the legacy single-job key once
+    var old = localStorage.getItem(BULK_JOB_KEY);
+    if(old){
+      var j = JSON.parse(old);
+      if(j && j.rows && j.rows.length){
+        return j.completedAt ? {active:[], lastCompleted:(j.kind==='update' ? j : null)}
+                             : {active:[j], lastCompleted:null};
+      }
+    }
+  }catch(e){}
+  return {active:[], lastCompleted:null};
 }
+// bulk state must load before the first refreshUndoButtons() in init
+var _bulkInitState = loadBulkState();
+lastCompletedBulkJob = _bulkInitState.lastCompleted;
+var _resumableBulkJobs = _bulkInitState.active;
 function txnById(id){
   for(var i=0;i<state.transactions.length;i++){
     if(state.transactions[i].id===id) return state.transactions[i];
@@ -2133,61 +2204,79 @@ function buildUpdateJob(ids, overrides){
 /* Runs a bulk write job: per-row progress UI, live card refresh, a final
    reload + verify pass, then finalize. Shared by fresh updates, resume,
    and undo.
+   Multiple jobs may run at once: each gets its own progress bar with a Stop
+   button, and tracks its own done/failed/skipped sets. Individual row writes
+   are serialized through the save lock so concurrent jobs can't clobber each
+   other; the selection bar stays fully usable while jobs run.
    job.rows: [{id, before, expected, target}]; job.status: id -> pending|done|failed|skipped.
    opts: {verb, resume}. */
 async function runBulkJob(job, opts){
   opts = opts||{};
   var verb = opts.verb || (job.kind==='undo' ? 'Restored' : 'Updated');
-  var uset = {};
-  job.rows.forEach(function(r){ uset[r.id]=true; });
-  bulkUpdating = {set:uset, done:{}, failed:{}, skipped:{}, verb:verb};
-  bulkDoneIds = {}; bulkFailIds = {};
+  var n = job.rows.length;
+  var rec = {
+    job:job, verb:verb,
+    title: job.kind==='undo' ? ('Undo update ('+n+' transaction'+(n===1?'':'s')+')')
+                             : ('Update '+n+' transaction'+(n===1?'':'s')),
+    running: job.kind==='undo' ? 'Restoring…' : 'Updating…',
+    doneIds:{}, failIds:{}, skipIds:{},
+    stopRequested:false, stopped:false, barEl:null, subEl:null
+  };
+  var firstJob = activeBulkJobs.length===0;
+  activeBulkJobs.push(rec);
+  if(firstJob && job.kind!=='undo' && !opts.resume){ bulkDoneIds = {}; bulkFailIds = {}; }
+  renderJobBars();
   if(state.screen==='transactions') renderTransactions();
-  updateBulkProgress();
-  var progBtn = $('selbar-update');
-  if(progBtn){
-    progBtn.disabled = true;
-    progBtn.innerHTML = '<span class="spin" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span> ' +
-      (verb==='Restored' ? 'Restoring' : 'Updating') + '&hellip;';
-  }
-  persistBulkJob(job);
+  persistBulkState();
+  refreshUndoButtons();
   var done=0, failed=0, skipped=0;
   try{
-  await withSaveLock(async function(){
     for(var i=0;i<job.rows.length;i++){
+      if(rec.stopRequested){
+        // user stopped: leave the remaining rows untouched for a later retry
+        for(var k=i;k<job.rows.length;k++){
+          var rk = job.rows[k];
+          if(job.status[rk.id]!=='done' && job.status[rk.id]!=='skipped'){
+            job.status[rk.id]='skipped'; rec.skipIds[rk.id]=true; skipped++;
+          }
+        }
+        rec.stopped = true;
+        updateJobBar(rec);
+        break;
+      }
       var r = job.rows[i];
       var st = job.status[r.id];
-      if(st==='done'){ done++; bulkUpdating.done[r.id]=true; continue; }
-      if(st==='skipped'){ skipped++; bulkUpdating.skipped[r.id]=true; continue; }
+      if(st==='done'){ done++; rec.doneIds[r.id]=true; updateJobBar(rec); continue; }
+      if(st==='skipped'){ skipped++; rec.skipIds[r.id]=true; updateJobBar(rec); continue; }
       var x = txnById(r.id);
       if(!x){
-        job.status[r.id]='failed'; bulkUpdating.failed[r.id]=true; failed++;
-        persistBulkJob(job); updateBulkProgress(); continue;
+        job.status[r.id]='failed'; rec.failIds[r.id]=true; failed++;
+        persistBulkState(); updateJobBar(rec); continue;
       }
       if(opts.resume && rowFieldsMatch(x, r.expected)){
         // the write landed before the reload; no rewrite needed
-        job.status[r.id]='done'; bulkUpdating.done[r.id]=true; done++;
+        job.status[r.id]='done'; rec.doneIds[r.id]=true; done++;
         applyRowFields(x, r.expected);
         var rb0 = bulkBars[r.id];
         if(rb0){ rb0.className='bulkbar done'; rb0.parentNode.classList.add('bulk-done'); refreshTxnCardEl(rb0.parentNode, x); }
-        persistBulkJob(job); updateBulkProgress(); continue;
+        persistBulkState(); updateJobBar(rec); continue;
       }
-      var bf = bulkFills[x.id];
+      var bf = bulkFills[r.id];
       if(bf){ void bf.offsetWidth; bf.style.width='100%'; }
       var ok = true;
       try{
-        await apiPost({action:'update', tab:'Transactions', id:x.id, row:r.target});
+        await withSaveLock(function(){ return apiPost({action:'update', tab:'Transactions', id:x.id, row:r.target}); });
         done++;
       }catch(e){ failed++; ok=false; }
       if(ok){
-        bulkUpdating.done[x.id]=true; job.status[x.id]='done';
+        rec.doneIds[r.id]=true; job.status[r.id]='done';
         applyRowFields(x, r.expected);
       }else{
-        bulkUpdating.failed[x.id]=true; job.status[x.id]='failed';
+        rec.failIds[r.id]=true; job.status[r.id]='failed';
       }
-      persistBulkJob(job);
-      updateBulkProgress();
-      var bb = bulkBars[x.id];
+      persistBulkState();
+      updateJobBar(rec);
+      var bb = bulkBars[r.id];
       if(bb){
         bb.className='bulkbar '+(ok?'done':'fail');
         bb.parentNode.classList.add(ok?'bulk-done':'bulk-fail');
@@ -2195,55 +2284,55 @@ async function runBulkJob(job, opts){
       }
       if(bf && !ok) bf.style.background='rgba(255,59,48,.20)';
     }
-    var loadOk = true;
-    try{ await loadAll(); }catch(e){ loadOk=false; }
-    if(loadOk){
-      // Verify the writes actually landed. A "success" that didn't stick
-      // is reported as a failure, never as a success.
-      for(var v=0; v<job.rows.length; v++){
-        var r2 = job.rows[v], vid = r2.id;
-        if(job.status[vid]!=='done') continue;
-        var xt = txnById(vid);
-        if(xt && rowFieldsMatch(xt, r2.expected)) continue;
-        delete bulkUpdating.done[vid];
-        bulkUpdating.failed[vid]=true;
-        job.status[vid]='failed';
-        done--; failed++;
-        if(xt) applyRowFields(xt, r2.before); // card shows the old values again
-        persistBulkJob(job);
-        var vbb = bulkBars[vid];
-        if(vbb){
-          vbb.className='bulkbar fail';
-          vbb.parentNode.classList.remove('bulk-done');
-          vbb.parentNode.classList.add('bulk-fail');
-          if(xt) refreshTxnCardEl(vbb.parentNode, xt);
+    if(!rec.stopRequested){
+      var loadOk = true;
+      try{ await loadAll(); }catch(e){ loadOk=false; }
+      if(loadOk){
+        // Verify the writes actually landed. A "success" that didn't stick
+        // is reported as a failure, never as a success.
+        for(var v=0; v<job.rows.length; v++){
+          var r2 = job.rows[v], vid = r2.id;
+          if(job.status[vid]!=='done') continue;
+          var xt = txnById(vid);
+          if(xt && rowFieldsMatch(xt, r2.expected)) continue;
+          delete rec.doneIds[vid];
+          rec.failIds[vid]=true;
+          job.status[vid]='failed';
+          done--; failed++;
+          if(xt) applyRowFields(xt, r2.before); // card shows the old values again
+          persistBulkState();
+          var vbb = bulkBars[vid];
+          if(vbb){
+            vbb.className='bulkbar fail';
+            vbb.parentNode.classList.remove('bulk-done');
+            vbb.parentNode.classList.add('bulk-fail');
+            if(xt) refreshTxnCardEl(vbb.parentNode, xt);
+          }
+          var vbf = bulkFills[vid];
+          if(vbf) vbf.style.background='rgba(255,59,48,.20)';
         }
-        var vbf = bulkFills[vid];
-        if(vbf) vbf.style.background='rgba(255,59,48,.20)';
       }
+      updateJobBar(rec);
     }
-  });
-  bulkDoneIds = {}; bulkFailIds = {};
-  for(var did in bulkUpdating.done) bulkDoneIds[did]=true;
-  for(var fid in bulkUpdating.failed) bulkFailIds[fid]=true;
-  updateBulkProgress(); // final numbers, then the bar resets below
-  bulkUpdating = null;
-  if(state.screen==='transactions') renderTransactions();
-  updateSelbar();
-  if(progBtn) progBtn.disabled = false;
-  if(job.kind==='undo') clearBulkJob(); // one level of undo
-  else{ job.completedAt = new Date().toISOString(); persistBulkJob(job); }
-  refreshUndoButtons();
-  var total = job.rows.length;
-  if(failed) toast(verb+' '+done+' of '+total+' \u2014 '+failed+' failed.'+(skipped?' '+skipped+' skipped.':''), true);
-  else if(skipped) toast(verb+' '+done+' of '+total+' \u2014 '+skipped+' skipped (changed since the update).', true);
-  else toast(verb+' '+done+' transaction'+(done===1?'':'s')+'.');
   }finally{
-    // Never leave the Update button stuck on its spinner: if anything above
-    // threw, the normal reset never ran, so restore the bar state here.
-    if(progBtn) progBtn.disabled = false;
-    bulkUpdating = null;
-    try{ updateSelbar(); }catch(e){}
+    // detach this job, fold its result colors into the persistent sets, and announce
+    var ai = activeBulkJobs.indexOf(rec);
+    if(ai>=0) activeBulkJobs.splice(ai,1);
+    for(var did in rec.doneIds) bulkDoneIds[did]=true;
+    for(var fid in rec.failIds) bulkFailIds[fid]=true;
+    job.completedAt = new Date().toISOString();
+    if(job.kind==='undo') lastCompletedBulkJob = null; // one level of undo
+    else lastCompletedBulkJob = job;
+    persistBulkState();
+    renderJobBars();
+    if(state.screen==='transactions') renderTransactions();
+    updateSelbar();
+    refreshUndoButtons();
+    var total = job.rows.length;
+    if(rec.stopped) toast('Stopped — '+done+' of '+total+' updated.', true);
+    else if(failed) toast(verb+' '+done+' of '+total+' \u2014 '+failed+' failed.'+(skipped?' '+skipped+' skipped.':''), true);
+    else if(skipped) toast(verb+' '+done+' of '+total+' \u2014 '+skipped+' skipped.', true);
+    else toast(verb+' '+done+' transaction'+(done===1?'':'s')+'.');
   }
 }
 /* Build the undo run for a completed update job. Strict rule: a row is
@@ -2271,43 +2360,47 @@ function buildUndoJob(updateJob){
   };
 }
 async function undoBulkUpdate(){
-  if(bulkUpdating){ toast('A bulk update is already running.', true); return; }
-  var job = loadBulkJob();
-  if(!job || job.kind!=='update' || !job.completedAt || !job.rows || !job.rows.length){
+  if(activeBulkJobs.length){ toast('A bulk update is already running.', true); return; }
+  var job = lastCompletedBulkJob;
+  if(!job || job.kind!=='update' || !job.rows || !job.rows.length){
     toast('Nothing to undo.', true); return;
   }
   var n = job.rows.length;
   var ok = await confirmDialog('Undo the last bulk update? '+n+' transaction'+(n===1?'':'s')+' will be restored to their previous values.', 'Undo');
   if(!ok) return;
-  await runBulkJob(buildUndoJob(job), {verb:'Restored'});
+  runBulkJob(buildUndoJob(job), {verb:'Restored'}); // not awaited: stays out of the user's way
 }
 function refreshUndoButtons(){
-  var job = loadBulkJob();
-  var show = !!(job && job.kind==='update' && job.completedAt && job.rows && job.rows.length);
+  // Undo is offered only when no bulk job is running, and only for the most
+  // recently completed update.
+  var job = lastCompletedBulkJob;
+  var show = activeBulkJobs.length===0 &&
+    !!(job && job.kind==='update' && job.rows && job.rows.length);
   var u = $('selbar-undo');
   if(u) u.hidden = !show;
 }
-/* After a reload with an unfinished job, offer to resume it. */
+/* After a reload with unfinished jobs, offer to resume them. */
 async function maybeResumeBulkJob(){
-  var job = loadBulkJob();
-  if(!job || job.completedAt || !job.rows || !job.rows.length) return;
+  var incomplete = _resumableBulkJobs.filter(function(j){
+    return j && !j.completedAt && j.rows && j.rows.length;
+  });
+  _resumableBulkJobs = [];
+  if(!incomplete.length){ refreshUndoButtons(); return; }
   try{
-    var total = job.rows.length, doneN = 0;
-    job.rows.forEach(function(r){ if(job.status[r.id]==='done') doneN++; });
-    var what = job.kind==='undo' ? 'bulk undo' : 'bulk update';
+    var total = 0, doneN = 0;
+    incomplete.forEach(function(j){
+      total += j.rows.length;
+      j.rows.forEach(function(r){ if(j.status[r.id]==='done') doneN++; });
+    });
     var ok = await confirmDialog(
-      'A '+what+' of '+total+' transactions was interrupted ('+doneN+' applied). Resume it now?',
+      (incomplete.length===1 ? 'An interrupted bulk update' : incomplete.length+' interrupted bulk updates')+
+      ' ('+doneN+' of '+total+' rows applied). Resume now?',
       'Resume');
     if(ok){
-      // show the update button panel with the job's rows selected, so the
-      // progress readout and the spinner in the Update button are visible
       showScreen('transactions');
-      txnSelected = {};
-      job.rows.forEach(function(r){ if(txnById(r.id)) txnSelected[r.id] = true; });
-      setTxnSelectMode(true);
-      await runBulkJob(job, {resume:true});
+      incomplete.forEach(function(j){ runBulkJob(j, {resume:true}); });
     }
-    else clearBulkJob();
+    persistBulkState(); // declined jobs are dropped, so we don't ask again
   }catch(e){
     toast('Could not resume the interrupted bulk update.', true);
   }
@@ -2401,8 +2494,11 @@ function openBulkUpdate(ids){
       if(sTax.value) overrides.tax_category = sTax.value==='__empty__' ? '' : sTax.value;
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
-      close(); // dismiss the sheet right away; progress shows on the rows themselves
-      await runBulkJob(buildUpdateJob(ids, overrides), {verb:'Updated'});
+      close(); // dismiss the sheet right away; progress shows in the job bar + on the rows
+      var job = buildUpdateJob(ids, overrides);
+      txnSelected = {}; // clear the batch so the next one can be picked while this runs
+      updateSelbar();
+      runBulkJob(job, {verb:'Updated'}); // not awaited: more updates can start while this runs
     };
   });
 }
