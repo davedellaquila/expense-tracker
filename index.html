@@ -429,13 +429,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <!-- TRANSACTIONS -->
     <section id="screen-transactions" class="screen" hidden>
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <h2 style="margin:0">Filters</h2>
-          <div>
-            <button class="linkbtn" id="f-select" type="button">Select</button>
-            <button class="linkbtn" id="f-reset" type="button">Reset</button>
-          </div>
-        </div>
+        <h2 style="margin:0 0 10px">Filters</h2>
         <div class="filters">
           <div><label class="f" style="margin-top:0" for="f-preset">Period</label>
             <select id="f-preset">
@@ -456,7 +450,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
           <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
-            <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off"></div>
+            <div style="display:flex;align-items:center;gap:2px">
+              <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off" style="flex:1;min-width:0">
+              <button class="linkbtn" id="f-select" type="button" style="flex:none">Select</button>
+              <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
+            </div></div>
         </div>
       </div>
       <div class="searchstick" id="searchstick" hidden>
