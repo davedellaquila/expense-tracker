@@ -580,7 +580,7 @@ if(window.matchMedia){
 var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-var PAYMENT_METHODS = ['Cash','Credit Card','Debit Card','Bank Transfer','Check','Other'];
+var PAYMENT_METHODS = ['Cash','Credit Card','Capital One','Debit Card','Bank Transfer','Check','Other'];
 
 var TAX_GROUPS = [
   {label:'Business income', items:['Gross receipts or sales','Other income']},
@@ -1292,6 +1292,10 @@ function openTxnForm(t){
       if(t&&t.payment_method===p) o.selected=true;
       inPay.appendChild(o);
     });
+    if(t && t.payment_method && PAYMENT_METHODS.indexOf(t.payment_method)<0){
+      var ox=el('option',{value:t.payment_method},t.payment_method);
+      ox.selected=true; inPay.appendChild(ox);
+    }
     var inNotes = field('Notes', el('textarea',{placeholder:'Optional'}));
     if(t&&t.notes) inNotes.value=t.notes;
 
@@ -1786,7 +1790,7 @@ function previewToTxn(r){
     date: r.date, merchant: r.description, description: r.description,
     amount: Math.round(num(r.amount)*100)/100,
     txn_type: r.txn_type, category: r.category, tax_category: '',
-    business_personal: r.business_personal, payment_method: 'Other',
+    business_personal: r.business_personal, payment_method: r.payment_method||'Other',
     notes: '', entered_by: state.userName||''
   };
 }
@@ -2014,10 +2018,32 @@ function guessTypeFromDesc(desc){
   if(/purchase authorized|purchase with cash back|\bchecks?\b|withdrawal|bill pay|online pmt|\bfee\b|moneylink|\bmtg\b|mortgage|\bloan\b|\bpymts?\b|\bpayment\b|premium/.test(d)) return 'expense';
   return null;
 }
+/* Dave's rule for Capital One / Wells Fargo statement imports: assume every
+   transaction is an expense, except refunds and payments (credits). */
+function stmtDefaultType(bankName, desc){
+  var d = String(desc||'').toLowerCase();
+  if(/purchase return|refund/.test(d)) return 'income';
+  if(bankName==='Capital One' && /\bpayments?\b/.test(d)) return 'income';
+  return guessTypeFromDesc(d) || 'expense';
+}
+/* Wells Fargo payment-method label: prefer the account nickname, fall back to
+   the (masked) account number, e.g. "Wells Fargo Prime Checking" or
+   "Wells Fargo xxxxxx8345". */
+function wfPaymentMethod(lines){
+  var joined = lines.join(' ');
+  var nick = (joined.match(/\b(prime|everyday|way2save|platinum)\s+(checking|savings)\b/i) || [])[0];
+  var num = (joined.match(/x{2,}\d{3,4}/i) || [])[0];
+  var card = (joined.match(/\bcard\s*\d{4}/i) || [])[0];
+  var label = (nick || num || card || '').trim();
+  return 'Wells Fargo' + (label ? ' ' + label : '');
+}
 function parsePdfTransactions(lines, bank, year, stmtMonth){
   var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
+  var bankName = bank && bank.name;
+  var stmtPayMethod = bankName==='Capital One' ? 'Capital One'
+    : bankName==='Wells Fargo' ? wfPaymentMethod(lines) : null;
   function setSection(line){
     if(!bank) return false;
     var i;
@@ -2054,11 +2080,13 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       var type;
       if(section==='income') type='income';
       else if(section==='expense') type='expense';
+      else if(bankName==='Capital One' || bankName==='Wells Fargo') type = stmtDefaultType(bankName, desc);
       else type = guessTypeFromDesc(desc) || (amt<0 ? 'expense' : 'income');
       lastTxn = {
         date: yy+'-'+mm+'-'+dd,
         description: desc, amount: Math.abs(Math.round(amt*100)/100),
         txn_type: type, business_personal:'Personal', category:'', include:true,
+        payment_method: (stmtPayMethod && type==='expense') ? stmtPayMethod : 'Other',
         _defYear: !explicitYear
       };
       out.push(lastTxn);
