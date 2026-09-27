@@ -12,7 +12,9 @@ no per-user setup is needed.
 2. **Build → Firestore Database → Create database** → Start in **production
    mode** → pick a region → Enable.
 3. **Firestore Database → Rules** → replace with the rules below → Publish.
-4. **Build → Authentication → Sign-in method → Anonymous → Enable → Save.**
+4. **Build → Authentication → Sign-in method** → enable **Anonymous**,
+   **Email/Password**, and **Google** → Save each. (Anonymous gives instant
+   private storage; email/Google enable cross-device sync.)
 5. **Project overview → Add app → Web (`</>`)** → register (no hosting) →
    copy the `firebaseConfig` object.
 6. In `index.html`, replace `var FIREBASE_CONFIG = null;` with your config:
@@ -48,10 +50,9 @@ Each anonymous user can only read/write their own `users/{uid}` subtree.
 
 - The `apiKey` in the web config is a public identifier, not a secret — it is
   safe to ship in the page. Security comes from the rules above plus Auth.
-- Anonymous sign-in gives each *browser* its own UID, so this is cloud backup
-  per device, not cross-device sync. Cross-device sync or shared access (two
-  people, one dataset) needs a real sign-in method (email/Google) — the
-  adapter is structured for that upgrade (see the comment above
-  `firebaseReady()` in `index.html`).
+- Anonymous sign-in gives each *browser* its own UID. Linking an email or
+  Google account in the app (Setup → Data storage → Sync across devices)
+  keeps the same UID, so data carries over and syncs to every device signed
+  in to that account. Two people sharing one login share one dataset.
 - Firestore is pay-as-you-go but the free Spark quota (50k reads / 20k
   writes / 1 GiB per day) comfortably covers a personal finance app.

@@ -789,6 +789,27 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
         <div id="set-firebase-box" hidden>
           <p class="muted" id="set-firebase-status">Checking Firebase connection…</p>
+          <div id="set-auth-box">
+            <label class="f">Sync across devices</label>
+            <p class="muted" id="set-auth-desc"></p>
+            <div id="set-auth-form" hidden>
+              <label class="f" for="set-auth-email">Email</label>
+              <input type="email" id="set-auth-email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com">
+              <label class="f" for="set-auth-pass">Password</label>
+              <input type="password" id="set-auth-pass" autocomplete="current-password" placeholder="6+ characters">
+              <div class="btnrow">
+                <button class="btn" id="set-auth-signin">Sign in</button>
+                <button class="btn ghost" id="set-auth-signup">Create account</button>
+              </div>
+              <div class="btnrow">
+                <button class="btn ghost" id="set-auth-google">Continue with Google</button>
+                <button class="btn ghost" id="set-auth-forgot">Forgot password?</button>
+              </div>
+            </div>
+            <div class="btnrow" id="set-auth-out-row" hidden>
+              <button class="btn ghost" id="set-auth-signout">Sign out</button>
+            </div>
+          </div>
         </div>
         <div id="set-copy-list"></div>
         <div class="btnrow">
@@ -1274,10 +1295,10 @@ LocalStore.prototype.setBudget = function(category, month, amount){
    Cloud backend via the Firebase JS SDK (loaded lazily, only when used).
    Each browser signs in anonymously, so every user gets a private silo:
      users/{uid}/transactions, users/{uid}/budgets, users/{uid}/categories
-   NOTE: anonymous UIDs are per-browser, so this backs data up to the cloud
-   but does NOT sync across a user's devices. True cross-device sync / sharing
-   needs a real sign-in method (email, Google) — the layout below is ready for
-   it: swap the signInAnonymously() call in firebaseReady().
+   NOTE: anonymous UIDs are per-browser. Linking an email or Google account (see
+   the Auth section below, exposed in Settings) keeps the same UID and enables
+   true cross-device sync; signing in with the same account elsewhere (or sharing
+   one login between two people) shares the dataset.
    Paste your web app's firebaseConfig into FIREBASE_CONFIG to enable the
    Firebase option; leave it null and the option stays hidden. The apiKey is a
    public identifier, not a secret — security comes from Firestore rules +
@@ -1305,10 +1326,12 @@ function loadScriptOnce(src){
     setTimeout(function(){ if(!done) bad(); }, 20000);
   });
 }
-var _fbReady = null;
-function firebaseReady(){
-  if(_fbReady) return _fbReady;
-  _fbReady = (async function(){
+/* Loads the SDK and initializes the app once; auth state is read fresh on each
+   use so sign-in / sign-out / linking take effect immediately. */
+var _fbSdk = null;
+function firebaseSdk(){
+  if(_fbSdk) return _fbSdk;
+  _fbSdk = (async function(){
     if(!FIREBASE_CONFIG) throw new Error('Firebase is not set up in this copy of the app yet.');
     if(typeof firebase==='undefined' || !firebase.firestore){
       await loadScriptOnce(FB_SDK_BASE+'firebase-app-compat.js');
@@ -1316,16 +1339,115 @@ function firebaseReady(){
       await loadScriptOnce(FB_SDK_BASE+'firebase-firestore-compat.js');
     }
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-    var auth = firebase.auth();
-    try{
-      if(!auth.currentUser) await auth.signInAnonymously();
-    }catch(e){
-      throw new Error('Firebase sign-in failed. In the Firebase console, enable Anonymous sign-in (Authentication → Sign-in method).');
-    }
-    return {db: firebase.firestore(), uid: auth.currentUser.uid};
   })();
-  _fbReady.catch(function(){ _fbReady = null; }); // failed attempt: let the next call retry
-  return _fbReady;
+  _fbSdk.catch(function(){ _fbSdk = null; }); // failed attempt: let the next call retry
+  return _fbSdk;
+}
+var _fbSignin = null; // in-flight anonymous sign-in (dedupes concurrent calls)
+function firebaseReady(){
+  return firebaseSdk().then(function(){
+    var auth = firebase.auth();
+    if(auth.currentUser) return {db: firebase.firestore(), uid: auth.currentUser.uid};
+    if(!_fbSignin){
+      _fbSignin = auth.signInAnonymously().then(function(cred){
+        _fbSignin = null;
+        return cred.user;
+      }, function(){
+        _fbSignin = null;
+        throw new Error('Firebase sign-in failed. In the Firebase console, enable Anonymous sign-in (Authentication → Sign-in method).');
+      });
+    }
+    return _fbSignin.then(function(u){ return {db: firebase.firestore(), uid: u.uid}; });
+  });
+}
+/* Surface Google redirect sign-in errors once per page load. */
+var _fbRedirectChecked = false;
+function firebaseCheckRedirect(){
+  if(_fbRedirectChecked) return Promise.resolve(null);
+  _fbRedirectChecked = true;
+  return firebaseSdk().then(function(){
+    return firebase.auth().getRedirectResult().then(function(res){
+      return (res && res.user) ? res : null;
+    }, function(e){
+      throw friendlyAuthError(e);
+    });
+  });
+}
+/* ---------- Firebase Auth: link an account for cross-device sync ----------
+   Anonymous sign-in is automatic (zero friction, per-browser silo). Linking an
+   email or Google account to the anonymous user KEEPS the same UID, so existing
+   data carries over. Signing in on another device with the same account yields
+   the same UID -> the same data -> true sync. Two people sharing one login
+   share one dataset. Google uses redirect (reliable on mobile browsers). */
+function firebaseAuth(){ return firebaseSdk().then(function(){ return firebase.auth(); }); }
+function friendlyAuthError(e){
+  var code = (e && e.code) || '';
+  var map = {
+    'auth/invalid-email': 'That email address looks invalid.',
+    'auth/user-not-found': 'No account found for that email — try Create account.',
+    'auth/wrong-password': 'Wrong password.',
+    'auth/invalid-credential': 'Wrong email or password.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+    'auth/network-request-failed': 'Network error — check your connection.',
+    'auth/operation-not-allowed': 'This sign-in method is not enabled in the Firebase console (Authentication → Sign-in method).',
+    'auth/account-exists-with-different-credential': 'An account with that email already uses a different sign-in method.'
+  };
+  return new Error(map[code] || (e && e.message) || 'Sign-in failed.');
+}
+function firebaseAuthState(){
+  return firebaseReady().then(function(){
+    var u = firebase.auth().currentUser;
+    if(!u) return {signedIn:false};
+    return {signedIn:true, uid:u.uid, email:u.email||null, isAnonymous:!!u.isAnonymous,
+            providers:((u.providerData||[]).map(function(p){ return p.providerId; }))};
+  });
+}
+/* Email sign-in / sign-up. While anonymous, this LINKS the credential to the
+   anonymous user so the UID (and data) is preserved. Returns null if the user
+   cancels the "account already exists" prompt. */
+function firebaseLinkOrSignInEmail(email, password, mode){
+  return firebaseAuth().then(function(auth){
+    var cred = firebase.auth.EmailAuthProvider.credential(email, password);
+    var u = auth.currentUser;
+    function linkCurrent(){
+      return u.linkWithCredential(cred).catch(function(e){
+        if(e && (e.code==='auth/credential-already-in-use' || e.code==='auth/email-already-in-use')){
+          return confirmDialog('That account already exists. Sign in to it? (This browser\'s current Firebase data stays under its private copy.)', 'Sign in')
+            .then(function(ok){
+              if(!ok) return null;
+              return auth.signInWithCredential(cred).catch(function(e2){ throw friendlyAuthError(e2); });
+            });
+        }
+        throw friendlyAuthError(e);
+      });
+    }
+    if(u && u.isAnonymous) return linkCurrent();
+    if(mode==='signup'){
+      return auth.createUserWithEmailAndPassword(email, password).catch(function(e){
+        if(e && e.code==='auth/email-already-in-use') throw new Error('An account with that email already exists — try Sign in instead.');
+        throw friendlyAuthError(e);
+      });
+    }
+    return auth.signInWithEmailAndPassword(email, password).catch(function(e){ throw friendlyAuthError(e); });
+  });
+}
+/* Google sign-in via redirect (reliable on mobile). While anonymous, links. */
+function firebaseGoogle(){
+  return firebaseAuth().then(function(auth){
+    var provider = new firebase.auth.GoogleAuthProvider();
+    var u = auth.currentUser;
+    var p = (u && u.isAnonymous) ? u.linkWithRedirect(provider) : auth.signInWithRedirect(provider);
+    return p.catch(function(e){ throw friendlyAuthError(e); });
+  });
+}
+function firebaseSignOut(){
+  return firebaseAuth().then(function(auth){ return auth.signOut(); });
+}
+function firebaseResetPassword(email){
+  return firebaseAuth().then(function(auth){
+    return auth.sendPasswordResetEmail(email).catch(function(e){ throw friendlyAuthError(e); });
+  });
 }
 function firebaseConfigured(){ return !!FIREBASE_CONFIG; }
 function FirebaseStore(){ this._rp = null; }
@@ -1483,6 +1605,15 @@ async function boot(){
   updateUserChip();
   var kind = storeKind();
   if(kind==='firebase' && !firebaseConfigured()) kind = null; // config removed: choose again
+  if(kind==='firebase'){
+    // Coming back from Google sign-in? Settle it before loading data.
+    try{
+      var redir = await firebaseCheckRedirect();
+      if(redir && redir.user) setTimeout(function(){ toast('Signed in with Google — sync is on.'); }, 600);
+    }catch(e){
+      setTimeout(function(){ toast(e.message, true); }, 600);
+    }
+  }
   if(!kind){
     if(state.apiUrl){ setStoreKind('sheets'); kind = 'sheets'; } // existing setup keeps working
     else{ showSetupPicker('local'); return; }                    // brand-new user: choose storage
@@ -1624,11 +1755,25 @@ async function syncStoreSettings(){
   if(k==='firebase'){
     var st = $('set-firebase-status');
     st.textContent = 'Checking Firebase connection…';
+    $('set-auth-form').hidden = true;
+    $('set-auth-out-row').hidden = true;
+    $('set-auth-desc').textContent = '';
     try{
       var fs = getStore();
       await fs.ping();
-      var uid = await fs.uid();
-      st.textContent = 'Connected to Firebase (signed in as '+String(uid).slice(0,8)+'…). Your data is stored in the cloud.';
+      var ast = await firebaseAuthState();
+      if(!ast.signedIn){
+        st.textContent = 'Connected to Firebase.';
+        $('set-auth-desc').textContent = 'Not signed in.';
+      }else if(ast.isAnonymous){
+        st.textContent = 'Connected to Firebase (private copy on this browser).';
+        $('set-auth-desc').textContent = 'This browser has its own private data. Link an account below to sync it across your devices — everything carries over. Two people sharing one login share the data.';
+        $('set-auth-form').hidden = false;
+      }else{
+        st.textContent = 'Connected to Firebase.';
+        $('set-auth-desc').textContent = 'Signed in as '+(ast.email||ast.uid)+' — data syncs across devices signed in to this account.';
+        $('set-auth-out-row').hidden = false;
+      }
     }catch(e){
       st.textContent = 'Could not reach Firebase: '+e.message;
     }
@@ -1706,11 +1851,66 @@ async function backupJson(){
     toast('Backup failed: '+err.message, true);
   }finally{ btn.disabled = false; }
 }
+async function authEmailFlow(mode, btn){
+  var email = $('set-auth-email').value.trim();
+  var pass = $('set-auth-pass').value;
+  if(!email || !pass){ toast('Enter an email and password.', true); return; }
+  if(mode==='signup' && pass.length<6){ toast('Password must be at least 6 characters.', true); return; }
+  var orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> …';
+  try{
+    var res = await firebaseLinkOrSignInEmail(email, pass, mode);
+    if(res===null) return; // user cancelled the "account already exists" prompt
+    $('set-auth-pass').value = '';
+    await afterAuthChange(mode==='signup' ? 'Account created — sync is on.' : 'Signed in — sync is on.');
+  }catch(err){
+    toast(err.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+/* Refresh everything after the Firebase auth user changes. */
+async function afterAuthChange(msg){
+  toast(msg);
+  try{ await loadAll(); }
+  catch(e){ toast('Signed in, but data would not load: '+e.message, true); }
+  try{ await syncStoreSettings(); }catch(e){}
+  showScreen(state.screen);
+}
 function wireSettings(){
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
     b.addEventListener('click', function(){ switchStoreKind(b.getAttribute('data-spick')); });
   });
   $('set-backup').addEventListener('click', backupJson);
+  /* Firebase account linking for cross-device sync. */
+  $('set-auth-signin').addEventListener('click', function(){ authEmailFlow('signin', $('set-auth-signin')); });
+  $('set-auth-signup').addEventListener('click', function(){ authEmailFlow('signup', $('set-auth-signup')); });
+  $('set-auth-google').addEventListener('click', async function(){
+    var btn = $('set-auth-google');
+    btn.disabled = true;
+    try{
+      await firebaseGoogle(); // redirects to Google; result handled on return
+    }catch(err){
+      toast(err.message, true);
+      btn.disabled = false;
+    }
+  });
+  $('set-auth-signout').addEventListener('click', async function(){
+    var ok = await confirmDialog('Sign out? This browser will switch to a fresh private copy. Your synced data stays in the cloud.', 'Sign out');
+    if(!ok) return;
+    try{
+      await firebaseSignOut();
+      await afterAuthChange('Signed out.');
+    }catch(err){ toast('Sign out failed: '+err.message, true); }
+  });
+  $('set-auth-forgot').addEventListener('click', async function(){
+    var email = $('set-auth-email').value.trim();
+    if(!email){ toast('Enter your email first.', true); return; }
+    try{ await firebaseResetPassword(email); toast('Password reset email sent.'); }
+    catch(err){ toast(err.message, true); }
+  });
   $('set-test').addEventListener('click', async function(){
     var url = $('set-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Enter a URL first.', true); return; }
