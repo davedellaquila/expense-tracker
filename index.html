@@ -1357,7 +1357,9 @@ function txnVisible(t){
   }
   if(q){
     var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
-    if(hay.indexOf(q)===-1) return false;
+    var aq = q.replace(/[$,\s]/g,'');
+    var amtHit = aq && String(num(t.amount)).indexOf(aq)>=0;
+    if(hay.indexOf(q)===-1 && !amtHit) return false;
   }
   return true;
 }
