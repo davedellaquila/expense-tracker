@@ -1220,27 +1220,41 @@ function txnRowForUpdate(x, newCategory){
     created_at: x.created_at||''
   };
 }
-/* "Similar" = same merchant (or description), same type, currently in the
-   category being changed FROM. The edited transaction itself is excluded. */
+/* Merchant key: groups variant descriptions of the same merchant, e.g.
+   "AMAZON MKTPL*U750Z4RQ3" and "AMAZON MKTPL*X92K1" -> "amazon mktpl com billwa";
+   "Purchase authorized on 08/30 SQ *Pine Grove" -> "sq pine grove a pine grove c". */
+function merchantKey(s){
+  var k = String(s||'').toLowerCase().trim();
+  if(!k) return '';
+  // strip bank-statement prefixes ("purchase authorized on 08/30 ", "bill pay ", ...)
+  k = k.replace(/^(purchase authorized on|purchase with cash back|atm withdrawal authorized on|money transfer authorized on|recurring transfer|online transfer|bill pay|mobile deposit|zelle to)\s*[^a-z]*/, '');
+  k = k.replace(/[*#]/g, ' ');
+  k = k.replace(/[^a-z0-9&' ]+/g, ' ');
+  var toks = k.split(/\s+/).filter(function(w){
+    return w && !(w.length>=4 && /\d/.test(w)); // drop code-like tokens (U750Z4RQ3, 0098245)
+  });
+  return toks.join(' ');
+}
+/* "Similar" = same merchant key, same type. The edited transaction itself is
+   excluded. Old category is NOT required to match — the review dialog shows
+   each candidate's current category so Dave can untick the odd ones. */
 function findSimilarTxns(t, rowData){
-  var mkey = (rowData.merchant||rowData.description||'').trim().toLowerCase();
+  var mkey = merchantKey(rowData.merchant||rowData.description);
   if(!mkey) return [];
   var res = state.transactions.filter(function(x){
     return x.id!==t.id &&
       x.txn_type===rowData.txn_type &&
-      (x.category||'')===(t.category||'') &&
-      ((x.merchant||x.description||'').trim().toLowerCase()===mkey);
+      merchantKey(x.merchant||x.description)===mkey;
   });
   res.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   return res;
 }
-function confirmBulkRecat(similar, oldCat, newCat, merchLabel){
+function confirmBulkRecat(similar, newCat){
   return new Promise(function(resolve){
     openSheet(function(sh, done){
       sh.appendChild(el('h2',null,'Update similar too?'));
       sh.appendChild(el('p',{class:'muted'},
-        similar.length+' other transaction'+(similar.length===1?'':'s')+' from "'+merchLabel+'" '+
-        (similar.length===1?'is':'are')+' currently "'+(oldCat||'Uncategorized')+'". '+
+        similar.length+' other transaction'+(similar.length===1?'':'s')+' from the same merchant. '+
         'Tick the ones to also move to "'+newCat+'".'));
       var list = el('div',{class:'reclist'});
       var boxes = similar.map(function(x){
@@ -1249,6 +1263,7 @@ function confirmBulkRecat(similar, oldCat, newCat, merchLabel){
         cb.checked = true;
         lab.appendChild(cb);
         lab.appendChild(el('span',{class:'recmain'}, (x.date||'????-??-??')+' · '+(x.merchant||x.description||'(no description)')));
+        lab.appendChild(el('span',{class:'muted',style:'flex:none;font-size:12px'}, (x.category||'Uncategorized')+' → '+newCat));
         lab.appendChild(el('span',{class:'recamt'}, money(num(x.amount))));
         list.appendChild(lab);
         return {cb:cb, id:x.id};
@@ -1392,7 +1407,7 @@ function openTxnForm(t){
       if(isEdit && newCatName !== (t.category||'')){
         var similar = findSimilarTxns(t, rowData);
         if(similar.length){
-          var res = await confirmBulkRecat(similar, t.category||'', newCatName, rowData.merchant||rowData.description||'this merchant');
+          var res = await confirmBulkRecat(similar, newCatName);
           if(res===null) return; // user cancelled — leave the form as-is
           bulkIds = res;
         }
