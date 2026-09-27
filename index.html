@@ -63,6 +63,15 @@ body{
 
 /* ---------- report charts (style inspired by capital_one_dashboard) ---------- */
 .rep-svg{ width:100%; height:auto; display:block; }
+.rep-click{ cursor:pointer; }
+.rep-click:hover{ opacity:.7; }
+.dl-row.rep-click:hover{ background:rgba(140,140,140,.12); opacity:1; }
+#txn-drill:empty{ display:none; }
+.drillchip{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--blue-soft); border:1px solid #c3d4f5; color:#1e3f8f;
+  border-radius:12px; padding:9px 12px; font-size:13.5px; margin-bottom:10px; }
+[data-theme="dark"] .drillchip{ border-color:#31497a; color:#a9c3f5; }
+.drillx{ border:0; background:none; font-size:19px; line-height:1; cursor:pointer; color:inherit; padding:2px 6px; }
 .rep-svg text{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
 .donut-legend{ margin-top:4px; }
 .dl-row{ display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid var(--border); font-size:13.5px; }
@@ -309,6 +318,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off"></div>
         </div>
       </div>
+      <div id="txn-drill"></div>
       <div id="txn-list"></div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
     </section>
@@ -441,6 +451,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card">
         <h2 id="rep-title" style="margin-bottom:2px">Expense report</h2>
         <p class="muted" id="rep-sub" style="margin-top:0"></p>
+        <p class="muted" style="font-size:12.5px; margin:6px 0 0">Tip: tap any chart to see the underlying transactions.</p>
         <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
       </div>
       <div class="card"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div><div id="rep-cattable"></div></div>
@@ -669,6 +680,7 @@ var state = {
   transactions: [], budgets: [], categories: [],
   screen: 'dashboard', dataLoaded: false
 };
+var txnDrill = null; // report-chart drill-down: {from,to,weekday,dispCats,label}
 try{
   state.apiUrl = localStorage.getItem(LS_API) || null;
   state.userName = localStorage.getItem(LS_USER) || null;
@@ -878,11 +890,21 @@ function renderDashboard(){
     var d = new Date((t.date||'')+'T12:00:00');
     if(!isNaN(d)) byDay[(d.getDay()+6)%7] += num(t.amount);
   });
+  var dashLabel = fmtMonthPretty(ym);
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
-  repDonut($('dash-donut'), cats.map(function(c){ return {name:c, value:byCat[c]}; }));
+  repDonut($('dash-donut'), cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
+    drillToTransactions({singleMonth: ym, type:'expense',
+      dispCats: (it.names && it.names.length ? it.names : [it.name]),
+      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + dashLabel});
+  });
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
-  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses this month.');
-  repWeekday($('dash-week'), byDay);
+  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses this month.', function(it){
+    drillToTransactions({singleMonth: ym, type:'expense', q: it.name});
+  });
+  repWeekday($('dash-week'), byDay, function(i){
+    drillToTransactions({singleMonth: ym, type:'expense', weekday:i,
+      label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+dashLabel});
+  });
 
   // budgets progress
   var bb = $('dash-budgets'); bb.innerHTML='';
@@ -922,6 +944,53 @@ function wireTransactions(){
   });
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
 }
+function txnVisible(t){
+  var ym = $('f-month').value, ty = $('f-type').value, bp = $('f-bp').value,
+      cat = $('f-cat').value, q = $('f-q').value.trim().toLowerCase();
+  var m = String(t.date||'').slice(0,7);
+  if(txnDrill && txnDrill.from){
+    if(m < txnDrill.from || m > txnDrill.to) return false;
+  } else if(ym && m!==ym) return false;
+  if(ty && t.txn_type!==ty) return false;
+  if(bp && t.business_personal!==bp) return false;
+  if(cat && t.category!==cat) return false;
+  if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
+  if(txnDrill && txnDrill.weekday!=null){
+    var d = new Date((t.date||'')+'T12:00:00');
+    if(isNaN(d) || (d.getDay()+6)%7!==txnDrill.weekday) return false;
+  }
+  if(q){
+    var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
+    if(hay.indexOf(q)===-1) return false;
+  }
+  return true;
+}
+function renderDrillChip(){
+  var td = $('txn-drill');
+  td.innerHTML = '';
+  if(!txnDrill) return;
+  var chip = el('div',{class:'drillchip'});
+  chip.appendChild(el('span',null,'\U0001F4CA '+txnDrill.label));
+  var x = el('button',{class:'drillx',type:'button','aria-label':'Clear report filter'},'\u00D7');
+  x.addEventListener('click', function(){ txnDrill = null; renderTransactions(); });
+  chip.appendChild(x);
+  td.appendChild(chip);
+}
+/* Jump to the Transactions screen showing exactly the drilled selection. */
+function drillToTransactions(o){
+  var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
+  var ranged = !!(o.from || o.to);
+  txnDrill = (ranged || o.dispCats || o.weekday!=null)
+    ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
+       dispCats:o.dispCats||null, label:o.label||'Report selection'}
+    : null;
+  $('f-month').value = o.singleMonth || '';
+  $('f-type').value = o.type || '';
+  $('f-bp').value = o.bp || '';
+  $('f-cat').value = '';
+  $('f-q').value = o.q || '';
+  showScreen('transactions');
+}
 function renderTransactions(){
   var fcat = $('f-cat');
   var keep = fcat.value;
@@ -933,19 +1002,8 @@ function renderTransactions(){
     fcat.appendChild(o);
   });
 
-  var ym = $('f-month').value, ty = $('f-type').value, bp = $('f-bp').value,
-      cat = fcat.value, q = $('f-q').value.trim().toLowerCase();
-  var rows = state.transactions.filter(function(t){
-    if(ym && String(t.date||'').slice(0,7)!==ym) return false;
-    if(ty && t.txn_type!==ty) return false;
-    if(bp && t.business_personal!==bp) return false;
-    if(cat && t.category!==cat) return false;
-    if(q){
-      var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
-      if(hay.indexOf(q)===-1) return false;
-    }
-    return true;
-  });
+  renderDrillChip();
+  var rows = state.transactions.filter(txnVisible);
   rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
 
   var list = $('txn-list'); list.innerHTML='';
@@ -1986,6 +2044,7 @@ function monthAdd(ym, n){
    donut with center total, horizontal bars on a track, monthly bars with a
    cumulative line, and a weekday pattern chart. Adapted to this app's light theme. */
 var REP_TEAL = '#2dd4bf', REP_CORAL = '#ff8a63', REP_GREEN = '#78d56f';
+var WD_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 var REP_PALETTE = ['#2dd4bf','#ff8a63','#a78bfa','#60a5fa','#f6c85f','#78d56f','#fb7185','#38bdf8'];
 function repShort(n){
   n = Number(n)||0;
@@ -2002,31 +2061,38 @@ function repDonutPath(cx, cy, r, inner, start, end){
          ' L '+f(p3[0])+' '+f(p3[1])+' A '+inner+' '+inner+' 0 '+large+' 1 '+f(p4[0])+' '+f(p4[1])+' Z';
 }
 /* Donut: top slices + Other, total in the center, HTML legend with shares. */
-function repDonut(el, items){
+function repDonut(el, items, onSlice){
   var total = items.reduce(function(s,i){ return s+i.value; }, 0);
   if(!total){ emptyInto(el,'🍩','No expenses in this period.'); return; }
   var top = items.slice(0,7);
   var topSum = top.reduce(function(s,i){ return s+i.value; }, 0);
-  if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum});
+  if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum,
+    names: items.slice(7).map(function(i){ return i.name; })});
   var W=560, H=290, cx=150, cy=145, r=112, inner=66, start=-Math.PI/2, svg='';
   top.forEach(function(it, i){
     var angle = (it.value/total)*Math.PI*2, end = start+angle, color = REP_PALETTE[i%REP_PALETTE.length];
-    if(it.value>0) svg += '<path d="'+repDonutPath(cx,cy,r,inner,start,end)+'" fill="'+color+'" opacity="0.92"><title>'+esc(it.name)+': '+money(it.value)+'</title></path>';
+    if(it.value>0) svg += '<path d="'+repDonutPath(cx,cy,r,inner,start,end)+'" fill="'+color+'" opacity="0.92"'+(onSlice?' class="rep-click" data-slice="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></path>';
     it._color = color;
     start = end;
   });
   svg += '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="22" font-weight="700" class="cx-text">'+money(total)+'</text>';
   svg += '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="12" class="cx-mut">total</text>';
   var leg = '<div class="donut-legend">';
-  top.forEach(function(it){
-    leg += '<div class="dl-row"><span class="dl-swatch" style="background:'+it._color+'"></span>'+
+  top.forEach(function(it, i){
+    leg += '<div class="dl-row'+(onSlice?' rep-click':'')+'"'+(onSlice?' data-slice="'+i+'"':'')+'><span class="dl-swatch" style="background:'+it._color+'"></span>'+
            '<span class="dl-name">'+esc(it.name)+'</span>'+
            '<span class="dl-pct">'+Math.round(it.value/total*100)+'%</span></div>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img" style="max-width:340px; margin:0 auto">'+svg+'</svg>'+leg+'</div>';
+  if(onSlice){
+    var sn = el.querySelectorAll('[data-slice]');
+    for(var si=0; si<sn.length; si++)(function(n){
+      n.addEventListener('click', function(){ onSlice(top[parseInt(n.getAttribute('data-slice'),10)]); });
+    })(sn[si]);
+  }
 }
 /* Horizontal bars on a subtle track, label left, value right. */
-function repHBars(el, items, color, emptyMsg){
+function repHBars(el, items, color, emptyMsg, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
   var W=720, labelW=200, rowH=36, top=6, bot=6;
   var H = top + items.length*rowH + bot, max = items[0].value || 1, svg='';
@@ -2035,13 +2101,19 @@ function repHBars(el, items, color, emptyMsg){
     var nm = it.name.length>26 ? it.name.slice(0,25)+'…' : it.name;
     svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
       '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" class="cx-track"/>'+
-      '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"><title>'+esc(it.name)+': '+money(it.value)+'</title></rect>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></rect>'+
       '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+money(it.value)+'</text></g>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var hn = el.querySelectorAll('[data-bar]');
+    for(var hi=0; hi<hn.length; hi++)(function(n){
+      n.addEventListener('click', function(){ onBar(items[parseInt(n.getAttribute('data-bar'),10)]); });
+    })(hn[hi]);
+  }
 }
 /* Monthly bars with cumulative line, gridlines and axis labels. */
-function repTrend(el, months){
+function repTrend(el, months, onBar){
   if(!months.length){ emptyInto(el,'📈','No transactions in this period.'); return; }
   var W=720, H=300, pad={top:36, right:14, bottom:48, left:62};
   var plotW = W-pad.left-pad.right, plotH = H-pad.top-pad.bottom;
@@ -2057,7 +2129,7 @@ function repTrend(el, months){
   vals.forEach(function(v, i){
     var cx = pad.left + (i+0.5)*step;
     var bh = (v.exp/maxV)*plotH;
-    svg += '<rect x="'+Math.round(cx-barW/2)+'" y="'+Math.round(pad.top+plotH-bh)+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+REP_TEAL+'" opacity="0.82"><title>'+esc(v.label)+': '+money(v.exp)+'</title></rect>';
+    svg += '<rect x="'+Math.round(cx-barW/2)+'" y="'+Math.round(pad.top+plotH-bh)+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+REP_TEAL+'" opacity="0.82"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(v.label)+': '+money(v.exp)+'</title></rect>';
     pts.push([cx, pad.top+plotH-(v.cum/maxV)*plotH]);
   });
   svg += '<polyline points="'+pts.map(function(p){ return Math.round(p[0])+','+Math.round(p[1]); }).join(' ')+'" fill="none" stroke="'+REP_CORAL+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';
@@ -2069,9 +2141,15 @@ function repTrend(el, months){
   svg += '<text x="'+pad.left+'" y="20" font-size="12" class="cx-mut">Bars: monthly spend</text>'+
          '<text x="'+(pad.left+170)+'" y="20" font-size="12" fill="'+REP_CORAL+'">Line: cumulative</text>';
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var tn = el.querySelectorAll('[data-bar]');
+    for(var ti=0; ti<tn.length; ti++)(function(n){
+      n.addEventListener('click', function(){ onBar(months[parseInt(n.getAttribute('data-bar'),10)]); });
+    })(tn[ti]);
+  }
 }
 /* Weekday pattern: vertical bars Mon–Sun. */
-function repWeekday(el, days){
+function repWeekday(el, days, onBar){
   var total = days.reduce(function(s,v){ return s+v; }, 0);
   if(!total){ emptyInto(el,'📅','No expenses in this period.'); return; }
   var names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -2080,11 +2158,17 @@ function repWeekday(el, days){
   var step=plotW/7, barW=Math.min(44, step*0.55), svg='';
   days.forEach(function(v, i){
     var cx=pad.left+(i+0.5)*step, bh=(v/max)*plotH;
-    svg += '<rect x="'+Math.round(cx-barW/2)+'" y="'+Math.round(pad.top+plotH-bh)+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+REP_GREEN+'" opacity="0.9"><title>'+names[i]+': '+money(v)+'</title></rect>'+
+    svg += '<rect x="'+Math.round(cx-barW/2)+'" y="'+Math.round(pad.top+plotH-bh)+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+REP_GREEN+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+names[i]+': '+money(v)+'</title></rect>'+
            '<text x="'+Math.round(cx)+'" y="'+Math.round(pad.top+plotH-bh-8)+'" text-anchor="middle" font-size="11" class="cx-mut">'+repShort(v)+'</text>'+
            '<text x="'+Math.round(cx)+'" y="'+(H-10)+'" text-anchor="middle" font-size="12" class="cx-mut">'+names[i]+'</text>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var wn = el.querySelectorAll('[data-bar]');
+    for(var wi=0; wi<wn.length; wi++)(function(n){
+      n.addEventListener('click', function(){ onBar(parseInt(n.getAttribute('data-bar'),10)); });
+    })(wn[wi]);
+  }
 }
 function wireReports(){
   ['rep-preset','rep-acct'].forEach(function(id){ $(id).addEventListener('change', renderReports); });
@@ -2097,6 +2181,7 @@ function wireReports(){
 }
 function renderReports(){
   var preset = $('rep-preset').value, acct = $('rep-acct').value;
+  var bpVal = acct==='all' ? '' : acct;
   var now = monthLocal(), from, to;
   if(preset==='month'){ from = to = now; }
   else if(preset==='last-month'){ from = to = monthAdd(now,-1); }
@@ -2135,7 +2220,11 @@ function renderReports(){
   // --- category mix donut ---
   var cc = $('rep-catchart');
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
-  repDonut(cc, cats.map(function(c){ return {name:c, value:byCat[c]}; }));
+  repDonut(cc, cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal,
+      dispCats: (it.names && it.names.length ? it.names : [it.name]),
+      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+  });
   // --- category table ---
   var ct = $('rep-cattable');
   if(!cats.length){ ct.innerHTML=''; }
@@ -2149,8 +2238,10 @@ function renderReports(){
   var mc = $('rep-monthchart');
   var months = Object.keys(byMonth).sort();
   repTrend(mc, months.map(function(m){
-    return {label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: byMonth[m].exp};
-  }));
+    return {key:m, label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: byMonth[m].exp};
+  }), function(it){
+    drillToTransactions({singleMonth: it.key, type:'expense', bp:bpVal});
+  });
   var mt = $('rep-monthtable');
   var mh = '<div class="ptablewrap"><table class="ptable"><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr>';
   months.forEach(function(m){
@@ -2161,10 +2252,16 @@ function renderReports(){
 
   // --- top merchants (horizontal bars) ---
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,10);
-  repHBars($('rep-merchchart'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.');
+  repHBars($('rep-merchchart'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, q: it.name,
+      label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+  });
 
   // --- weekday pattern ---
-  repWeekday($('rep-weekchart'), byDay);
+  repWeekday($('rep-weekchart'), byDay, function(i){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, weekday:i,
+      label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
+  });
 
   // --- largest expenses ---
   var tp = $('rep-top');
