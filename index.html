@@ -1531,7 +1531,7 @@ function openTxnForm(t){
     var inCat = field('Category', el('select'));
     var inNewCat = el('input',{type:'text',placeholder:'New category name',autocomplete:'off',style:'display:none;margin-top:8px'});
     sh.appendChild(inNewCat);
-    function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; }
+    function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; if(inCat.value==='__new__') inNewCat.focus(); }
     var inTax = field('Tax category', el('select'));
     var inPay = field('Payment method', el('select'));
     PAYMENT_METHODS.forEach(function(p){
