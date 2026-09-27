@@ -1546,6 +1546,17 @@ var SKIP_LINE = /page\s*\d+|continued|statement\s*period|account\s*(number|summa
 var MONEY_TOK = '-?\\$?[\\d,]+\\.\\d{2}|\\(\\$?[\\d,]+\\.\\d{2}\\)';
 var TXN_RE = new RegExp('^(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{2,4}))?\\s+(.+?)\\s+((?:'+MONEY_TOK+')(?:\\s+(?:'+MONEY_TOK+'))?)\\s*$');
 
+/* Fallback type guess when the statement's debit/credit sections weren't recognized.
+   Bank statements list positive amounts in both sections, so the amount sign
+   alone can't tell them apart — description keywords are the next best signal. */
+function guessTypeFromDesc(desc){
+  var d = String(desc||'').toLowerCase();
+  if(/purchase return|refund/.test(d)) return 'income';
+  if(/payroll|deposit|interest payment|zelle from|instant pmt from/.test(d)) return 'income';
+  if(/transfer/.test(d)) return /\bfrom\b/.test(d) ? 'income' : 'expense';
+  if(/purchase authorized|purchase with cash back|\bchecks?\b|withdrawal|bill pay|online pmt|\bfee\b|moneylink|\bmtg\b|mortgage|\bloan\b|\bpymts?\b|\bpayment\b|premium/.test(d)) return 'expense';
+  return null;
+}
 function parsePdfTransactions(lines, bank, year){
   var out = [];
   var section = null; // 'income' | 'expense' | null
@@ -1572,7 +1583,7 @@ function parsePdfTransactions(lines, bank, year){
       var type;
       if(section==='income') type='income';
       else if(section==='expense') type='expense';
-      else type = amt<0 ? 'expense' : 'income';
+      else type = guessTypeFromDesc(desc) || (amt<0 ? 'expense' : 'income');
       lastTxn = {
         date: yy+'-'+mm+'-'+dd,
         description: desc, amount: Math.abs(Math.round(amt*100)/100),
