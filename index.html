@@ -509,7 +509,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
                   </select>
                   <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
                   <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
-                  <button class="linkbtn" id="f-undo" type="button" style="flex:none" hidden>Undo</button>
                 </div>
               </div>
             </div></div>
@@ -537,7 +536,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               </select>
               <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
               <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
-              <button class="linkbtn" id="f-undo-stick" type="button" style="flex:none" hidden>Undo</button>
             </div>
           </div>
         </div>
@@ -548,6 +546,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <span id="selbar-count">0 selected</span>
         <button class="btn small ghost" id="selbar-all" type="button">All</button>
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
+        <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
         <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         <button class="btn small ghost" id="selbar-done" type="button">Done</button>
       </div>
@@ -1523,8 +1522,6 @@ function wireTransactions(){
   });
   $('f-reset').addEventListener('click', resetTxnFilters);
   $('f-reset-stick').addEventListener('click', resetTxnFilters);
-  $('f-undo').addEventListener('click', undoBulkUpdate);
-  $('f-undo-stick').addEventListener('click', undoBulkUpdate);
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
@@ -1563,6 +1560,7 @@ function wireTransactions(){
     openBulkUpdate(ids);
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
+  $('selbar-undo').addEventListener('click', undoBulkUpdate);
   restoreTxnPeriod(); // reopen on the period the user was last viewing
   refreshUndoButtons(); // show Undo only when a completed bulk update exists
 }
@@ -2252,9 +2250,8 @@ async function undoBulkUpdate(){
 function refreshUndoButtons(){
   var job = loadBulkJob();
   var show = !!(job && job.kind==='update' && job.completedAt && job.rows && job.rows.length);
-  var a = $('f-undo'), b = $('f-undo-stick');
-  if(a) a.hidden = !show;
-  if(b) b.hidden = !show;
+  var u = $('selbar-undo');
+  if(u) u.hidden = !show;
 }
 /* After a reload with an unfinished job, offer to resume it. */
 async function maybeResumeBulkJob(){
