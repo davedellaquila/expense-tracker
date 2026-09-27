@@ -126,6 +126,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .barrow{margin:10px 0;}
 .barrow .top{display:flex; justify-content:space-between; font-size:13.5px;}
 .barrow .top b{font-weight:700;}
+.sharebar{height:6px; background:var(--track); border-radius:99px; overflow:hidden; margin:8px 0 2px;}
+.sharebar > div{height:100%; background:var(--blue); border-radius:99px;}
+.sharecap{font-size:11px; color:var(--muted);}
 
 /* ---------- lists ---------- */
 .txn{display:flex; align-items:center; gap:10px; width:100%; text-align:left;
@@ -334,7 +337,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants this month</p><div id="dash-merch"></div></div>
       <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="dash-week"></div></div>
       <div class="card">
-        <h2>Budgets</h2>
+        <h2>Budget vs Actual</h2>
         <div id="dash-budgets"></div>
       </div>
     </section>
@@ -1038,19 +1041,36 @@ function renderDashboard(){
   var bCats = Object.keys(bMap).sort(function(a,b){ return a.localeCompare(b); });
   if(!bCats.length){ emptyInto(bb,'🎯', from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.'); }
   else{
-    bCats.forEach(function(bc){
+    // overall proposed vs actual across all budgeted categories
+    var totB = 0, totS = 0;
+    var perCat = bCats.map(function(bc){
       var spent = 0;
       rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===bc) spent += num(t.amount); });
-      var amt = bMap[bc], pct = amt>0?Math.min(100, spent/amt*100):0;
+      totB += bMap[bc]; totS += spent;
+      return {c:bc, amt:bMap[bc], spent:spent};
+    });
+    var sumWrap = el('div',{class:'barrow'});
+    var sumTop = el('div',{class:'top'});
+    sumTop.appendChild(el('b',null,'Total'));
+    var sumLbl = el('span',null,money(totS)+' of '+money(totB)+' budgeted');
+    if(totS>totB) sumLbl.className='neg';
+    sumTop.appendChild(sumLbl);
+    sumWrap.appendChild(sumTop);
+    var sumBar = el('div',{class:'bar'+(totS>totB?' over':'')});
+    var sumFill = el('div');
+    sumFill.style.width = (totB>0 ? Math.min(100, totS/totB*100) : 0)+'%';
+    sumBar.appendChild(sumFill); sumWrap.appendChild(sumBar);
+    bb.appendChild(sumWrap);
+    perCat.forEach(function(p){
       var wrap = el('div',{class:'barrow'});
       var top = el('div',{class:'top'});
-      top.appendChild(el('b',null,bc));
-      var lbl = el('span',null,money(spent)+' of '+money(amt));
-      if(spent>amt) lbl.className='neg';
+      top.appendChild(el('b',null,p.c));
+      var lbl = el('span',null,money(p.spent)+' of '+money(p.amt));
+      if(p.spent>p.amt) lbl.className='neg';
       top.appendChild(lbl);
       wrap.appendChild(top);
-      var bar = el('div',{class:'bar'+(spent>amt?' over':'')});
-      var fill = el('div'); fill.style.width = pct+'%'; bar.appendChild(fill);
+      var bar = el('div',{class:'bar'+(p.spent>p.amt?' over':'')});
+      var fill = el('div'); fill.style.width = (p.amt>0?Math.min(100, p.spent/p.amt*100):0)+'%'; bar.appendChild(fill);
       wrap.appendChild(bar);
       bb.appendChild(wrap);
     });
@@ -2360,10 +2380,12 @@ function renderBudgets(){
   if(!cats.length){ emptyInto(list,'🎯','No categories yet. Add transactions or check your Categories tab.'); return; }
   var bmap = {};
   state.budgets.forEach(function(b){ if(String(b.month)===ym) bmap[b.category]=num(b.amount); });
+  var totalBud = Object.keys(bmap).reduce(function(s,k){ return s+num(bmap[k]); }, 0);
   cats.forEach(function(c){
     var spent = 0;
     rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===c) spent += num(t.amount); });
     var amt = bmap[c]||0;
+    var share = (amt>0 && totalBud>0) ? amt/totalBud : 0;
     var wrap = el('div',{class:'barrow'});
     var top = el('div',{class:'top'});
     top.appendChild(el('b',null,c));
@@ -2375,6 +2397,12 @@ function renderBudgets(){
       var bar = el('div',{class:'bar'+(spent>amt?' over':'')});
       var fill = el('div'); fill.style.width = Math.min(100,spent/amt*100)+'%'; bar.appendChild(fill);
       wrap.appendChild(bar);
+      // relative size of this category's budget vs the whole month's budget
+      var sh = el('div',{class:'sharebar',title:Math.round(share*100)+'% of total budget'});
+      var shf = el('div'); shf.style.width = Math.max(share*100, 1.5)+'%'; sh.appendChild(shf);
+      wrap.appendChild(sh);
+      wrap.appendChild(el('div',{class:'sharecap'},
+        Math.round(share*100)+'% of '+money(totalBud)+' total budget'));
     }
     var ctl = el('div',{style:'display:flex;gap:8px;margin-top:6px'});
     var inp = el('input',{type:'number',min:'0',step:'1',placeholder:'Monthly limit',inputmode:'decimal',style:'flex:1'});
