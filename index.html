@@ -159,6 +159,14 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar .btn{margin:0;}
 .txn.selrow.checked{background:var(--th-bg); border-color:var(--blue);}
 .txn .selbox{width:20px; height:20px; flex:none; accent-color:var(--blue); pointer-events:none;}
+/* busy feedback */
+.spinner{display:inline-block; width:15px; height:15px; border:2px solid rgba(255,255,255,.35);
+  border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
+  vertical-align:-2px; margin-right:8px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.pbar{height:6px; background:var(--th-bg); border-radius:99px; overflow:hidden;
+  margin-top:10px; display:none;}
+.pbar > div{height:100%; width:0; background:var(--blue); border-radius:99px; transition:width .2s;}
 .empty{text-align:center; color:var(--muted); padding:34px 16px; font-size:14.5px;}
 .empty .big{font-size:30px; display:block; margin-bottom:8px;}
 
@@ -1819,6 +1827,10 @@ function openBulkUpdate(ids){
     sh.appendChild(inNotes);
     var prog = el('p',{class:'muted',style:'display:none;margin-top:12px'});
     sh.appendChild(prog);
+    var pbar = el('div',{class:'pbar'});
+    var pfill = el('div');
+    pbar.appendChild(pfill);
+    sh.appendChild(pbar);
     var row = el('div',{class:'btnrow stickybar'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.onclick = close;
@@ -1843,8 +1855,13 @@ function openBulkUpdate(ids){
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
       cancel.disabled = true; apply.disabled = true;
+      apply.innerHTML = '';
+      apply.appendChild(el('span',{class:'spinner'}));
+      apply.appendChild(document.createTextNode('Updating\u2026'));
       [sCat,sType,sBp,sPay,sTax,sNotes,inNotes].forEach(function(c){ c.disabled = true; });
       prog.style.display = '';
+      pbar.style.display = '';
+      prog.textContent = 'Starting\u2026';
       var done = 0, failed = 0;
       await withSaveLock(async function(){
         for(var i=0;i<ids.length;i++){
@@ -1866,6 +1883,7 @@ function openBulkUpdate(ids){
             }catch(e){ failed++; }
           }
           prog.textContent = 'Updating\u2026 '+(i+1)+' of '+ids.length;
+          pfill.style.width = Math.round((i+1)/ids.length*100)+'%';
         }
         try{ await loadAll(); }catch(e){}
       });
