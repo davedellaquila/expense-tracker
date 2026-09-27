@@ -163,11 +163,11 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   display:flex; flex-direction:column; gap:8px;}
 #jobbars:empty{display:none;}
 .jobbar{background:var(--card); border:1px solid var(--border); border-radius:14px;
-  box-shadow:0 10px 24px rgba(10,20,15,.18); padding:10px 12px;
+  box-shadow:0 10px 24px rgba(10,20,15,.18); padding:8px 12px;
   display:flex; align-items:center; gap:10px;}
-.jobbar .jlabel{flex:1; min-width:0;}
-.jobbar .jtitle{font-size:14px; font-weight:700;}
-.jobbar .jsub{font-size:12.5px; color:var(--muted); margin-top:1px;}
+.jobbar .jlabel{flex:1; min-width:0; font-size:13.5px; font-weight:700;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.jobbar .jlabel .jsub{font-weight:400; color:var(--muted);}
 .jobbar .jstop{flex:none;}
 .txn.selrow.checked{background:var(--th-bg); border-color:var(--blue);}
 /* bulk-update result highlight: green once a row's update has landed */
@@ -1662,8 +1662,9 @@ function renderJobBars(){
     var bar = el('div',{class:'jobbar'});
     bar.appendChild(el('span',{class:'spin'}));
     var lab = el('div',{class:'jlabel'});
-    lab.appendChild(el('div',{class:'jtitle'}, rec.title));
-    rec.subEl = el('div',{class:'jsub'}, rec.running);
+    lab.appendChild(el('span',{class:'jtitle'}, rec.title));
+    lab.appendChild(document.createTextNode(' · '));
+    rec.subEl = el('span',{class:'jsub'}, rec.running);
     lab.appendChild(rec.subEl);
     bar.appendChild(lab);
     var stop = el('button',{class:'btn small ghost jstop',type:'button'},'Stop');
@@ -1677,6 +1678,14 @@ function renderJobBars(){
     rec.barEl = bar;
     updateJobBar(rec);
   });
+  /* Pad the page so the list can scroll clear of the floating bars —
+     no row stays trapped underneath them. Cleared when the last bar goes. */
+  var mainEl = document.querySelector('main');
+  if(mainEl){
+    mainEl.style.paddingBottom = activeBulkJobs.length
+      ? 'calc(var(--tabbar-h) + ' + (wrap.offsetHeight + 96) + 'px + env(safe-area-inset-bottom))'
+      : '';
+  }
 }
 function updateJobBar(rec){
   if(!rec.subEl) return;
