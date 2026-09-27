@@ -110,6 +110,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 
 /* ---------- stats ---------- */
 .stat-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;}
+.duo-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;}
+.duo-grid .card{margin-bottom:0;}
+@media (max-width:560px){ .duo-grid{grid-template-columns:1fr;} }
 .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center;}
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 .stat .value{font-size:19px; font-weight:800; margin:4px 0 2px; letter-spacing:-.3px;}
@@ -324,7 +327,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="stat"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
         <div class="stat"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
-      <div class="card"><h2>Category Mix</h2><p class="chart-sub">Share of spend this month</p><div id="dash-donut"></div></div>
+      <div class="duo-grid">
+        <div class="card"><h2>Income</h2><p class="chart-sub" id="dash-donut-inc-sub">By category</p><div id="dash-donut-inc"></div></div>
+        <div class="card"><h2>Expenses</h2><p class="chart-sub" id="dash-donut-exp-sub">By category</p><div id="dash-donut-exp"></div></div>
+      </div>
       <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants this month</p><div id="dash-merch"></div></div>
       <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="dash-week"></div></div>
       <div class="card">
@@ -969,13 +975,16 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCat = {};
+  var byCatInc = {}, byCatExp = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
-    if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a; }
+    if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
+      var ci = repDisplayCat(t);
+      byCatInc[ci] = (byCatInc[ci]||0)+a;
+    }
     else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
-      var c = repDisplayCat(t);
-      byCat[c] = (byCat[c]||0)+a;
+      var ce = repDisplayCat(t);
+      byCatExp[ce] = (byCatExp[ce]||0)+a;
     }
   });
   var net = inc-exp;
@@ -1003,11 +1012,18 @@ function renderDashboard(){
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
   }
-  var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
-  repDonut($('dash-donut'), cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
-    dashDrill({dispCats: (it.names && it.names.length ? it.names : [it.name]),
+  var catsI = Object.keys(byCatInc).sort(function(a,b){ return byCatInc[b]-byCatInc[a]; });
+  var catsE = Object.keys(byCatExp).sort(function(a,b){ return byCatExp[b]-byCatExp[a]; });
+  $('dash-donut-inc-sub').textContent = 'By category · '+rangeLabel;
+  $('dash-donut-exp-sub').textContent = 'By category · '+rangeLabel;
+  repDonut($('dash-donut-inc'), catsI.map(function(c){ return {name:c, value:byCatInc[c]}; }), function(it){
+    dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
+      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
+  }, 'No income in this period.');
+  repDonut($('dash-donut-exp'), catsE.map(function(c){ return {name:c, value:byCatExp[c]}; }), function(it){
+    dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
       label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
-  });
+  }, 'No expenses in this period.');
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
   repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
     dashDrill({q: it.name});
@@ -2684,9 +2700,9 @@ function repDonutPath(cx, cy, r, inner, start, end){
          ' L '+f(p3[0])+' '+f(p3[1])+' A '+inner+' '+inner+' 0 '+large+' 1 '+f(p4[0])+' '+f(p4[1])+' Z';
 }
 /* Donut: top slices + Other, total in the center, HTML legend with shares. */
-function repDonut(el, items, onSlice){
+function repDonut(el, items, onSlice, emptyMsg){
   var total = items.reduce(function(s,i){ return s+i.value; }, 0);
-  if(!total){ emptyInto(el,'🍩','No expenses in this period.'); return; }
+  if(!total){ emptyInto(el,'🍩', emptyMsg||'No expenses in this period.'); return; }
   var top = items.slice(0,7);
   var topSum = top.reduce(function(s,i){ return s+i.value; }, 0);
   if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum,
