@@ -427,6 +427,30 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <input type="month" id="bud-month">
         <p class="muted">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
       </div>
+      <div class="card">
+        <h2>Budget Bot</h2>
+        <p class="muted">Studies your last 3 months of spending and drafts a monthly budget. Edit any number, lock categories you don't want touched, then set a financial goal and let the bot suggest the trims.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="bot-propose" type="button">Propose my budget</button>
+        </div>
+        <div id="bot-table" style="margin-top:12px"></div>
+        <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <label class="f" for="bot-goal-type" style="margin-top:0">Financial goal</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <select id="bot-goal-type" style="flex:1;min-width:190px">
+              <option value="save">Save $___ more per month</option>
+              <option value="cap">Keep total spending under $___/mo</option>
+              <option value="cut">Cut a category by ___%</option>
+            </select>
+            <span id="bot-goal-inputs" style="display:flex;gap:8px;flex-wrap:wrap"></span>
+            <button class="btn" id="bot-suggest" type="button">Suggest changes</button>
+          </div>
+          <div id="bot-suggestions" style="margin-top:10px"></div>
+        </div>
+        <div id="bot-save-row" hidden style="margin-top:14px">
+          <button class="btn" id="bot-save" type="button">Save as <span id="bot-save-month"></span> budget</button>
+        </div>
+      </div>
       <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
     </section>
 
@@ -2193,7 +2217,11 @@ function finishPdfParse(pending, year, stmtMonth){
 
 /* ================= budgets ================= */
 function wireBudgets(){
-  $('bud-month').addEventListener('change', renderBudgets);
+  $('bud-month').addEventListener('change', function(){ botReset(); renderBudgets(); });
+  $('bot-propose').addEventListener('click', botPropose);
+  $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
+  $('bot-suggest').addEventListener('click', botSuggest);
+  $('bot-save').addEventListener('click', botSave);
 }
 function renderBudgets(){
   var ym = $('bud-month').value || monthLocal();
@@ -2243,6 +2271,254 @@ function renderBudgets(){
     wrap.appendChild(ctl);
     list.appendChild(wrap);
   });
+}
+
+/* ================= budget bot ================= */
+var botProposal = null; // {month, rows:[{category, avg, last, amount, locked}], avgIncome}
+
+function botNiceRound(avg){
+  if(avg>=100) return Math.round(avg/10)*10;
+  if(avg>=25) return Math.round(avg/5)*5;
+  return Math.round(avg);
+}
+var BOT_CUTTABILITY = {
+  'Dining':1.0,'Entertainment':1.0,'Shopping':0.9,'Travel':0.9,
+  'Clothing':0.85,'Gifts':0.85,'Hobbies':0.85,'Personal Care':0.8,
+  'Home Improvement':0.7,'Groceries':0.5,'Transportation':0.5,
+  'Auto':0.45,'Gas':0.45,'Fuel':0.45,'Health':0.2,'Medical':0.2,
+  'Utilities':0.15,'Phone':0.15,'Internet':0.15,'Debt':0.15,
+  'Insurance':0.08,'Housing':0.08,'Rent':0.08,'Mortgage':0.08,
+  'Property Tax':0.05,'Taxes':0.05,'Childcare':0.1,'Education':0.2,
+  'Uncategorized':0.7
+};
+function botCuttability(cat){
+  return Object.prototype.hasOwnProperty.call(BOT_CUTTABILITY, cat) ? BOT_CUTTABILITY[cat] : 0.6;
+}
+function botWhy(r, cut){
+  var pct = Math.round(cut/r.from*100);
+  if(r.last > r.avg*1.15 && r.last > 0)
+    return 'You spent '+money(Math.round(r.last))+' last month vs '+money(Math.round(r.avg))+' on average — trimming back toward your norm.';
+  if(botCuttability(r.category)>=0.8)
+    return 'Discretionary spending — a '+pct+'% trim frees '+money(cut)+'/mo.';
+  return 'A '+pct+'% trim frees '+money(cut)+'/mo.';
+}
+/* Pure core: given proposal rows and a savings gap, suggest trims — most
+   cuttable categories first, at most 35% per category, locked rows skipped. */
+function botAllocateCuts(rows, gap){
+  var cands = rows.filter(function(r){ return !r.locked && r.amount>0; }).sort(function(a,b){
+    return (botCuttability(b.category)-botCuttability(a.category)) || (b.amount-a.amount);
+  });
+  var list = [], remaining = Math.round(gap);
+  cands.forEach(function(r){
+    if(remaining<=0) return;
+    var maxCut = Math.max(1, Math.round(r.amount*0.35));
+    var cut = Math.min(remaining, maxCut);
+    if(cut<=0) return;
+    var to = r.amount - cut;
+    list.push({category:r.category, from:r.amount, to:to, cut:cut,
+               why:botWhy({category:r.category, from:r.amount, avg:r.avg, last:r.last}, cut)});
+    remaining -= cut;
+  });
+  return {list:list, remaining:remaining};
+}
+function botProposalTotal(){
+  return botProposal.rows.reduce(function(s,r){ return s + num(r.amount); }, 0);
+}
+function botPropose(){
+  var ym = $('bud-month').value || monthLocal();
+  var prior = [monthAdd(ym,-1), monthAdd(ym,-2), monthAdd(ym,-3)];
+  var sums = {}, lasts = {}, income = 0;
+  prior.forEach(function(m, idx){
+    txnsForMonth(m).forEach(function(t){
+      if(repDisplayCat(t)==='Transfers') return;
+      if(t.txn_type==='income'){ income += num(t.amount); return; }
+      var c = t.category || 'Uncategorized';
+      sums[c] = (sums[c]||0) + num(t.amount);
+      if(idx===0) lasts[c] = (lasts[c]||0) + num(t.amount);
+    });
+  });
+  var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
+    var avg = sums[c]/3;
+    return {category:c, avg:avg, last:lasts[c]||0, amount:botNiceRound(avg), locked:false};
+  }).sort(function(a,b){ return b.amount-a.amount; });
+  botProposal = {month:ym, rows:rows, avgIncome:income/3};
+  $('bot-suggestions').innerHTML = '';
+  botRenderTable();
+  botRenderGoalInputs();
+  $('bot-goal').hidden = false;
+  $('bot-save-row').hidden = false;
+  $('bot-save-month').textContent = fmtMonthPretty(ym);
+  toast(rows.length ? 'Budget drafted from your last 3 months.' : 'No spending found in the last 3 months.');
+}
+function botRenderTable(){
+  var host = $('bot-table'); host.innerHTML = '';
+  if(!botProposal) return;
+  var rows = botProposal.rows;
+  if(!rows.length){
+    host.appendChild(el('p',{class:'muted'},'No spending in the last 3 months — nothing to base a budget on.'));
+    return;
+  }
+  rows.forEach(function(r){
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
+    var nm = el('div');
+    nm.appendChild(el('b',null,r.category));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
+    line.appendChild(nm);
+    var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
+    inp.value = r.amount;
+    inp.disabled = r.locked;
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); inp.value = r.amount; botRenderTotal(); });
+    line.appendChild(inp);
+    var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — bot may suggest trims':'Lock — bot will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
+    lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); });
+    line.appendChild(lock);
+    var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    del.addEventListener('click', function(){
+      botProposal.rows = botProposal.rows.filter(function(x){ return x!==r; });
+      botRenderTable(); botRenderGoalInputs();
+    });
+    line.appendChild(del);
+    host.appendChild(line);
+  });
+  var have = {};
+  rows.forEach(function(r){ have[r.category] = true; });
+  var sel = el('select',{style:'flex:1'});
+  var addable = false;
+  allCategories().forEach(function(c){ if(!have[c]){ sel.appendChild(el('option',{value:c},c)); addable = true; } });
+  if(addable){
+    var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
+    var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
+    addBtn.addEventListener('click', function(){
+      botProposal.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false});
+      botProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
+      botRenderTable(); botRenderGoalInputs();
+    });
+    addRow.appendChild(sel); addRow.appendChild(addBtn);
+    host.appendChild(addRow);
+  }
+  var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
+  tot.appendChild(el('span',null,'Proposed total'));
+  tot.appendChild(el('span',{id:'bot-total'},money(botProposalTotal())));
+  host.appendChild(tot);
+  if(botProposal.avgIncome > 0){
+    host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
+      'You bring in about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
+  }
+}
+function botRenderTotal(){
+  var t = $('bot-total');
+  if(t) t.textContent = money(botProposalTotal());
+}
+function botRenderGoalInputs(){
+  var host = $('bot-goal-inputs'); host.innerHTML = '';
+  if(!botProposal) return;
+  var type = $('bot-goal-type').value;
+  if(type==='cut'){
+    var sel = el('select',{id:'bot-goal-cat'});
+    botProposal.rows.forEach(function(r){ sel.appendChild(el('option',{value:r.category},r.category)); });
+    host.appendChild(sel);
+    host.appendChild(el('input',{type:'number',min:'1',max:'99',step:'1',placeholder:'%',inputmode:'decimal',id:'bot-goal-pct',style:'width:76px'}));
+  }else{
+    host.appendChild(el('input',{type:'number',min:'1',step:'1',placeholder:'$ amount',inputmode:'decimal',id:'bot-goal-amt',style:'width:120px'}));
+  }
+}
+function botApplySuggestion(s, btn){
+  var r = botProposal.rows.filter(function(x){ return x.category===s.category; })[0];
+  if(r) r.amount = s.to;
+  botRenderTable();
+  if(btn){ btn.disabled = true; btn.textContent = 'Applied'; }
+}
+function botSuggest(){
+  var host = $('bot-suggestions'); host.innerHTML = '';
+  if(!botProposal || !botProposal.rows.length){ toast('Propose a budget first.', true); return; }
+  var type = $('bot-goal-type').value;
+  var total = botProposalTotal();
+  var res = null, note = '';
+  if(type==='save'){
+    var want = num($('bot-goal-amt').value);
+    if(!(want>0)){ toast('Enter how much you want to save per month.', true); return; }
+    var projected = botProposal.avgIncome - total;
+    var gap = want - Math.max(0, projected);
+    note = 'You bring in ~'+money(Math.round(botProposal.avgIncome))+'/mo; this draft spends '+money(Math.round(total))+'/mo.';
+    if(gap<=0){
+      host.appendChild(el('p',{style:'margin:0'},'Good news — this draft already leaves about '+money(Math.round(projected))+'/mo unspent, which covers your '+money(want)+' goal.'));
+      return;
+    }
+    res = botAllocateCuts(botProposal.rows, gap);
+  }else if(type==='cap'){
+    var cap = num($('bot-goal-amt').value);
+    if(!(cap>0)){ toast('Enter your target monthly spending.', true); return; }
+    var over = total - cap;
+    if(over<=0){
+      host.appendChild(el('p',{style:'margin:0'},'This draft already spends '+money(Math.round(total))+'/mo — under your '+money(cap)+' target.'));
+      return;
+    }
+    res = botAllocateCuts(botProposal.rows, over);
+  }else{
+    var cat = $('bot-goal-cat').value, pct = num($('bot-goal-pct').value);
+    if(!(pct>0 && pct<100)){ toast('Enter a percent between 1 and 99.', true); return; }
+    var r = botProposal.rows.filter(function(x){ return x.category===cat; })[0];
+    if(!r) return;
+    if(r.locked){ toast(cat+' is locked — unlock it first.', true); return; }
+    var to = Math.max(0, Math.round(r.amount*(1-pct/100)));
+    res = {list:[{category:cat, from:r.amount, to:to, cut:r.amount-to,
+                  why:'Direct '+pct+'% cut as requested.'}], remaining:0};
+  }
+  if(note) host.appendChild(el('p',{class:'muted',style:'margin:0 0 8px'},note));
+  if(!res.list.length){
+    host.appendChild(el('p',{style:'margin:0'},'Nothing to trim — every category is locked or at $0.'));
+    return;
+  }
+  var applyAll = el('button',{class:'btn small',type:'button',style:'margin-bottom:8px'},'Apply all '+res.list.length+' suggestions');
+  applyAll.addEventListener('click', function(){
+    res.list.forEach(function(s){ botApplySuggestion(s, null); });
+    applyAll.disabled = true; applyAll.textContent = 'Applied';
+  });
+  host.appendChild(applyAll);
+  res.list.forEach(function(s){
+    var card = el('div',{style:'border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px'});
+    var top = el('div',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px'});
+    var t = el('div');
+    t.appendChild(el('b',null,s.category+': '));
+    t.appendChild(el('span',null,money(s.from)+' → '+money(s.to)+' '));
+    t.appendChild(el('span',{class:'neg'},'(-'+money(s.cut)+')'));
+    var ap = el('button',{class:'btn small ghost',type:'button',style:'flex:none'},'Apply');
+    ap.addEventListener('click', function(){ botApplySuggestion(s, ap); });
+    top.appendChild(t); top.appendChild(ap);
+    card.appendChild(top);
+    card.appendChild(el('div',{class:'muted',style:'font-size:13px;margin-top:4px'},s.why));
+    host.appendChild(card);
+  });
+  if(res.remaining > 0.5){
+    host.appendChild(el('p',{class:'muted'},'Even after these trims you are still '+money(Math.round(res.remaining))+'/mo short of the goal. Unlock more categories or revisit the goal.'));
+  }else{
+    var saved = res.list.reduce(function(a,s){ return a+s.cut; }, 0);
+    host.appendChild(el('p',{style:'font-weight:bold;margin:8px 0 0'},'These changes free '+money(saved)+'/mo.'));
+  }
+}
+async function botSave(){
+  var ym = $('bud-month').value || monthLocal();
+  var btn = $('bot-save'); btn.disabled = true;
+  try{
+    var n = 0;
+    for(var i=0;i<botProposal.rows.length;i++){
+      var r = botProposal.rows[i];
+      if(r.amount>0){
+        await apiPost({action:'setBudget', category:r.category, month:ym, amount:Math.round(r.amount*100)/100});
+        n++;
+      }
+    }
+    toast('Saved '+n+' category budgets for '+fmtMonthPretty(ym)+'.');
+    await loadAll(); renderBudgets();
+  }catch(err){ toast('Save failed: '+err.message, true); }
+  btn.disabled = false;
+}
+function botReset(){
+  botProposal = null;
+  $('bot-table').innerHTML = '';
+  $('bot-suggestions').innerHTML = '';
+  $('bot-goal').hidden = true;
+  $('bot-save-row').hidden = true;
 }
 
 /* ================= tax ================= */
