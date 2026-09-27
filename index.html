@@ -23,6 +23,12 @@ body{
 }
 [hidden]{display:none !important;}
 
+@media print{
+  .app-header, .tabbar, .toast-wrap, .no-print{ display:none !important; }
+  body{ background:#fff; }
+  .card{ box-shadow:none; break-inside:avoid; }
+}
+
 /* ---------- header ---------- */
 .app-header{
   position:sticky; top:0; z-index:20;
@@ -302,7 +308,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div id="pdf-year-wrap" hidden>
           <div class="notice">We couldn't detect the statement year from the PDF. Enter it to continue:</div>
           <div style="display:flex; gap:8px">
-            <input type="number" id="pdf-year" placeholder="2026" min="1990" max="2100" inputmode="numeric">
+            <select id="pdf-month" style="flex:1">
+              <option value="">Month (optional)</option>
+            </select>
+            <input type="number" id="pdf-year" placeholder="2026" min="1990" max="2100" inputmode="numeric" style="flex:1">
             <button class="btn small" id="pdf-year-go" style="flex:none">Continue</button>
           </div>
         </div>
@@ -358,6 +367,48 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card"><p class="muted" style="margin:0">Note: deductible business meals are generally only 50% deductible. Amounts above are shown in full — apply the 50% limit on your return.</p></div>
     </section>
 
+    <!-- REPORTS -->
+    <section id="screen-reports" class="screen" hidden>
+      <div class="card no-print">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+          <div style="flex:1; min-width:150px">
+            <label class="f" style="margin-top:0" for="rep-preset">Period</label>
+            <select id="rep-preset">
+              <option value="month">This month</option>
+              <option value="last-month">Last month</option>
+              <option value="last-3">Last 3 months</option>
+              <option value="ytd" selected>Year to date</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+          <div id="rep-custom" style="display:none; gap:10px; flex:2; min-width:220px">
+            <div style="flex:1"><label class="f" style="margin-top:0" for="rep-from">From</label><input type="month" id="rep-from"></div>
+            <div style="flex:1"><label class="f" style="margin-top:0" for="rep-to">To</label><input type="month" id="rep-to"></div>
+          </div>
+          <div style="flex:1; min-width:130px">
+            <label class="f" style="margin-top:0" for="rep-acct">Account</label>
+            <select id="rep-acct">
+              <option value="all">All</option>
+              <option value="Personal">Personal</option>
+              <option value="Business">Business</option>
+            </select>
+          </div>
+          <button class="btn" id="rep-print">🖨 Print / PDF</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2 id="rep-title" style="margin-bottom:2px">Expense report</h2>
+        <p class="muted" id="rep-sub" style="margin-top:0"></p>
+        <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
+      </div>
+      <div class="card"><h2>Spending by category</h2><div id="rep-catchart"></div><div id="rep-cattable"></div></div>
+      <div class="card"><h2>Income vs expenses by month</h2><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
+      <div class="card"><h2>Largest expenses</h2><div id="rep-top"></div></div>
+      <div class="card"><h2>Income by category</h2><div id="rep-inc"></div></div>
+      <div class="card"><p class="muted" style="margin:0">Internal account movements (brokerage, savings, line-of-credit, transfers) are grouped as “Transfers” for display only — your sheet categories are unchanged.</p></div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="screen-settings" class="screen" hidden>
       <div class="card">
@@ -399,6 +450,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <button data-screen="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
     <button data-screen="budgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
     <button data-screen="tax"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
+    <button data-screen="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
     <button data-screen="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
   </nav>
 </div>
@@ -434,7 +486,7 @@ function el(tag, attrs, text){
   if(text !== undefined && text !== null) n.textContent = text;
   return n;
 }
-function esc(s){ return String(s==null?'':s); } // we always use textContent, this is a reminder
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 var moneyFmt = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
 function money(n){ n = Number(n)||0; return moneyFmt.format(n); }
 function todayLocal(){
@@ -576,7 +628,7 @@ async function loadAll(){
 function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(n)?n:0; }
 
 /* ================= navigation ================= */
-var SCREENS = ['dashboard','transactions','import','budgets','tax','settings'];
+var SCREENS = ['dashboard','transactions','import','budgets','tax','reports','settings'];
 function showScreen(name){
   state.screen = name;
   SCREENS.forEach(function(s){
@@ -589,6 +641,7 @@ function showScreen(name){
     else if(name==='transactions') renderTransactions();
     else if(name==='budgets') renderBudgets();
     else if(name==='tax') renderTax();
+    else if(name==='reports') renderReports();
   }
   window.scrollTo(0,0);
 }
@@ -601,7 +654,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('#tabbar button').forEach(function(b){
     b.addEventListener('click', function(){ showScreen(b.getAttribute('data-screen')); });
   });
-  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireTax();
+  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireTax(); wireReports();
   boot();
 });
 async function boot(){
@@ -1330,6 +1383,11 @@ function wireImport(){
   $('csv-parse').addEventListener('click', buildPreviewFromCsv);
 
   /* --- PDF --- */
+  (function(){
+    var ms = $('pdf-month');
+    ['January','February','March','April','May','June','July','August','September','October','November','December']
+      .forEach(function(n,i){ var o=document.createElement('option'); o.value=String(i+1); o.textContent=n; ms.appendChild(o); });
+  })();
   $('pdf-pick').addEventListener('click', function(){ $('pdf-file').click(); });
   $('pdf-file').addEventListener('change', function(){
     var f = $('pdf-file').files[0];
@@ -1338,8 +1396,9 @@ function wireImport(){
   $('pdf-year-go').addEventListener('click', function(){
     var y = parseInt($('pdf-year').value,10);
     if(!y || y<1990 || y>2100){ toast('Enter a valid year.', true); return; }
+    var mo = parseInt($('pdf-month').value,10) || null;
     $('pdf-year-wrap').hidden = true;
-    if(pendingPdf) finishPdfParse(pendingPdf, y);
+    if(pendingPdf) finishPdfParse(pendingPdf, y, mo);
   });
 
   /* --- preview actions --- */
@@ -1536,11 +1595,47 @@ function detectBank(headerText){
   return null;
 }
 function detectYear(headerText){
-  var m = /((?:19|20)\d{2})/.exec(headerText);
-  if(m) return parseInt(m[1],10);
-  m = /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+((?:19|20)\d{2})/i.exec(headerText);
-  if(m) return parseInt(m[2],10);
+  var info = detectStatementInfo(headerText);
+  return info ? info.year : null;
+}
+/* Statement period detection: returns {month, year}, month may be null.
+   Used to fix the year on transactions near a year boundary — e.g. December
+   transactions on a January statement belong to the prior year. */
+var MONTH_NAMES_RE = 'january|february|march|april|may|june|july|august|september|october|november|december';
+function monthNameToNum(n){
+  var names = MONTH_NAMES_RE.split('|');
+  var i = names.indexOf(String(n||'').toLowerCase());
+  return i===-1 ? null : i+1;
+}
+function normYear2(y){
+  y = parseInt(y,10);
+  if(y<100) y = y<50 ? 2000+y : 1900+y;
+  return y;
+}
+function detectStatementInfo(headerText){
+  var m;
+  // "Statement Period 12/13/2025 - 01/12/2026" -> end date wins
+  m = /statement\s*period[\s\S]{0,80}?(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(?:-|–|—|through|thru|to)\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/i.exec(headerText);
+  if(m) return {month:parseInt(m[4],10), year:normYear2(m[6])};
+  // "Statement Period December 13, 2025 through January 12, 2026"
+  m = new RegExp('statement\\s*period[\\s\\S]{0,80}?('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})[\\s\\S]{0,60}?(?:through|thru|to|-|–)[\\s\\S]{0,60}?('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+(\\d{4})','i').exec(headerText);
+  if(m) return {month:monthNameToNum(m[3]), year:parseInt(m[4],10)};
+  // "January 13, 2026"
+  m = new RegExp('('+MONTH_NAMES_RE+')\\s+\\d{1,2},?\\s+((?:19|20)\\d{2})','i').exec(headerText);
+  if(m) return {month:monthNameToNum(m[1]), year:parseInt(m[2],10)};
+  // "01/2026"
+  m = /(\d{1,2})[\/\-](20\d{2})/.exec(headerText);
+  if(m) return {month:parseInt(m[1],10), year:parseInt(m[2],10)};
+  // year only
+  m = /((?:19|20)\d{2})/.exec(headerText);
+  if(m) return {month:null, year:parseInt(m[1],10)};
   return null;
+}
+function stmtPeriodLabel(year, month){
+  if(!year) return '';
+  if(!month) return String(year);
+  var names = MONTH_NAMES_RE.split('|');
+  return names[month-1].charAt(0).toUpperCase()+names[month-1].slice(1)+' '+year;
 }
 var SKIP_LINE = /page\s*\d+|continued|statement\s*period|account\s*(number|summary)|beginning\s*balance|ending\s*balance|^\s*totals?\b|date\s+description\s+amount|transaction\s+detail|important\s*account|how\s*to\s*avoid|daily\s*balance|for\s*more\s*information/i;
 var MONEY_TOK = '-?\\$?[\\d,]+\\.\\d{2}|\\(\\$?[\\d,]+\\.\\d{2}\\)';
@@ -1557,7 +1652,7 @@ function guessTypeFromDesc(desc){
   if(/purchase authorized|purchase with cash back|\bchecks?\b|withdrawal|bill pay|online pmt|\bfee\b|moneylink|\bmtg\b|mortgage|\bloan\b|\bpymts?\b|\bpayment\b|premium/.test(d)) return 'expense';
   return null;
 }
-function parsePdfTransactions(lines, bank, year){
+function parsePdfTransactions(lines, bank, year, stmtMonth){
   var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
@@ -1575,6 +1670,12 @@ function parsePdfTransactions(lines, bank, year){
     if(m){
       var mm=m[1].padStart(2,'0'), dd=m[2].padStart(2,'0'), yy=year;
       if(m[3]){ var y2=parseInt(m[3],10); yy = m[3].length===2 ? (y2<50?2000+y2:1900+y2) : y2; }
+      else if(stmtMonth){
+        // Year boundary: December transactions on a January statement
+        // belong to the prior year.
+        var back = (stmtMonth - parseInt(m[1],10) + 12) % 12;
+        if(back===1 || back===2) yy = year-1;
+      }
       var desc = m[4].trim();
       // amount token may be "amt bal" — take the first
       var amtTok = m[5].trim().split(/\s+/)[0];
@@ -1631,10 +1732,13 @@ async function handlePdfFile(file){
     }
     var headerText = allLines.slice(0,30).join('\n');
     var bank = detectBank(headerText);
-    var year = detectYear(headerText);
-    pendingPdf = {lines:allLines, bank:bank, fileInfo:fileInfo};
+    var stmtInfo = detectStatementInfo(headerText);
+    var year = stmtInfo ? stmtInfo.year : null;
+    pendingPdf = {lines:allLines, bank:bank, fileInfo:fileInfo, stmtMonth: stmtInfo ? stmtInfo.month : null};
     var found = el('div',{class:'notice blue'},
-      'Detected: '+(bank?bank.name:'unknown bank (using generic parser)')+' · '+allLines.length+' text lines across '+pdf.numPages+' page(s).');
+      'Detected: '+(bank?bank.name:'unknown bank (using generic parser)')+
+      (year ? ' · '+stmtPeriodLabel(year, stmtInfo.month) : '')+
+      ' · '+allLines.length+' text lines across '+pdf.numPages+' page(s).');
     st.appendChild(found);
     if(year){
       finishPdfParse(pendingPdf, year);
@@ -1648,8 +1752,9 @@ async function handlePdfFile(file){
     st.appendChild(el('div',{class:'notice'},'PDF import failed: '+err.message));
   }
 }
-function finishPdfParse(pending, year){
-  var rows = parsePdfTransactions(pending.lines, pending.bank, year);
+function finishPdfParse(pending, year, stmtMonth){
+  stmtMonth = stmtMonth || pending.stmtMonth || null;
+  var rows = parsePdfTransactions(pending.lines, pending.bank, year, stmtMonth);
   pendingPdf = null;
   importFileInfo = pending.fileInfo || null;
   markDuplicates(rows);
@@ -1658,7 +1763,7 @@ function finishPdfParse(pending, year){
   if(!rows.length){
     notices.push('No transactions were recognized. Bank layouts vary — if this keeps happening, export a CSV from your bank and use the CSV importer above.');
   }else{
-    notices.push({blue:true, text:rows.length+' transactions found ('+(pending.bank?pending.bank.name:'generic')+', '+year+'). Review types and categories below — flip any row that was guessed wrong.'});
+    notices.push({blue:true, text:rows.length+' transactions found ('+(pending.bank?pending.bank.name:'generic')+', '+stmtPeriodLabel(year, stmtMonth)+'). Review types and categories below — flip any row that was guessed wrong.'});
   }
   showImportNotices(pn, notices, rows);
   importRows = rows;
@@ -1742,6 +1847,149 @@ function wireTax(){
   });
 }
 var PERSONAL_DEDUCTION_CATS = ['Mortgage interest','Property tax (SALT)','Charitable contributions','Medical expenses'];
+
+/* ================= reports ================= */
+var REP_TRANSFER_RE = /(schwab|fidelity|vanguard|brokerage|transfer|line of credit|loc payment|sweep|money ?market|high yield|savings)/i;
+function repDisplayCat(t){
+  var c = t.category || 'Uncategorized';
+  if(REP_TRANSFER_RE.test(c) || (c==='Uncategorized' && REP_TRANSFER_RE.test(t.description||''))) return 'Transfers';
+  return c;
+}
+function monthAdd(ym, n){
+  var y = parseInt(ym.slice(0,4),10), m = parseInt(ym.slice(5,7),10) + n;
+  while(m<1){ m+=12; y--; } while(m>12){ m-=12; y++; }
+  return y + '-' + String(m).padStart(2,'0');
+}
+function repSvg(tag, attrs, parent){
+  var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for(var k in attrs) e.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function repSvgText(parent, x, y, str, attrs){
+  var t = repSvg('text', attrs||{}, parent);
+  t.setAttribute('x', x); t.setAttribute('y', y);
+  t.textContent = str;
+  return t;
+}
+function wireReports(){
+  ['rep-preset','rep-acct'].forEach(function(id){ $(id).addEventListener('change', renderReports); });
+  $('rep-preset').addEventListener('change', function(){
+    $('rep-custom').style.display = ($('rep-preset').value==='custom') ? 'flex' : 'none';
+  });
+  $('rep-from').addEventListener('change', renderReports);
+  $('rep-to').addEventListener('change', renderReports);
+  $('rep-print').addEventListener('click', function(){ window.print(); });
+}
+function renderReports(){
+  var preset = $('rep-preset').value, acct = $('rep-acct').value;
+  var now = monthLocal(), from, to;
+  if(preset==='month'){ from = to = now; }
+  else if(preset==='last-month'){ from = to = monthAdd(now,-1); }
+  else if(preset==='last-3'){ from = monthAdd(now,-2); to = now; }
+  else if(preset==='ytd'){ from = now.slice(0,4)+'-01'; to = now; }
+  else if(preset==='all'){ from = '2000-01'; to = now; }
+  else { from = $('rep-from').value || now; to = $('rep-to').value || now; if(from>to){ var s=from; from=to; to=s; } }
+  var rows = state.transactions.filter(function(t){
+    var m = (t.txn_date||'').slice(0,7);
+    if(m<from || m>to) return false;
+    if(acct!=='all' && t.business_personal!==acct) return false;
+    return true;
+  });
+  var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byMonth={}, top=[];
+  rows.forEach(function(t){
+    var a = num(t.amount), m = (t.txn_date||'').slice(0,7);
+    if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
+    if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; }
+    else { exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; top.push(t); }
+  });
+  top.sort(function(a,b){ return num(b.amount)-num(a.amount); });
+  var net = inc-exp;
+  var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
+  $('rep-title').textContent = 'Expense report';
+  $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
+  $('rep-stats').innerHTML =
+    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type!=='income';}).length + ' transactions') +
+    statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions') +
+    statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit') +
+    statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months');
+
+  // --- spending by category chart ---
+  var cc = $('rep-catchart'); cc.innerHTML='';
+  var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+  if(!cats.length){ emptyInto(cc,'📊','No expenses in this period.'); }
+  else{
+    var show = cats.slice(0,10), max = byCat[show[0]]||1, rowH=36, W=100;
+    var svg = repSvg('svg',{width:'100%', height:String(show.length*rowH+6), viewBox:'0 0 '+W+' '+(show.length*rowH+6)}, cc);
+    show.forEach(function(c,i){
+      var g = repSvg('g',{},svg), y = i*rowH+4;
+      var w = Math.max(2,(byCat[c]/max)*(W-38));
+      repSvg('rect',{x:'0', y:String(y+15), width:String(w), height:'10', rx:'5', fill:'#177a52'}, g);
+      repSvgText(g,'0',String(y+11),(c.length>28?c.slice(0,27)+'…':c),{'font-size':'12', fill:'#17202a'});
+      repSvgText(g,String(W),String(y+11),money(byCat[c]),{'font-size':'12', fill:'#68727f','text-anchor':'end'});
+      repSvgText(g,String(w+4),String(y+24),Math.round(byCat[c]/exp*100)+'%',{'font-size':'10', fill:'#9aa3ad'});
+    });
+  }
+  // --- category table ---
+  var ct = $('rep-cattable');
+  if(!cats.length){ ct.innerHTML=''; }
+  else{
+    var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th></tr>';
+    cats.forEach(function(c){ h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+byCatN[c]+'</td><td style="text-align:right">'+Math.round(byCat[c]/exp*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>'; });
+    ct.innerHTML = h + '</table></div>';
+  }
+
+  // --- monthly income vs expenses ---
+  var mc = $('rep-monthchart'); mc.innerHTML='';
+  var months = Object.keys(byMonth).sort();
+  if(!months.length){ emptyInto(mc,'📈','No transactions in this period.'); }
+  else{
+    var maxV = 1;
+    months.forEach(function(m){ maxV = Math.max(maxV, byMonth[m].inc, byMonth[m].exp); });
+    var bw=26, gap=10, mg=30, H=170, plotH=H-34;
+    var svgW = months.length*(bw*2+gap)+mg*2;
+    var svg2 = repSvg('svg',{width:'100%', height:String(H), viewBox:'0 0 '+svgW+' '+H}, mc);
+    months.forEach(function(m,i){
+      var x = mg + i*(bw*2+gap);
+      var ih = Math.round(byMonth[m].inc/maxV*plotH), eh = Math.round(byMonth[m].exp/maxV*plotH);
+      repSvg('rect',{x:String(x), y:String(H-30-ih), width:String(bw), height:String(ih), rx:'3', fill:'#2563eb'}, svg2);
+      repSvg('rect',{x:String(x+bw+2), y:String(H-30-eh), width:String(bw), height:String(eh), rx:'3', fill:'#177a52'}, svg2);
+      var lbl = m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5);
+      repSvgText(svg2, String(x+bw+1), String(H-12), lbl, {'font-size':'10', fill:'#68727f','text-anchor':'middle'});
+    });
+    repSvgText(svg2, String(svgW-2), '12', '■ Income  ■ Expenses', {'font-size':'11', fill:'#68727f','text-anchor':'end'});
+  }
+  var mt = $('rep-monthtable');
+  var mh = '<div class="ptablewrap"><table class="ptable"><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr>';
+  months.forEach(function(m){
+    var b = byMonth[m], n = b.inc-b.exp;
+    mh += '<tr><td>'+fmtMonthPretty(m)+'</td><td style="text-align:right">'+money(b.inc)+'</td><td style="text-align:right">'+money(b.exp)+'</td><td style="text-align:right; color:'+(n>=0?'var(--accent)':'var(--danger)')+'">'+money(n)+'</td></tr>';
+  });
+  mt.innerHTML = mh + '</table></div>';
+
+  // --- largest expenses ---
+  var tp = $('rep-top');
+  if(!top.length){ tp.innerHTML = '<p class="muted">No expenses in this period.</p>'; }
+  else{
+    var th = '<div class="ptablewrap"><table class="ptable"><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>';
+    top.slice(0,10).forEach(function(t){
+      th += '<tr><td>'+esc(t.txn_date||'')+'</td><td>'+esc(t.description||'')+'</td><td>'+esc(repDisplayCat(t))+'</td><td style="text-align:right">'+money(num(t.amount))+'</td></tr>';
+    });
+    tp.innerHTML = th + '</table></div>';
+  }
+  // --- income by category ---
+  var ic2 = $('rep-inc');
+  var ics = Object.keys(byInc).sort(function(a,b){ return byInc[b]-byInc[a]; });
+  if(!ics.length){ ic2.innerHTML = '<p class="muted">No income in this period.</p>'; }
+  else{
+    var ih2 = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th></tr>';
+    ics.forEach(function(c){ ih2 += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td></tr>'; });
+    ic2.innerHTML = ih2 + '</table></div>';
+  }
+}
+function statHtml(label, value, cls, sub){
+  return '<div class="stat"><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
+}
 function renderTaxGroup(node, rows){
   node.innerHTML='';
   if(!rows.length){ emptyInto(node,'🧾','Nothing here for this year.'); return; }
