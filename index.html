@@ -273,6 +273,9 @@ textarea{resize:vertical; min-height:64px;}
 }
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 #toast.err{background:#8f2424;}
+/* When a bottom sheet is open, show the toast at the top so it never covers the sheet's buttons. */
+#toast.top{bottom:auto; top:calc(var(--headH, 60px) + 10px + env(safe-area-inset-top)); transform:translateX(-50%) translateY(-20px);}
+#toast.top.show{transform:translateX(-50%) translateY(0);}
 .spin{display:inline-block; width:18px; height:18px; border:2.5px solid var(--border);
   border-top-color:var(--blue); border-radius:50%; animation:sp 0.8s linear infinite; vertical-align:-4px;}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -765,7 +768,8 @@ var toastTimer = null;
 function toast(msg, isErr){
   var t = $('toast');
   t.textContent = msg;
-  t.className = isErr ? 'err show' : 'show';
+  var sheetOpen = $('modal-root') && $('modal-root').children.length>0;
+  t.className = (isErr ? 'err show' : 'show') + (sheetOpen ? ' top' : '');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ t.className=''; }, 3400);
 }
@@ -2584,7 +2588,7 @@ function paymentMethodFromAccount(text, hint){
   var t = String(text||'').trim();
   var src = t + ' ' + String(hint||'');
   var bank = /wells\s*fargo/i.test(src) ? 'Wells Fargo'
-    : /capital\s*one/i.test(src) ? 'Capital One'
+    : /capital\s*one|quicksilver/i.test(src) ? 'Capital One'
     : /citibank|\bciti\b/i.test(src) ? 'Citibank' : null;
   if(!t) return bank; // nothing to read: bank name alone, or null
   var m, last4 = null, masked = null;
