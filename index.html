@@ -909,7 +909,9 @@ async function fetchTimeout(url, opts, ms){
   }finally{ clearTimeout(timer); }
 }
 async function apiGet(params){
-  var qs = new URLSearchParams(params).toString();
+  var q = {_: Date.now()}; // cache-buster: a stale cached list is worse than useless
+  for(var k in params) q[k] = params[k];
+  var qs = new URLSearchParams(q).toString();
   var lastErr = null;
   for(var attempt=0; attempt<3; attempt++){
     try{
@@ -1896,6 +1898,7 @@ function openBulkUpdate(ids){
       bulkUpdating = {set:uset, done:{}, failed:{}};
       if(state.screen==='transactions') renderTransactions();
       var done = 0, failed = 0;
+      var expected = {}; // id -> per-row expected field values, for verify-after-write
       await withSaveLock(async function(){
         for(var i=0;i<ids.length;i++){
           var x = null;
@@ -1910,6 +1913,7 @@ function openBulkUpdate(ids){
               var dflt = defaultTaxFor(ov.category);
               if(dflt) ov.tax_category = dflt;
             }
+            expected[x.id] = ov;
             var newCat = ov.category!==undefined ? ov.category : (x.category||'');
             try{
               await apiPost({action:'update', tab:'Transactions', id:x.id, row:txnRowForUpdate(x, newCat, ov)});
@@ -1920,7 +1924,34 @@ function openBulkUpdate(ids){
             if(bb) bb.className = 'bulkbar '+(ok?'done':'fail');
           }
         }
-        try{ await loadAll(); }catch(e){}
+        var loadOk = true;
+        try{ await loadAll(); }catch(e){ loadOk = false; }
+        if(loadOk){
+          // Verify the writes actually landed. A "success" that didn't stick
+          // is reported as a failure, never as a success.
+          for(var v=0; v<ids.length; v++){
+            var vid = ids[v];
+            if(!bulkUpdating.done[vid]) continue;
+            var xt = null;
+            for(var w=0; w<state.transactions.length; w++){
+              if(state.transactions[w].id===vid){ xt = state.transactions[w]; break; }
+            }
+            var exp = expected[vid]||{};
+            var mismatch = !xt;
+            if(!mismatch){
+              for(var fk in exp){
+                if(String(xt[fk]||'')!==String(exp[fk])){ mismatch = true; break; }
+              }
+            }
+            if(mismatch){
+              delete bulkUpdating.done[vid];
+              bulkUpdating.failed[vid] = true;
+              done--; failed++;
+              var vbb = bulkBars[vid];
+              if(vbb) vbb.className = 'bulkbar fail';
+            }
+          }
+        }
       });
       bulkUpdating = null;
       if(state.screen==='transactions') renderTransactions();
