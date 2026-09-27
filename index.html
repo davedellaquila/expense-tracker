@@ -897,6 +897,16 @@ try{
 
 /* ================= api ================= */
 function apiUrl(){ return state.apiUrl; }
+/* fetch that gives up after ms instead of hanging forever */
+async function fetchTimeout(url, opts, ms){
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, ms||25000);
+  try{
+    var o = opts||{};
+    o.signal = ctrl.signal;
+    return await fetch(url, o);
+  }finally{ clearTimeout(timer); }
+}
 async function apiGet(params){
   var qs = new URLSearchParams(params).toString();
   var lastErr = null;
@@ -920,15 +930,30 @@ async function apiGet(params){
   }
   throw lastErr;
 }
+/* POST with timeout. Idempotent actions (full-row update/delete) are retried;
+   appends are not, to avoid double-writing after a lost response. */
+var IDEMPOTENT_POST = {update:1, 'delete':1, setBudget:1, ping:1};
 async function apiPost(body){
-  var res = await fetch(state.apiUrl, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify(body)
-  });
-  var j = await res.json().catch(function(){ throw new Error('The server returned an unreadable response. Check the Web app URL.'); });
-  if(!j.ok) throw new Error(j.error || 'Request failed.');
-  return j;
+  var attempts = IDEMPOTENT_POST[body.action] ? 3 : 1;
+  var lastErr = null;
+  for(var attempt=0; attempt<attempts; attempt++){
+    try{
+      var res = await fetchTimeout(state.apiUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify(body)
+      }, 25000);
+      var j = await res.json().catch(function(){ throw new Error('The server returned an unreadable response. Check the Web app URL.'); });
+      if(!j.ok) throw new Error(j.error || 'Request failed.');
+      return j;
+    }catch(err){
+      lastErr = err;
+      var msg = String((err && err.message) || '');
+      if(/Unknown tab|Unknown action|Row not found/i.test(msg)) throw err; // retrying won't help
+      if(attempt<attempts-1) await new Promise(function(r){ setTimeout(r, 1200*(attempt+1)); });
+    }
+  }
+  throw lastErr;
 }
 /* Serialize save flows (update → reload → render → toast). Without this,
    two overlapping saves race: the slower one's reload can overwrite fresh
@@ -1031,7 +1056,7 @@ function wireSetup(){
     btn.disabled = true;
     btn.innerHTML = '<span class="spin"></span> Testing…';
     try{
-      var res = await fetch(url + '?action=ping');
+      var res = await fetchTimeout(url + '?action=ping', null, 20000);
       var j = await res.json();
       if(!j.ok) throw new Error(j.error||'Ping failed');
       try{ localStorage.setItem(LS_API, url); }catch(e){}
@@ -1051,7 +1076,7 @@ function wireSettings(){
     var url = $('set-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Enter a URL first.', true); return; }
     try{
-      var res = await fetch(url + '?action=ping');
+      var res = await fetchTimeout(url + '?action=ping', null, 20000);
       var j = await res.json();
       if(j.ok) toast('Connection works!');
       else toast('Server error: '+(j.error||'unknown'), true);
@@ -1061,7 +1086,7 @@ function wireSettings(){
     var url = $('set-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Enter a URL first.', true); return; }
     try{
-      var res = await fetch(url + '?action=ping');
+      var res = await fetchTimeout(url + '?action=ping', null, 20000);
       var j = await res.json();
       if(!j.ok) throw new Error(j.error||'Ping failed');
       try{ localStorage.setItem(LS_API, url); }catch(e){}
