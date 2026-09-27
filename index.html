@@ -2296,7 +2296,6 @@ function openBulkUpdate(ids){
       return s;
     }
     var sCat = noChangeSelect();
-    allCategories().forEach(function(c){ sCat.appendChild(el('option',{value:c},c)); });
     changeRow('Category', sCat);
     var sType = noChangeSelect();
     sType.appendChild(el('option',{value:'income'},'Income'));
@@ -2306,6 +2305,25 @@ function openBulkUpdate(ids){
     sBp.appendChild(el('option',{value:'Personal'},'Personal'));
     sBp.appendChild(el('option',{value:'Business'},'Business'));
     changeRow('Account (Personal / Business)', sBp);
+    // The category list follows the chosen account type: pick Personal or
+    // Business to see only that kind of category; with no account chosen,
+    // every category is shown.
+    function refreshBulkCats(){
+      var prev = sCat.value;
+      sCat.innerHTML = '';
+      sCat.appendChild(el('option',{value:''},'— no change —'));
+      var kind = sBp.value;
+      var names = {};
+      state.categories.forEach(function(c){
+        if((!kind || c.kind===kind) && c.name) names[c.name] = true;
+      });
+      if(!kind) state.transactions.forEach(function(t){ if(t.category) names[t.category] = true; });
+      Object.keys(names).sort(function(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); })
+        .forEach(function(nm){ sCat.appendChild(el('option',{value:nm},nm)); });
+      sCat.value = prev; // reverts to '— no change —' when the old pick is filtered out
+    }
+    sBp.addEventListener('change', refreshBulkCats);
+    refreshBulkCats();
     var sPay = noChangeSelect();
     var payOpts = PAYMENT_METHODS.slice();
     state.transactions.forEach(function(t){
