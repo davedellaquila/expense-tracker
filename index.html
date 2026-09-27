@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Expense Tracker</title>
+<script>
+/* Apply saved theme before first paint to avoid a flash. */
+(function(){ try{
+  var t = localStorage.getItem('expenseTracker.theme') || 'system';
+  var dark = t==='dark' || (t==='system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+}catch(e){} })();
+</script>
 <style>
 :root{
   --bg:#f3f5f7; --card:#ffffff; --text:#17202a; --muted:#68727f;
@@ -12,8 +20,30 @@
   --blue:#2563eb; --blue-soft:#e8effd;
   --danger:#cf3f3f; --danger-soft:#fbecec;
   --warn:#9a6b1a; --warn-soft:#fdf3e0;
+  --track:#edf0f3; --th-bg:#f0f3f6; --input-bg:#ffffff; --seg-bg:#edf0f3;
   --radius:14px; --tabbar-h:64px;
 }
+[data-theme="dark"]{
+  --bg:#0f141a; --card:#182028; --text:#edf1f5; --muted:#9aa7b4;
+  --border:#2b3540; --accent:#35a06c; --accent-soft:#123528;
+  --blue:#6b9bf3; --blue-soft:#1b2a4a;
+  --danger:#e87a7a; --danger-soft:#3d1f1f;
+  --warn:#d9a441; --warn-soft:#3a2c12;
+  --track:#232c35; --th-bg:#1f2730; --input-bg:#141b22; --seg-bg:#232c35;
+}
+[data-theme="dark"] .notice{ border-color:#6b5a26; color:#ecd9a0; }
+[data-theme="dark"] .notice.blue{ border-color:#31497a; color:#a9c3f5; }
+[data-theme="dark"] .privacy{ border-color:#6b5a26; color:#ecd9a0; }
+[data-theme="dark"] .confbadge.high{ background:#123528; color:#5fd598; }
+[data-theme="dark"] .confbadge.medium{ background:#3a2c12; color:#e8b64c; }
+[data-theme="dark"] .confbadge.low{ background:#232c35; color:#9aa7b4; }
+[data-theme="dark"] .dupbadge{ background:#3d1f1f; color:#f0938c; }
+/* chart element colors that follow the theme */
+.cx-text{ fill:var(--text); }
+.cx-mut{ fill:var(--muted); }
+.cx-faint{ fill:var(--muted); opacity:.75; }
+.cx-track{ fill:var(--track); }
+.cx-grid{ stroke:var(--border); }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
 body{
@@ -76,7 +106,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .pos{color:var(--accent);} .neg{color:var(--danger);}
 
 /* ---------- bars ---------- */
-.bar{height:9px; background:#edf0f3; border-radius:99px; overflow:hidden; margin:6px 0 2px;}
+.bar{height:9px; background:var(--track); border-radius:99px; overflow:hidden; margin:6px 0 2px;}
 .bar > div{height:100%; background:var(--accent); border-radius:99px; transition:width .3s;}
 .bar.over > div{background:var(--danger);}
 .barrow{margin:10px 0;}
@@ -87,7 +117,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .txn{display:flex; align-items:center; gap:10px; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--border); border-radius:12px;
   padding:10px 12px; margin-bottom:8px; cursor:pointer; font-size:15px; color:var(--text);}
-.txn:active{background:#f0f3f6;}
+.txn:active{background:var(--th-bg);}
 .txn .dot{width:10px; height:10px; border-radius:50%; flex:none;}
 .txn .dot.in{background:var(--accent);} .txn .dot.ex{background:var(--danger);}
 .txn .mid{flex:1; min-width:0;}
@@ -103,14 +133,14 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 label.f{display:block; font-size:13px; font-weight:600; color:var(--muted); margin:12px 0 5px;}
 input[type=text],input[type=number],input[type=date],input[type=month],input[type=url],select,textarea{
   width:100%; font-size:16px; padding:10px 12px; border:1px solid var(--border);
-  border-radius:10px; background:#fff; color:var(--text); font-family:inherit;
+  border-radius:10px; background:var(--input-bg); color:var(--text); font-family:inherit;
 }
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue-soft); border-color:var(--blue);}
 textarea{resize:vertical; min-height:64px;}
-.seg{display:flex; background:#edf0f3; border-radius:12px; padding:3px; gap:3px;}
+.seg{display:flex; background:var(--seg-bg); border-radius:12px; padding:3px; gap:3px;}
 .seg button{flex:1; border:none; background:transparent; padding:9px 4px; border-radius:9px;
   font-size:14.5px; font-weight:600; color:var(--muted); cursor:pointer;}
-.seg button.on{background:#fff; color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.seg button.on{background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .filters{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
 .filters .full{grid-column:1 / -1;}
 .btn{
@@ -154,11 +184,11 @@ textarea{resize:vertical; min-height:64px;}
   display:flex; align-items:flex-end; justify-content:center; animation:fade .15s;
 }
 .sheet{
-  background:#fff; width:100%; max-width:760px; max-height:92dvh; overflow-y:auto;
+  background:var(--card); width:100%; max-width:760px; max-height:92dvh; overflow-y:auto;
   border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
 }
 .sheet h2{margin:0 0 4px; font-size:18px;}
-.grab{width:42px; height:5px; border-radius:99px; background:#d7dde3; margin:0 auto 12px;}
+.grab{width:42px; height:5px; border-radius:99px; background:var(--border); margin:0 auto 12px;}
 
 /* ---------- toast / spinner ---------- */
 #toast{
@@ -169,7 +199,7 @@ textarea{resize:vertical; min-height:64px;}
 }
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 #toast.err{background:#8f2424;}
-.spin{display:inline-block; width:18px; height:18px; border:2.5px solid #cfd6dd;
+.spin{display:inline-block; width:18px; height:18px; border:2.5px solid var(--border);
   border-top-color:var(--blue); border-radius:50%; animation:sp 0.8s linear infinite; vertical-align:-4px;}
 @keyframes sp{to{transform:rotate(360deg)}}
 .loading{text-align:center; padding:40px 0; color:var(--muted);}
@@ -181,7 +211,7 @@ textarea{resize:vertical; min-height:64px;}
 .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
 .ptablewrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px; margin:10px 0;}
 table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:640px;}
-.ptable th{background:#f0f3f6; text-align:left; padding:8px; font-size:12px; position:sticky; top:0;}
+.ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:12px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
 .ptable input,.ptable select{font-size:13.5px; padding:6px 8px;}
 .ptable tr.skip td{opacity:.45;}
@@ -441,6 +471,14 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="btnrow"><button class="btn" id="set-user-save">Save name</button></div>
       </div>
       <div class="card">
+        <h2>Appearance</h2>
+        <div class="seg" id="theme-seg">
+          <button data-theme-opt="light">☀️ Light</button>
+          <button data-theme-opt="dark">🌙 Dark</button>
+          <button data-theme-opt="system">🌓 System</button>
+        </div>
+      </div>
+      <div class="card">
         <h2>Setup steps</h2>
         <div class="steps" style="border:none; padding:0; margin:0;">
           <ol>
@@ -475,6 +513,29 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 /* ================= constants ================= */
 var LS_API = 'expenseTracker.apiUrl';
 var LS_USER = 'expenseTracker.userName';
+var LS_THEME = 'expenseTracker.theme';
+
+/* ================= theme ================= */
+function themePref(){ try{ return localStorage.getItem(LS_THEME) || 'system'; }catch(e){ return 'system'; } }
+function effectiveDark(){
+  var t = themePref();
+  if(t==='dark') return true;
+  if(t==='light') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', effectiveDark()?'dark':'light');
+  document.querySelectorAll('#theme-seg button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-theme-opt')===themePref());
+  });
+}
+if(window.matchMedia){
+  try{
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){
+      if(themePref()==='system'){ applyTheme(); renderReports(); }
+    });
+  }catch(e){}
+}
 var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -667,6 +728,7 @@ document.addEventListener('DOMContentLoaded', function(){
     b.addEventListener('click', function(){ showScreen(b.getAttribute('data-screen')); });
   });
   wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireTax(); wireReports();
+  applyTheme();
   boot();
 });
 async function boot(){
@@ -754,10 +816,20 @@ function wireSettings(){
     updateUserChip();
     toast('Name saved.');
   });
+  // theme segmented control
+  document.querySelectorAll('#theme-seg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      try{ localStorage.setItem(LS_THEME, b.getAttribute('data-theme-opt')); }catch(e){}
+      applyTheme();
+      renderReports();
+      toast('Theme updated.');
+    });
+  });
   // prefill when settings shown
   document.querySelector('#tabbar button[data-screen="settings"]').addEventListener('click', function(){
     $('set-url').value = state.apiUrl || '';
     $('set-user').value = state.userName || '';
+    applyTheme();
   });
 }
 
@@ -813,11 +885,11 @@ function renderDashboard(){
       r.setAttribute('rx','4.5'); r.setAttribute('fill','#177a52');
       var t1 = document.createElementNS(NS,'text');
       t1.setAttribute('x','0'); t1.setAttribute('y',String(y+10));
-      t1.setAttribute('font-size','12'); t1.setAttribute('fill','#17202a');
+      t1.setAttribute('font-size','12'); t1.setAttribute('class','cx-text');
       t1.textContent = (c.length>26?c.slice(0,25)+'…':c);
       var t2 = document.createElementNS(NS,'text');
       t2.setAttribute('x',String(W)); t2.setAttribute('y',String(y+10));
-      t2.setAttribute('font-size','12'); t2.setAttribute('fill','#68727f');
+      t2.setAttribute('font-size','12'); t2.setAttribute('class','cx-mut');
       t2.setAttribute('text-anchor','end');
       t2.textContent = money(byCat[c]);
       g.appendChild(r); g.appendChild(t1); g.appendChild(t2);
@@ -1905,8 +1977,8 @@ function repDonut(el, items){
     it._color = color;
     start = end;
   });
-  svg += '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="22" font-weight="700" fill="#17202a">'+money(total)+'</text>';
-  svg += '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="12" fill="#68727f">total</text>';
+  svg += '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="22" font-weight="700" class="cx-text">'+money(total)+'</text>';
+  svg += '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="12" class="cx-mut">total</text>';
   var leg = '<div class="donut-legend">';
   top.forEach(function(it){
     leg += '<div class="dl-row"><span class="dl-swatch" style="background:'+it._color+'"></span>'+
@@ -1923,10 +1995,10 @@ function repHBars(el, items, color, emptyMsg){
   items.forEach(function(it, i){
     var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*(W-labelW-110));
     var nm = it.name.length>26 ? it.name.slice(0,25)+'…' : it.name;
-    svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" fill="#17202a">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
-      '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" fill="#edf0f3"/>'+
+    svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" class="cx-track"/>'+
       '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"><title>'+esc(it.name)+': '+money(it.value)+'</title></rect>'+
-      '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" fill="#17202a">'+money(it.value)+'</text></g>';
+      '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+money(it.value)+'</text></g>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
 }
@@ -1940,8 +2012,8 @@ function repTrend(el, months){
   var svg='';
   for(var g=0; g<=4; g++){
     var gy = pad.top + plotH - (g/4)*plotH;
-    svg += '<line x1="'+pad.left+'" y1="'+gy+'" x2="'+(W-pad.right)+'" y2="'+gy+'" stroke="#e6eaee" stroke-width="1"/>'+
-           '<text x="'+(pad.left-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="11" fill="#9aa3ad">'+repShort(maxV*g/4)+'</text>';
+    svg += '<line x1="'+pad.left+'" y1="'+gy+'" x2="'+(W-pad.right)+'" y2="'+gy+'" class="cx-grid" stroke-width="1"/>'+
+           '<text x="'+(pad.left-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="11" class="cx-faint">'+repShort(maxV*g/4)+'</text>';
   }
   var step = plotW/vals.length, barW = Math.min(46, step*0.52), pts=[];
   vals.forEach(function(v, i){
@@ -1954,9 +2026,9 @@ function repTrend(el, months){
   pts.forEach(function(p){ svg += '<circle cx="'+Math.round(p[0])+'" cy="'+Math.round(p[1])+'" r="5" fill="'+REP_CORAL+'"><title>Cumulative: '+money(vals[pts.indexOf(p)].cum)+'</title></circle>'; });
   vals.forEach(function(v, i){
     var cx = pad.left + (i+0.5)*step;
-    svg += '<text x="'+Math.round(cx)+'" y="'+(H-14)+'" text-anchor="middle" font-size="11" fill="#68727f">'+esc(v.label)+'</text>';
+    svg += '<text x="'+Math.round(cx)+'" y="'+(H-14)+'" text-anchor="middle" font-size="11" class="cx-mut">'+esc(v.label)+'</text>';
   });
-  svg += '<text x="'+pad.left+'" y="20" font-size="12" fill="#68727f">Bars: monthly spend</text>'+
+  svg += '<text x="'+pad.left+'" y="20" font-size="12" class="cx-mut">Bars: monthly spend</text>'+
          '<text x="'+(pad.left+170)+'" y="20" font-size="12" fill="'+REP_CORAL+'">Line: cumulative</text>';
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
 }
@@ -1971,8 +2043,8 @@ function repWeekday(el, days){
   days.forEach(function(v, i){
     var cx=pad.left+(i+0.5)*step, bh=(v/max)*plotH;
     svg += '<rect x="'+Math.round(cx-barW/2)+'" y="'+Math.round(pad.top+plotH-bh)+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+REP_GREEN+'" opacity="0.9"><title>'+names[i]+': '+money(v)+'</title></rect>'+
-           '<text x="'+Math.round(cx)+'" y="'+Math.round(pad.top+plotH-bh-8)+'" text-anchor="middle" font-size="11" fill="#68727f">'+repShort(v)+'</text>'+
-           '<text x="'+Math.round(cx)+'" y="'+(H-10)+'" text-anchor="middle" font-size="12" fill="#68727f">'+names[i]+'</text>';
+           '<text x="'+Math.round(cx)+'" y="'+Math.round(pad.top+plotH-bh-8)+'" text-anchor="middle" font-size="11" class="cx-mut">'+repShort(v)+'</text>'+
+           '<text x="'+Math.round(cx)+'" y="'+(H-10)+'" text-anchor="middle" font-size="12" class="cx-mut">'+names[i]+'</text>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
 }
