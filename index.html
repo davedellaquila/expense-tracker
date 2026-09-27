@@ -1240,6 +1240,8 @@ function categoryOptionsFor(sel, bpKind, current){
   sel.innerHTML='';
   var list = state.categories.filter(function(c){
     return !bpKind || c.kind===bpKind;
+  }).sort(function(a,b){
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
   });
   if(!list.length){
     sel.appendChild(el('option',{value:''},'— no categories —'));
