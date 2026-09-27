@@ -2839,7 +2839,7 @@ function repDonut(el, items, onSlice, emptyMsg){
   var topSum = top.reduce(function(s,i){ return s+i.value; }, 0);
   if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum,
     names: items.slice(7).map(function(i){ return i.name; })});
-  var W=560, H=290, cx=150, cy=145, r=112, inner=66, start=-Math.PI/2, svg='';
+  var W=560, H=290, cx=280, cy=145, r=112, inner=66, start=-Math.PI/2, svg='';
   top.forEach(function(it, i){
     var angle = (it.value/total)*Math.PI*2, end = start+angle, color = REP_PALETTE[i%REP_PALETTE.length];
     if(it.value>0) svg += '<path d="'+repDonutPath(cx,cy,r,inner,start,end)+'" fill="'+color+'" opacity="0.92"'+(onSlice?' class="rep-click" data-slice="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></path>';
