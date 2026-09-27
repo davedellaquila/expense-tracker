@@ -457,21 +457,18 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
           <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
-            <div style="display:flex;align-items:center;gap:2px">
-              <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off" style="flex:1;min-width:0">
-              <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
-              <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-              <label class="f" for="f-sort" style="margin:0;flex:none">Sort</label>
-              <select id="f-sort" style="flex:1;min-width:0">
-                <option value="date-desc" selected>Newest first</option>
-                <option value="date-asc">Oldest first</option>
-                <option value="amount-desc">Amount: high to low</option>
-                <option value="amount-asc">Amount: low to high</option>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="flex:1;min-width:0">
+              <select id="f-sort" aria-label="Sort transactions" style="flex:none;width:auto;max-width:36%;font-size:14px;padding:9px 6px">
+                <option value="date-desc" selected>Newest</option>
+                <option value="date-asc">Oldest</option>
+                <option value="amount-desc">Amount ↓</option>
+                <option value="amount-asc">Amount ↑</option>
                 <option value="merchant-asc">Merchant A–Z</option>
                 <option value="merchant-desc">Merchant Z–A</option>
               </select>
+              <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
+              <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
             </div></div>
         </div>
       </div>
