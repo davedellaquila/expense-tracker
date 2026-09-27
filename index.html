@@ -452,7 +452,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
             <div style="display:flex;align-items:center;gap:2px">
               <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off" style="flex:1;min-width:0">
-              <button class="linkbtn" id="f-select" type="button" style="flex:none">Select</button>
+              <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
               <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
             </div></div>
         </div>
@@ -1415,7 +1415,7 @@ var bulkBars = {}; // id -> .bulkbar element, rebuilt on every renderTransaction
 function txnSelCount(){ return Object.keys(txnSelected).length; }
 function setTxnSelectMode(on){
   txnSelectMode = on;
-  $('f-select').textContent = on ? 'Done' : 'Select';
+  $('f-select').textContent = on ? 'Done' : 'Bulk update';
   $('selbar').hidden = !on;
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
