@@ -149,6 +149,16 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .txn .amt{font-weight:700; font-variant-numeric:tabular-nums; flex:none;}
 .txn .who{font-size:11px; color:var(--muted); background:var(--bg); border-radius:99px; padding:2px 8px; flex:none;}
 .datehead{font-size:12.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:14px 2px 8px;}
+/* bulk selection */
+.selbar{position:fixed; z-index:45; left:12px; right:12px;
+  bottom:calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom));
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  box-shadow:0 10px 24px rgba(10,20,15,.18); padding:10px 12px;
+  display:flex; align-items:center; gap:8px;}
+.selbar #selbar-count{flex:1; font-weight:700; font-size:14.5px;}
+.selbar .btn{margin:0;}
+.txn.selrow.checked{background:var(--th-bg); border-color:var(--blue);}
+.txn .selbox{width:20px; height:20px; flex:none; accent-color:var(--blue); pointer-events:none;}
 .empty{text-align:center; color:var(--muted); padding:34px 16px; font-size:14.5px;}
 .empty .big{font-size:30px; display:block; margin-bottom:8px;}
 
@@ -405,7 +415,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <h2 style="margin:0">Filters</h2>
-          <button class="linkbtn" id="f-reset" type="button">Reset</button>
+          <div>
+            <button class="linkbtn" id="f-select" type="button">Select</button>
+            <button class="linkbtn" id="f-reset" type="button">Reset</button>
+          </div>
         </div>
         <div class="filters">
           <div><label class="f" style="margin-top:0" for="f-preset">Period</label>
@@ -435,6 +448,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
+      <div id="selbar" class="selbar" hidden>
+        <span id="selbar-count">0 selected</span>
+        <button class="btn small ghost" id="selbar-all" type="button">All</button>
+        <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
+        <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
+      </div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
     </section>
 
@@ -1360,7 +1379,36 @@ function wireTransactions(){
     }, {threshold:0}).observe(origInput);
   }
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
+  $('f-select').addEventListener('click', function(){ setTxnSelectMode(!txnSelectMode); });
+  $('selbar-all').addEventListener('click', function(){
+    state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
+    renderTransactions(); updateSelbar();
+  });
+  $('selbar-clear').addEventListener('click', function(){
+    txnSelected = {}; renderTransactions(); updateSelbar();
+  });
+  $('selbar-update').addEventListener('click', function(){
+    var ids = Object.keys(txnSelected);
+    if(ids.length) openBulkUpdate(ids);
+  });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
+}
+/* bulk selection + bulk update on the Transactions screen */
+var txnSelectMode = false;
+var txnSelected = {}; // id -> true
+function txnSelCount(){ return Object.keys(txnSelected).length; }
+function setTxnSelectMode(on){
+  txnSelectMode = on;
+  $('f-select').textContent = on ? 'Done' : 'Select';
+  $('selbar').hidden = !on;
+  $('txn-add').style.display = on ? 'none' : '';
+  renderTransactions();
+  updateSelbar();
+}
+function updateSelbar(){
+  var n = txnSelCount();
+  $('selbar-count').textContent = n + ' selected';
+  $('selbar-update').disabled = !n;
 }
 function txnVisible(t){
   var ty = $('f-type').value, bp = $('f-bp').value,
@@ -1501,7 +1549,15 @@ function renderTransactions(){
       lastDay = day;
       list.appendChild(el('div',{class:'datehead'}, fmtDatePretty(day)));
     }
-    var b = el('button',{class:'txn',type:'button'});
+    var b, cb = null;
+    if(txnSelectMode){
+      b = el('div',{class:'txn selrow'+(txnSelected[t.id]?' checked':'')});
+      cb = el('input',{type:'checkbox', 'class':'selbox'});
+      cb.checked = !!txnSelected[t.id];
+      b.appendChild(cb);
+    }else{
+      b = el('button',{class:'txn',type:'button'});
+    }
     b.appendChild(el('span',{class:'dot '+(t.txn_type==='income'?'in':'ex')}));
     var mid = el('div',{class:'mid'});
     mid.appendChild(el('div',{class:'t1'}, t.merchant || t.description || '(no merchant)'));
@@ -1512,7 +1568,16 @@ function renderTransactions(){
     var amt = el('span',{class:'amt '+(t.txn_type==='income'?'pos':'neg')},
       (t.txn_type==='income'?'+':'−') + money(num(t.amount)));
     b.appendChild(amt);
-    b.addEventListener('click', function(){ openTxnForm(t); });
+    if(txnSelectMode){
+      b.addEventListener('click', function(){
+        if(txnSelected[t.id]) delete txnSelected[t.id]; else txnSelected[t.id]=true;
+        cb.checked = !!txnSelected[t.id];
+        b.classList.toggle('checked', !!txnSelected[t.id]);
+        updateSelbar();
+      });
+    }else{
+      b.addEventListener('click', function(){ openTxnForm(t); });
+    }
     list.appendChild(b);
   });
 }
@@ -1701,6 +1766,115 @@ function confirmBulkType(similar, fromType, toType){
       row.appendChild(cancel); row.appendChild(justOne); row.appendChild(apply);
       sh.appendChild(row);
     });
+  });
+}
+/* Bulk update: change chosen fields on a set of selected transactions.
+   Only fields the user sets are touched; everything else stays as-is. */
+function openBulkUpdate(ids){
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,'Update '+ids.length+' transaction'+(ids.length===1?'':'s')));
+    sh.appendChild(el('p',{class:'muted'},'Only the fields you change below will be updated \u2014 the rest stay as they are.'));
+    function changeRow(labelText, control){
+      sh.appendChild(el('label',{class:'f'},labelText));
+      sh.appendChild(control);
+    }
+    function noChangeSelect(){
+      var s = el('select');
+      s.appendChild(el('option',{value:''},'\u2014 no change \u2014'));
+      return s;
+    }
+    var sCat = noChangeSelect();
+    allCategories().forEach(function(c){ sCat.appendChild(el('option',{value:c},c)); });
+    changeRow('Category', sCat);
+    var sType = noChangeSelect();
+    sType.appendChild(el('option',{value:'income'},'Income'));
+    sType.appendChild(el('option',{value:'expense'},'Expense'));
+    changeRow('Type', sType);
+    var sBp = noChangeSelect();
+    sBp.appendChild(el('option',{value:'Personal'},'Personal'));
+    sBp.appendChild(el('option',{value:'Business'},'Business'));
+    changeRow('Account (Personal / Business)', sBp);
+    var sPay = noChangeSelect();
+    var payOpts = PAYMENT_METHODS.slice();
+    state.transactions.forEach(function(t){
+      var p = (t.payment_method||'').trim();
+      if(p && payOpts.indexOf(p)<0) payOpts.push(p);
+    });
+    payOpts.forEach(function(p){ sPay.appendChild(el('option',{value:p},p)); });
+    changeRow('Payment method', sPay);
+    var sTax = noChangeSelect();
+    sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
+    TAX_GROUPS.forEach(function(g){
+      g.items.forEach(function(it){ sTax.appendChild(el('option',{value:it},it)); });
+    });
+    changeRow('Tax category', sTax);
+    sh.appendChild(el('p',{class:'muted',style:'font-size:12px;margin:-4px 0 8px'},
+      'Tip: if you change the category but not the tax category, blank tax categories are filled in from the new category.'));
+    var sNotes = noChangeSelect();
+    sNotes.appendChild(el('option',{value:'__set__'},'Set to\u2026'));
+    sNotes.appendChild(el('option',{value:'__clear__'},'Clear'));
+    var inNotes = el('input',{type:'text',placeholder:'New notes text',style:'display:none;margin-top:8px'});
+    sNotes.addEventListener('change', function(){ inNotes.style.display = sNotes.value==='__set__' ? '' : 'none'; });
+    changeRow('Notes', sNotes);
+    sh.appendChild(inNotes);
+    var prog = el('p',{class:'muted',style:'display:none;margin-top:12px'});
+    sh.appendChild(prog);
+    var row = el('div',{class:'btnrow stickybar'});
+    var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancel.onclick = close;
+    var apply = el('button',{class:'btn',type:'button'},'Update '+ids.length);
+    row.appendChild(cancel); row.appendChild(apply);
+    sh.appendChild(row);
+    apply.onclick = async function(){
+      if(!(sCat.value||sType.value||sBp.value||sPay.value||sTax.value||sNotes.value)){
+        toast('Choose at least one field to update.', true); return;
+      }
+      if(sNotes.value==='__set__' && !inNotes.value.trim()){ toast('Type the notes text first.', true); return; }
+      if(ids.length>50){
+        var okc = await confirmDialog('Update '+ids.length+' transactions? This may take a minute or two.');
+        if(!okc) return;
+      }
+      var overrides = {};
+      if(sCat.value) overrides.category = sCat.value;
+      if(sType.value) overrides.txn_type = sType.value;
+      if(sBp.value) overrides.business_personal = sBp.value;
+      if(sPay.value) overrides.payment_method = sPay.value;
+      if(sTax.value) overrides.tax_category = sTax.value==='__empty__' ? '' : sTax.value;
+      if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
+      else if(sNotes.value==='__clear__') overrides.notes = '';
+      cancel.disabled = true; apply.disabled = true;
+      [sCat,sType,sBp,sPay,sTax,sNotes,inNotes].forEach(function(c){ c.disabled = true; });
+      prog.style.display = '';
+      var done = 0, failed = 0;
+      await withSaveLock(async function(){
+        for(var i=0;i<ids.length;i++){
+          var x = null;
+          for(var j=0;j<state.transactions.length;j++){
+            if(state.transactions[j].id===ids[i]){ x = state.transactions[j]; break; }
+          }
+          if(x){
+            var ov = {};
+            for(var k in overrides) ov[k] = overrides[k];
+            if(ov.category!==undefined && ov.tax_category===undefined && !(x.tax_category||'')){
+              var dflt = defaultTaxFor(ov.category);
+              if(dflt) ov.tax_category = dflt;
+            }
+            var newCat = ov.category!==undefined ? ov.category : (x.category||'');
+            try{
+              await apiPost({action:'update', tab:'Transactions', id:x.id, row:txnRowForUpdate(x, newCat, ov)});
+              done++;
+            }catch(e){ failed++; }
+          }
+          prog.textContent = 'Updating\u2026 '+(i+1)+' of '+ids.length;
+        }
+        try{ await loadAll(); }catch(e){}
+      });
+      close();
+      if(state.screen==='transactions') renderTransactions();
+      updateSelbar();
+      if(failed) toast('Updated '+done+' of '+ids.length+' \u2014 '+failed+' failed.', true);
+      else toast('Updated '+done+' transaction'+(done===1?'':'s')+'.');
+    };
   });
 }
 
