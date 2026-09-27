@@ -1186,24 +1186,16 @@ function allCategories(){
   return Object.keys(s).sort();
 }
 function wireTransactions(){
-  ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-q'].forEach(function(id){
-    $(id).addEventListener(id==='f-q'?'input':'change', renderTransactions);
+  ['f-preset','f-from','f-to','f-type','f-bp','f-cat'].forEach(function(id){
+    // a manual filter edit replaces any chart drill-down: the visible
+    // filters are always the single source of truth (search composes)
+    $(id).addEventListener('change', function(){ txnDrill = null; renderTransactions(); });
   });
+  $('f-q').addEventListener('input', renderTransactions);
   $('f-preset').addEventListener('change', function(){
     $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
   });
-  $('f-reset').addEventListener('click', function(){
-    $('f-preset').value = 'month';
-    $('f-custom').style.display = 'none';
-    $('f-from').value = ''; $('f-to').value = '';
-    $('f-type').value = '';
-    $('f-bp').value = '';
-    $('f-cat').value = '';
-    $('f-q').value = '';
-    $('f-q-stick').value = '';
-    txnDrill = null; // also clear any chart drill selection
-    renderTransactions();
-  });
+  $('f-reset').addEventListener('click', resetTxnFilters);
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
@@ -1252,11 +1244,36 @@ function renderDrillChip(){
   td.innerHTML = '';
   if(!txnDrill) return;
   var chip = el('div',{class:'drillchip'});
-  chip.appendChild(el('span',null,'\U0001F4CA '+txnDrill.label));
+  chip.appendChild(el('span',null,'📊 '+txnDrill.label));
   var x = el('button',{class:'drillx',type:'button','aria-label':'Clear report filter'},'\u00D7');
-  x.addEventListener('click', function(){ txnDrill = null; renderTransactions(); });
+  x.addEventListener('click', resetTxnFilters);
   chip.appendChild(x);
   td.appendChild(chip);
+}
+/* Reset all transaction filters to their defaults (also used by the drill chip's ×). */
+function resetTxnFilters(){
+  $('f-preset').value = 'month';
+  $('f-custom').style.display = 'none';
+  $('f-from').value = ''; $('f-to').value = '';
+  $('f-type').value = '';
+  $('f-bp').value = '';
+  $('f-cat').value = '';
+  $('f-q').value = '';
+  var si = $('f-q-stick'); if(si) si.value = '';
+  txnDrill = null; // also clear any chart drill selection
+  renderTransactions();
+}
+/* Set the Category filter even when its dropdown hasn't been built yet
+   (e.g. drilling straight from Home on first visit): make sure the option
+   exists before selecting it, otherwise the assignment silently fails. */
+function setCatFilter(name){
+  var fcat = $('f-cat');
+  if(name){
+    var has = false;
+    for(var i=0;i<fcat.options.length;i++) if(fcat.options[i].value===name){ has = true; break; }
+    if(!has) fcat.appendChild(el('option',{value:name},name));
+  }
+  fcat.value = name || '';
 }
 /* Jump to the Transactions screen showing exactly the drilled selection.
    The visible filters are set to match what was clicked (period, type,
@@ -1278,8 +1295,8 @@ function drillToTransactions(o){
   // single-category drill: show it in the Category filter (multi-category
   // "Other" slices and display-only names like Transfers stay on the chip)
   var cats = allCategories();
-  $('f-cat').value = (o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
-    ? o.dispCats[0] : '';
+  setCatFilter((o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
+    ? o.dispCats[0] : '');
   $('f-q').value = o.q || '';
   var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
   showScreen('transactions');
