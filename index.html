@@ -1575,14 +1575,22 @@ function openTxnForm(t){
       del.onclick = async function(){
         var ok = await confirmDialog('Delete this transaction? This cannot be undone.');
         if(!ok) return;
-        await withSaveLock(async function(){
+        if(String(t.id).indexOf('tmp-')===0){ toast('Still saving — try again in a moment.', true); return; }
+        // optimistic: drop it from the list immediately
+        state.transactions = state.transactions.filter(function(x){ return x.id!==t.id; });
+        close();
+        if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
+        withSaveLock(async function(){
           try{
             await apiPost({action:'delete', tab:'Transactions', id:t.id});
-            close();
             await loadAll();
-            showScreen('transactions');
+            if(state.screen==='transactions') renderTransactions();
             toast('Deleted.');
-          }catch(err){ toast('Delete failed: '+err.message, true); }
+          }catch(err){
+            try{ await loadAll(); }catch(e2){}
+            if(state.screen==='transactions') renderTransactions();
+            toast('Delete failed: '+err.message, true);
+          }
         });
       };
       row.appendChild(del);
@@ -1632,9 +1640,29 @@ function openTxnForm(t){
           bulkTypeIds = resT;
         }
       }
-      await withSaveLock(async function(){
-      save.disabled = true;
-      save.innerHTML = '<span class="spin"></span> Saving…';
+      // still-saving guard: don't re-edit a record whose add hasn't reached the sheet yet
+      if(isEdit && String(t.id).indexOf('tmp-')===0){ toast('Still saving — try again in a moment.', true); return; }
+      // ---- optimistic update: the list reflects the change immediately, filters
+      // included (a record that no longer matches the filters vanishes at once) ----
+      if(isEdit){
+        var cur = state.transactions.find(function(x){ return x.id===t.id; });
+        if(cur) for(var ok in rowData) cur[ok] = rowData[ok];
+        bulkIds.forEach(function(id){
+          var bx = state.transactions.find(function(x){ return x.id===id; });
+          if(bx) bx.category = newCatName;
+        });
+        bulkTypeIds.forEach(function(id){
+          var tx = state.transactions.find(function(x){ return x.id===id; });
+          if(tx) tx.txn_type = curType;
+        });
+      }else{
+        state.transactions.push(Object.assign({id:'tmp-'+Date.now(), created_at:new Date().toISOString()}, rowData));
+      }
+      var nUpdated = bulkIds.length + bulkTypeIds.length;
+      close();
+      if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
+      // ---- persist in the background, then reconcile with the sheet ----
+      withSaveLock(async function(){
       try{
         if(inCat.value==='__new__' && !existCat){
           await apiPost({action:'append', tab:'Categories', row:{name:newCatName, kind:curBp, tax_category:inTax.value||''}});
@@ -1658,15 +1686,13 @@ function openTxnForm(t){
           await apiPost({action:'update', tab:'Transactions', id:tx.id,
             row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType})});
         }
-        var nUpdated = bulkIds.length + bulkTypeIds.length;
-        close();
         await loadAll();
-        showScreen('transactions');
+        if(state.screen==='transactions') renderTransactions();
         toast(isEdit ? (nUpdated ? 'Saved. Updated '+(nUpdated+1)+' transactions.' : 'Saved.') : 'Added.');
       }catch(err){
+        try{ await loadAll(); }catch(e2){}
+        if(state.screen==='transactions') renderTransactions();
         toast('Save failed: '+err.message, true);
-        save.disabled = false;
-        save.textContent = isEdit?'Save':'Add';
       }
       });
     };
