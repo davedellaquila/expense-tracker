@@ -76,14 +76,14 @@ body{
 .donut-legend{ margin-top:4px; }
 .dl-row{ display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid var(--border); font-size:13.5px; }
 .dl-swatch{ width:11px; height:11px; border-radius:3px; flex:none; }
-.dl-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dl-name{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dl-pct{ color:var(--muted); font-variant-numeric:tabular-nums; }
 .chart-sub{ color:var(--muted); font-size:13px; margin:-6px 0 8px; }
 .chart-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
 .chart-pick-row h2{margin:0}
 .chart-pick-row select{max-width:48%;font-size:14px;padding:6px 8px}
-.donut-trio{display:grid;grid-template-columns:1fr;gap:10px;justify-items:center}
-.donut-trio>div{width:100%;max-width:560px}
+.donut-trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;justify-items:center}
+.donut-trio>div{width:100%;max-width:560px;min-width:0}
 .donut-trio-title{text-align:center;font-size:15px;margin:6px 0 0;color:var(--muted);font-weight:600}
 
 /* ---------- header ---------- */
@@ -3351,7 +3351,8 @@ function repDonut(el, items, onSlice, emptyMsg){
   var topSum = top.reduce(function(s,i){ return s+i.value; }, 0);
   if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum,
     names: items.slice(7).map(function(i){ return i.name; })});
-  var W=840, H=435, cx=420, cy=217, r=168, inner=99, start=-Math.PI/2, svg='';
+  var cx=420, cy=217, r=168, inner=112, start=-Math.PI/2, svg='';
+  var _vb = 2*(r+10), _vx = cx-r-10, _vy = cy-r-10; // tight viewBox around the ring
   top.forEach(function(it, i){
     var angle = (it.value/total)*Math.PI*2, end = start+angle, color = REP_PALETTE[i%REP_PALETTE.length];
     if(it.value>0) svg += '<path d="'+repDonutPath(cx,cy,r,inner,start,end)+'" fill="'+color+'" opacity="0.92"'+(onSlice?' class="rep-click" data-slice="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></path>';
@@ -3366,7 +3367,7 @@ function repDonut(el, items, onSlice, emptyMsg){
            '<span class="dl-name">'+esc(it.name)+'</span>'+
            '<span class="dl-pct">'+Math.round(it.value/total*100)+'%</span></div>';
   });
-  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img" style="max-width:510px; margin:0 auto">'+svg+'</svg>'+leg+'</div>';
+  el.innerHTML = '<svg class="rep-svg" viewBox="'+_vx+' '+_vy+' '+_vb+' '+_vb+'" role="img" style="max-width:510px; margin:0 auto">'+svg+'</svg>'+leg+'</div>';
   if(onSlice){
     var sn = el.querySelectorAll('[data-slice]');
     for(var si=0; si<sn.length; si++)(function(n){
