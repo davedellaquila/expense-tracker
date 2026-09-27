@@ -1561,6 +1561,17 @@ function updateSelbar(){
   c.style.display = n ? 'none' : ''; // count is redundant once the Update button shows it
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
+/* live "Updated X of N (P%)" readout in the selection bar while a bulk update runs */
+function updateBulkProgress(){
+  if(!bulkUpdating) return;
+  var total = Object.keys(bulkUpdating.set).length;
+  var done = Object.keys(bulkUpdating.done).length;
+  var failed = Object.keys(bulkUpdating.failed).length;
+  var pct = total ? Math.round((done+failed)/total*100) : 0;
+  var c = $('selbar-count');
+  c.textContent = 'Updated ' + done + ' of ' + total + ' (' + pct + '%)';
+  c.style.display = '';
+}
 /* transaction list sorting (remembered across visits) */
 var TXN_SORT_KEY = 'expenseTracker.txnSort';
 function txnSortPick(){
@@ -2034,6 +2045,7 @@ function openBulkUpdate(ids){
       bulkUpdating = {set:uset, done:{}, failed:{}};
       bulkDoneIds = {}; bulkFailIds = {};
       if(state.screen==='transactions') renderTransactions();
+      updateBulkProgress();
       var done = 0, failed = 0;
       var expected = {}; // id -> per-row expected field values, for verify-after-write
       await withSaveLock(async function(){
@@ -2059,6 +2071,7 @@ function openBulkUpdate(ids){
               done++;
             }catch(e){ failed++; ok = false; }
             if(ok) bulkUpdating.done[x.id]=true; else bulkUpdating.failed[x.id]=true;
+            updateBulkProgress();
             var bb = bulkBars[x.id];
             if(bb){ bb.className = 'bulkbar '+(ok?'done':'fail'); bb.parentNode.classList.add(ok?'bulk-done':'bulk-fail'); }
             if(bf && !ok) bf.style.background = 'rgba(255,59,48,.20)';
@@ -2098,6 +2111,7 @@ function openBulkUpdate(ids){
       bulkDoneIds = {}; bulkFailIds = {};
       for(var did in bulkUpdating.done) bulkDoneIds[did]=true;
       for(var fid in bulkUpdating.failed) bulkFailIds[fid]=true;
+      updateBulkProgress(); // final numbers, then the bar resets below
       bulkUpdating = null;
       if(state.screen==='transactions') renderTransactions();
       updateSelbar();
