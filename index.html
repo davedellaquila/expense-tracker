@@ -754,7 +754,7 @@ function catMixTable(byCat, byCatN, total){
   if(!cats.length || !total) return '';
   var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th></tr>';
   cats.forEach(function(c){
-    h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>';
+    h += '<tr class="rep-click" data-catrow="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>';
   });
   return h + '</table></div>';
 }
@@ -1177,6 +1177,13 @@ function renderDashChart(){
     }, 'No expenses in this period.');
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
     box.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE));
+    var catRows = box.querySelectorAll('[data-catrow]');
+    for(var ri=0; ri<catRows.length; ri++)(function(n){
+      n.addEventListener('click', function(){
+        var c = n.getAttribute('data-catrow');
+        dashDrill({type:'expense', dispCats:[c], label: c + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      });
+    })(catRows[ri]);
   } else if(pick==='inc'){
     var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
     repDonut(box, catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
