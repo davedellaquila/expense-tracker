@@ -861,10 +861,26 @@ try{
 function apiUrl(){ return state.apiUrl; }
 async function apiGet(params){
   var qs = new URLSearchParams(params).toString();
-  var res = await fetch(state.apiUrl + '?' + qs);
-  var j = await res.json().catch(function(){ throw new Error('The server returned an unreadable response. Check the Web app URL.'); });
-  if(!j.ok) throw new Error(j.error || 'Request failed.');
-  return j;
+  var lastErr = null;
+  for(var attempt=0; attempt<3; attempt++){
+    try{
+      var ctrl = new AbortController();
+      var timer = setTimeout(function(){ ctrl.abort(); }, 25000);
+      var res;
+      try{ res = await fetch(state.apiUrl + '?' + qs, {signal: ctrl.signal}); }
+      finally{ clearTimeout(timer); }
+      if(!res.ok) throw new Error('The server returned an error ('+res.status+').');
+      var j = await res.json().catch(function(){ throw new Error('The server returned an unreadable response. Check the Web app URL.'); });
+      if(!j.ok) throw new Error(j.error || 'Request failed.');
+      return j;
+    }catch(err){
+      lastErr = err;
+      var msg = String((err && err.message) || '');
+      if(/Unknown tab|Unknown action/i.test(msg)) throw err; // app error: retrying won't help
+      if(attempt<2) await new Promise(function(r){ setTimeout(r, 1200*(attempt+1)); });
+    }
+  }
+  throw lastErr;
 }
 async function apiPost(body){
   var res = await fetch(state.apiUrl, {
