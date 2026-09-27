@@ -1049,7 +1049,7 @@ function openTxnForm(t){
       sh.appendChild(input);
       return input;
     }
-    var inDate = field('Date', el('input',{type:'date',value:(t&&t.date)||todayLocal()}));
+    var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal()}));
     var inMerch = field('Merchant', el('input',{type:'text',placeholder:'e.g. Costco',autocomplete:'off'}));
     if(t&&t.merchant) inMerch.value=t.merchant;
     var inDesc = field('Description', el('input',{type:'text',placeholder:'Optional detail',autocomplete:'off'}));
