@@ -721,6 +721,16 @@ function toast(msg, isErr){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ t.className=''; }, 3400);
 }
+/* toast summary for a saved transaction: "Saved. Whole Foods · −$82.15 · Groceries" */
+function txnToast(verb, rd, nUpdated){
+  var parts = [];
+  if(rd.merchant) parts.push(rd.merchant);
+  parts.push((rd.txn_type==='income'?'+':'\u2212') + money(num(rd.amount)));
+  if(rd.category) parts.push(rd.category);
+  var msg = verb + '. ' + parts.join(' \u00B7 ');
+  if(nUpdated) msg += ' \u00B7 updated ' + (nUpdated+1) + ' transactions';
+  return msg;
+}
 function loadingInto(node, msg){
   node.innerHTML='';
   var d = el('div',{class:'loading'});
@@ -1688,7 +1698,7 @@ function openTxnForm(t){
         }
         await loadAll();
         if(state.screen==='transactions') renderTransactions();
-        toast(isEdit ? (nUpdated ? 'Saved. Updated '+(nUpdated+1)+' transactions.' : 'Saved.') : 'Added.');
+        toast(txnToast(isEdit?'Saved':'Added', rowData, nUpdated));
       }catch(err){
         try{ await loadAll(); }catch(e2){}
         if(state.screen==='transactions') renderTransactions();
