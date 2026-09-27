@@ -845,14 +845,14 @@ function openSheet(build){
   build(sh, close);
   return close;
 }
-function confirmDialog(message){
+function confirmDialog(message, okLabel){
   return new Promise(function(resolve){
     var close = openSheet(function(sh, done){
       sh.appendChild(el('h2',null,'Please confirm'));
       sh.appendChild(el('p',{class:'muted'},message));
       var row = el('div',{class:'btnrow'});
       var no = el('button',{class:'btn ghost'},'Cancel');
-      var yes = el('button',{class:'btn danger'},'Delete');
+      var yes = el('button',{class:'btn'+(okLabel?'':' danger')}, okLabel||'Delete');
       no.onclick = function(){ done(); resolve(false); };
       yes.onclick = function(){ done(); resolve(true); };
       row.appendChild(no); row.appendChild(yes);
@@ -1881,7 +1881,7 @@ function openBulkUpdate(ids){
       }
       if(sNotes.value==='__set__' && !inNotes.value.trim()){ toast('Type the notes text first.', true); return; }
       if(ids.length>50){
-        var okc = await confirmDialog('Update '+ids.length+' transactions? This may take a minute or two.');
+        var okc = await confirmDialog('Update '+ids.length+' transactions? This may take a minute or two.', 'Proceed');
         if(!okc) return;
       }
       var overrides = {};
