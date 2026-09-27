@@ -176,6 +176,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 .confbadge.high{background:#e6f4ea;color:#1e7e34}
 .confbadge.medium{background:#fef7e0;color:#b06000}
 .confbadge.low{background:#f1f3f4;color:#5f6368}
+.dupbadge{display:inline-block;font-size:11px;font-weight:700;margin-left:6px;padding:1px 7px;border-radius:9px;white-space:nowrap;vertical-align:middle;background:#fdecea;color:#b3261e}
 .applyall{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0;}
 .applyall label{font-size:12px; color:var(--muted); font-weight:600;}
 
@@ -1076,6 +1077,75 @@ function guessCategory(desc){
   return {category:'', confidence:'low'};
 }
 
+/* Duplicate detection: file fingerprint + row matching.
+   A row counts as a duplicate when date, type, amount, and normalized
+   description all match an existing transaction (or another row in the file). */
+function normDesc(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function dupKey(date, type, amount, desc){
+  return String(date||'').slice(0,10)+'|'+type+'|'+(Math.round(num(amount)*100)/100).toFixed(2)+'|'+normDesc(desc);
+}
+function markDuplicates(rows){
+  var seen = {};
+  state.transactions.forEach(function(t){
+    seen[dupKey(t.date, t.txn_type, t.amount, t.merchant||t.description)] = true;
+  });
+  rows.forEach(function(r){
+    var k = dupKey(r.date, r.txn_type, r.amount, r.description);
+    if(seen[k]){ r._dup = true; r.include = false; } // unchecked by default
+    else seen[k] = true; // also catches duplicates within the file itself
+  });
+}
+async function hashFile(file){
+  try{
+    var buf = await file.arrayBuffer();
+    var h = await crypto.subtle.digest('SHA-256', buf);
+    return Array.prototype.map.call(new Uint8Array(h), function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+  }catch(e){ return null; }
+}
+var importFileInfo = null; // {h, name} for the file currently in the preview
+function getImportedFiles(){
+  try{ return JSON.parse(localStorage.getItem('et_imported_files')||'[]'); }catch(e){ return []; }
+}
+function recordImportedFile(info, count){
+  if(!info || !info.h) return;
+  var a = getImportedFiles();
+  a.push({h:info.h, name:info.name, at:new Date().toISOString(), count:count});
+  try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-50))); }catch(e){}
+}
+function showImportNotices(pn, notices, rows){
+  pn.innerHTML='';
+  notices.forEach(function(n){
+    if(typeof n === 'string') pn.appendChild(el('div',{class:'notice'},n));
+    else pn.appendChild(el('div',{class:'notice'+(n.blue?' blue':'')},n.text));
+  });
+  if(importFileInfo && importFileInfo.h){
+    var seen = getImportedFiles().filter(function(f){return f.h===importFileInfo.h;});
+    if(seen.length){
+      var last = seen[seen.length-1];
+      pn.appendChild(el('div',{class:'notice'},
+        'This exact file was already imported'+(last.at?' on '+last.at.slice(0,10):'')+
+        ' ('+seen.length+' time'+(seen.length>1?'s':'')+'). Review carefully before importing again.'));
+    }
+  }
+  var dups = rows.filter(function(r){return r._dup;});
+  if(dups.length){
+    var w = el('div',{class:'notice'});
+    w.appendChild(document.createTextNode(
+      '⚠ '+dups.length+' of '+rows.length+' rows match transactions already in your sheet — unchecked below. '));
+    var sel = el('button',{class:'btn small ghost',type:'button'},'Select duplicates');
+    sel.style.marginLeft='8px';
+    sel.onclick=function(){ importRows.forEach(function(r){ if(r._dup) r.include=true; }); renderPreview(); };
+    w.appendChild(sel);
+    var des = el('button',{class:'btn small ghost',type:'button'},'Unselect duplicates');
+    des.style.marginLeft='6px';
+    des.onclick=function(){ importRows.forEach(function(r){ if(r._dup) r.include=false; }); renderPreview(); };
+    w.appendChild(des);
+    pn.appendChild(w);
+  }
+}
+
 function renderPreview(){
   var card = $('preview-card');
   if(!importRows.length){ card.hidden = true; return; }
@@ -1112,6 +1182,10 @@ function renderPreview(){
     var sIn = el('input',{type:'text',value:r.description||'',style:'width:200px'});
     sIn.addEventListener('change', function(){ r.description = sIn.value.trim(); });
     var td2 = el('td'); td2.appendChild(sIn); tr.appendChild(td2);
+    if(r._dup){
+      td2.appendChild(el('span',{class:'dupbadge',
+        title:'Matches a transaction already in your sheet (same date, amount, type, description). Unchecked — tick the box to import it anyway.'},'dup?'));
+    }
 
     var aIn = el('input',{type:'number',min:'0.01',step:'0.01',value:r.amount||'',style:'width:90px'});
     aIn.addEventListener('change', function(){ r.amount = num(aIn.value); });
@@ -1160,7 +1234,7 @@ function renderPreview(){
 function renderPreviewCount(){
   $('preview-count').textContent = '('+importRows.filter(function(r){return r.include;}).length+' selected)';
 }
-function clearPreview(){ importRows = []; renderPreview(); $('preview-notices').innerHTML=''; }
+function clearPreview(){ importRows = []; importFileInfo = null; renderPreview(); $('preview-notices').innerHTML=''; }
 
 /* CSV download (used by preview + tax) */
 function downloadCsv(filename, headers, rows){
@@ -1179,6 +1253,7 @@ var TXN_HEADERS = ['id','date','merchant','description','amount','txn_type','cat
 
 /* ================= import: CSV ================= */
 var csvData = []; // parsed rows (arrays)
+var csvFileInfo = null; // {h, name} fingerprint of the picked CSV
 function parseCsv(text){
   var rows=[], row=[], cur='', inQ=false;
   for(var i=0;i<text.length;i++){
@@ -1234,6 +1309,8 @@ function wireImport(){
     var f = $('csv-file').files[0];
     if(!f) return;
     $('csv-name').textContent = f.name;
+    csvFileInfo = null;
+    hashFile(f).then(function(h){ csvFileInfo = h?{h:h,name:f.name}:null; });
     var rd = new FileReader();
     rd.onload = function(){
       try{
@@ -1281,6 +1358,7 @@ function wireImport(){
     try{
       await apiPost({action:'appendMany', tab:'Transactions', rows:rows});
       toast(rows.length+' transactions imported.');
+      recordImportedFile(importFileInfo, rows.length);
       clearPreview();
       $('csv-file').value=''; $('pdf-file').value='';
       $('csv-name').textContent=''; $('pdf-name').textContent='';
@@ -1392,8 +1470,10 @@ function buildPreviewFromCsv(){
   var noDate = out.filter(function(r){return !r.date;}).length;
   if(noDate) notices.push(noDate+' row(s) had dates we could not parse — fix them in the preview (YYYY-MM-DD).');
   importRows = out;
-  var pn = $('preview-notices'); pn.innerHTML='';
-  notices.forEach(function(n){ pn.appendChild(el('div',{class:'notice'},n)); });
+  importFileInfo = csvFileInfo;
+  markDuplicates(out);
+  var pn = $('preview-notices');
+  showImportNotices(pn, notices, out);
   renderPreview();
   if(out.length) toast(out.length+' rows ready to review.');
   else toast('No usable rows found. Check your column mapping.', true);
@@ -1517,6 +1597,8 @@ async function handlePdfFile(file){
   loadingInto(st, 'Reading PDF…');
   $('pdf-year-wrap').hidden = true;
   pendingPdf = null;
+  var fileInfo = null;
+  hashFile(file).then(function(h){ fileInfo = h?{h:h,name:file.name}:null; if(pendingPdf) pendingPdf.fileInfo = fileInfo; });
   try{
     await pdfLibReady();
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
@@ -1539,7 +1621,7 @@ async function handlePdfFile(file){
     var headerText = allLines.slice(0,30).join('\n');
     var bank = detectBank(headerText);
     var year = detectYear(headerText);
-    pendingPdf = {lines:allLines, bank:bank};
+    pendingPdf = {lines:allLines, bank:bank, fileInfo:fileInfo};
     var found = el('div',{class:'notice blue'},
       'Detected: '+(bank?bank.name:'unknown bank (using generic parser)')+' · '+allLines.length+' text lines across '+pdf.numPages+' page(s).');
     st.appendChild(found);
@@ -1558,14 +1640,16 @@ async function handlePdfFile(file){
 function finishPdfParse(pending, year){
   var rows = parsePdfTransactions(pending.lines, pending.bank, year);
   pendingPdf = null;
-  var pn = $('preview-notices'); pn.innerHTML='';
+  importFileInfo = pending.fileInfo || null;
+  markDuplicates(rows);
+  var pn = $('preview-notices');
+  var notices = [];
   if(!rows.length){
-    pn.appendChild(el('div',{class:'notice'},
-      'No transactions were recognized. Bank layouts vary — if this keeps happening, export a CSV from your bank and use the CSV importer above.'));
+    notices.push('No transactions were recognized. Bank layouts vary — if this keeps happening, export a CSV from your bank and use the CSV importer above.');
   }else{
-    pn.appendChild(el('div',{class:'notice blue'},
-      rows.length+' transactions found ('+(pending.bank?pending.bank.name:'generic')+', '+year+'). Review types and categories below — flip any row that was guessed wrong.'));
+    notices.push({blue:true, text:rows.length+' transactions found ('+(pending.bank?pending.bank.name:'generic')+', '+year+'). Review types and categories below — flip any row that was guessed wrong.'});
   }
+  showImportNotices(pn, notices, rows);
   importRows = rows;
   renderPreview();
   if(rows.length){
