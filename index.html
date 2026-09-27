@@ -211,6 +211,7 @@ textarea{resize:vertical; min-height:64px;}
   cursor:pointer; background:var(--blue); color:#fff; width:100%;
 }
 .btn:active{opacity:.85;}
+.btn:disabled{opacity:.75; cursor:default;}
 .btn.ghost{background:var(--bg); color:var(--text); border:1px solid var(--border);}
 .btn.danger{background:var(--danger);}
 .btn.go{background:var(--accent);}
@@ -2085,8 +2086,15 @@ async function runBulkJob(job, opts){
   bulkDoneIds = {}; bulkFailIds = {};
   if(state.screen==='transactions') renderTransactions();
   updateBulkProgress();
+  var progBtn = $('selbar-update');
+  if(progBtn){
+    progBtn.disabled = true;
+    progBtn.innerHTML = '<span class="spin" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span> ' +
+      (verb==='Restored' ? 'Restoring' : 'Updating') + '&hellip;';
+  }
   persistBulkJob(job);
   var done=0, failed=0, skipped=0;
+  try{
   await withSaveLock(async function(){
     for(var i=0;i<job.rows.length;i++){
       var r = job.rows[i];
@@ -2164,6 +2172,7 @@ async function runBulkJob(job, opts){
   bulkUpdating = null;
   if(state.screen==='transactions') renderTransactions();
   updateSelbar();
+  if(progBtn) progBtn.disabled = false;
   if(job.kind==='undo') clearBulkJob(); // one level of undo
   else{ job.completedAt = new Date().toISOString(); persistBulkJob(job); }
   refreshUndoButtons();
@@ -2171,6 +2180,11 @@ async function runBulkJob(job, opts){
   if(failed) toast(verb+' '+done+' of '+total+' \u2014 '+failed+' failed.'+(skipped?' '+skipped+' skipped.':''), true);
   else if(skipped) toast(verb+' '+done+' of '+total+' \u2014 '+skipped+' skipped (changed since the update).', true);
   else toast(verb+' '+done+' transaction'+(done===1?'':'s')+'.');
+  }finally{
+    // never leave the Update button stuck disabled
+    if(progBtn) progBtn.disabled = false;
+    bulkUpdating = null;
+  }
 }
 /* Build the undo run for a completed update job. Strict rule: a row is
    restored only if it still holds exactly what the update wrote; anything
