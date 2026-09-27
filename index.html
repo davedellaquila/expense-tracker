@@ -285,6 +285,11 @@ textarea{resize:vertical; min-height:64px;}
 }
 .tabbar button svg{width:22px; height:22px;}
 .tabbar button.on{color:var(--accent);}
+.tabbar .tab-short{display:none;}
+@media (max-width:560px){
+  .tabbar .tab-full{display:none;}
+  .tabbar .tab-short{display:inline;}
+}
 
 /* ---------- modal ---------- */
 .overlay{
@@ -722,7 +727,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 
   <nav class="tabbar" id="tabbar">
     <button data-screen="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
-    <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Txns</button>
+    <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
     <button data-screen="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
     <button data-screen="budgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
     <button data-screen="tax"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
