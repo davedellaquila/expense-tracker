@@ -161,6 +161,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* bulk-update result highlight: green once a row's update has landed */
 .txn.bulk-done{background:rgba(52,199,89,.16);}
 .txn.bulk-fail{background:rgba(255,59,48,.13);}
+/* bulk result tint must beat the selected-row tint (higher specificity) */
+.txn.selrow.checked.bulk-done{background:rgba(52,199,89,.16);}
+.txn.selrow.checked.bulk-fail{background:rgba(255,59,48,.13);}
 .txn .selbox{width:20px; height:20px; flex:none; accent-color:var(--blue); pointer-events:none;}
 /* bulk-update per-row progress thermometer */
 .bulkbar{position:absolute; left:4px; top:8px; bottom:8px; width:4px;
