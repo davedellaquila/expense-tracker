@@ -1075,6 +1075,12 @@ function renderDashboard(){
     var d = new Date((t.date||'')+'T12:00:00');
     if(!isNaN(d)) byDay[(d.getDay()+6)%7] += num(t.amount);
   });
+/* Chip label for an aggregated "Other" donut slice: name the categories inside it. */
+function otherDrillLabel(names){
+  var shown = names.slice(0,2).join(', ');
+  if(names.length>2) shown += ' +'+(names.length-2)+' more';
+  return 'Other: ' + shown;
+}
   function dashDrill(extra){
     var o = {type:'expense', bp:bpVal};
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
@@ -1087,11 +1093,11 @@ function renderDashboard(){
   $('dash-donut-exp-sub').textContent = 'By category · '+rangeLabel;
   repDonut($('dash-donut-inc'), catsI.map(function(c){ return {name:c, value:byCatInc[c]}; }), function(it){
     dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
+      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
   }, 'No income in this period.');
   repDonut($('dash-donut-exp'), catsE.map(function(c){ return {name:c, value:byCatExp[c]}; }), function(it){
     dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
   }, 'No expenses in this period.');
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
   repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
@@ -3036,7 +3042,7 @@ function renderReports(){
   repDonut(cc, cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
     drillToTransactions({from:from, to:to, type:'expense', bp:bpVal,
       dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? 'Other categories' : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
   });
   // --- category table ---
   var ct = $('rep-cattable');
