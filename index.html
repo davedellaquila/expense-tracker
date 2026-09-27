@@ -458,7 +458,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
       </div>
       <div class="searchstick" id="searchstick" hidden>
-        <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions">
+        <div style="display:flex;align-items:center;gap:2px">
+          <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="flex:1;min-width:0;margin:0">
+          <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
+          <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
+        </div>
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
@@ -1403,6 +1407,7 @@ function wireTransactions(){
     $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
   });
   $('f-reset').addEventListener('click', resetTxnFilters);
+  $('f-reset-stick').addEventListener('click', resetTxnFilters);
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
@@ -1422,6 +1427,7 @@ function wireTransactions(){
   }
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
   $('f-select').addEventListener('click', function(){ setTxnSelectMode(!txnSelectMode); });
+  $('f-select-stick').addEventListener('click', function(){ setTxnSelectMode(!txnSelectMode); });
   $('selbar-all').addEventListener('click', function(){
     state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
     renderTransactions(); updateSelbar();
@@ -1445,6 +1451,7 @@ function txnSelCount(){ return Object.keys(txnSelected).length; }
 function setTxnSelectMode(on){
   txnSelectMode = on;
   $('f-select').textContent = on ? 'Done' : 'Bulk update';
+  $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
   $('selbar').hidden = !on;
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
