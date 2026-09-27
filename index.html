@@ -195,6 +195,8 @@ input[type=text],input[type=number],input[type=date],input[type=month],input[typ
   width:100%; font-size:16px; padding:10px 12px; border:1px solid var(--border);
   border-radius:10px; background:var(--input-bg); color:var(--text); font-family:inherit;
 }
+/* month pickers have a wide intrinsic minimum; let them shrink inside flex/grid columns */
+input[type=month]{min-width:0;}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue-soft); border-color:var(--blue);}
 textarea{resize:vertical; min-height:64px;}
 .seg{display:flex; background:var(--seg-bg); border-radius:12px; padding:3px; gap:3px;}
