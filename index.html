@@ -927,14 +927,27 @@ function otherDrillLabel(names){
   return 'Other: ' + shown;
 }
 /* Category list table under a category-mix donut (same columns as Reports). */
-function catMixTable(byCat, byCatN, total){
+/* Category mix data table. opts: {byCatM:{cat:{'yyyy-MM':1}}} adds an Avg / mo column
+   (averaged over each category's active months, not the full period);
+   {clickable:true} adds drill-down row hooks; {footnote} adds a muted note. */
+function catMixTable(byCat, byCatN, total, opts){
+  opts = opts || {};
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
   if(!cats.length || !total) return '';
-  var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th></tr>';
+  var avgCol = !!opts.byCatM;
+  var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th>'+(avgCol?'<th style="text-align:right">Avg / mo</th>':'')+'</tr>';
   cats.forEach(function(c){
-    h += '<tr class="rep-click" data-catrow="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>';
+    var avgCell = '';
+    if(avgCol){
+      var activeMonths = Object.keys(opts.byCatM[c]||{}).length || 1;
+      avgCell = '<td style="text-align:right">'+money(byCat[c]/activeMonths)+'</td>';
+    }
+    var rowAttr = opts.clickable ? ' class="rep-click" data-catrow="'+esc(c)+'"' : '';
+    h += '<tr'+rowAttr+'><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td>'+avgCell+'</tr>';
   });
-  return h + '</table></div>';
+  h += '</table></div>';
+  if(opts.footnote) h += '<p class="muted" style="font-size:12px; margin:6px 0 0">'+esc(opts.footnote)+'</p>';
+  return h;
 }
 var toastTimer = null;
 function toast(msg, isErr){
@@ -1612,7 +1625,7 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatMExp = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -1631,6 +1644,7 @@ function renderDashboard(){
     else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       byCatExp[dc] = (byCatExp[dc]||0)+a;
       byCatNExp[dc] = (byCatNExp[dc]||0)+1;
+      if(m.length>=7) (byCatMExp[dc]||(byCatMExp[dc]={}))[m]=1;
     }
   });
   var net = inc-exp;
@@ -1654,7 +1668,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatMExp:byCatMExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashChart();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -1713,7 +1727,7 @@ function renderDashChart(){
     }, 'No transfers in this period.');
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
     var tblBox = box.querySelector('[data-dd-table]');
-    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE));
+    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {byCatM:d.byCatMExp, clickable:true}));
     var catRows = tblBox.querySelectorAll('[data-catrow]');
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
@@ -4428,16 +4442,8 @@ function renderReports(){
   });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
-  var ct = $('rep-cattable');
-  if(!cats.length){ ct.innerHTML=''; }
-  else{
-    var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th><th style="text-align:right">Avg / mo</th></tr>';
-    cats.forEach(function(c){
-      var activeMonths = Object.keys(byCatM[c]||{}).length || 1;
-      h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+byCatN[c]+'</td><td style="text-align:right">'+Math.round(byCat[c]/exp*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td><td style="text-align:right">'+money(byCat[c]/activeMonths)+'</td></tr>';
-    });
-    ct.innerHTML = h + '</table></div><p class="muted" style="font-size:12px; margin:6px 0 0">Avg / mo is averaged over the months each category had spending, not the full period.</p>';
-  }
+  $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {byCatM:byCatM,
+    footnote:'Avg / mo is averaged over the months each category had spending, not the full period.'});
 
   // --- monthly trend: bars + cumulative line ---
   var mc = $('rep-monthchart');
