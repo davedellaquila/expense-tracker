@@ -409,8 +409,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
   <div class="seg" id="setup-store-seg">
     <button type="button" data-spick="local">📱 This device</button>
     <button type="button" data-spick="sheets">📊 Google Sheets</button>
+    <button type="button" data-spick="firebase">🔥 Firebase</button>
   </div>
   <p class="muted" id="setup-store-desc"></p>
+  <div id="setup-firebase-box" hidden>
+    <div class="btnrow">
+      <button class="btn" id="setup-firebase-go">Start tracking</button>
+    </div>
+    <p class="muted">Your data is stored in the cloud via Firebase — backed up off this device and available from any browser with a connection. Nothing to set up.</p>
+  </div>
   <div id="setup-local-box" hidden>
     <div class="btnrow">
       <button class="btn" id="setup-local-go">Start tracking</button>
@@ -768,6 +775,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="seg" id="set-store-seg">
           <button type="button" data-spick="local">📱 This device</button>
           <button type="button" data-spick="sheets">📊 Google Sheets</button>
+          <button type="button" data-spick="firebase">🔥 Firebase</button>
         </div>
         <p class="muted" id="set-store-desc"></p>
         <div id="set-sheets-box">
@@ -779,9 +787,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           </div>
           <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
         </div>
-        <div class="btnrow" id="set-copy-row" hidden>
-          <button class="btn ghost" id="set-copy">Copy data from <span id="set-copy-from"></span></button>
+        <div id="set-firebase-box" hidden>
+          <p class="muted" id="set-firebase-status">Checking Firebase connection…</p>
         </div>
+        <div id="set-copy-list"></div>
         <div class="btnrow">
           <button class="btn ghost" id="set-backup">Download backup (JSON)</button>
         </div>
@@ -1120,13 +1129,13 @@ async function apiPost(body){
    Tabs: 'Transactions' | 'Budgets' | 'Categories'.
    - SheetsStore: the Apps Script web app (shared through your Google Sheet).
    - LocalStore: IndexedDB in this browser (private, offline, per-device). */
-var LS_STORE = 'expenseTracker.storeKind'; // 'sheets' | 'local'
+var LS_STORE = 'expenseTracker.storeKind'; // 'sheets' | 'local' | 'firebase'
 var _storeKind = null, _store = null;
 function storeKind(){
   if(_storeKind) return _storeKind;
   try{
     var k = localStorage.getItem(LS_STORE);
-    if(k==='sheets' || k==='local'){ _storeKind = k; return k; }
+    if(k==='sheets' || k==='local' || k==='firebase'){ _storeKind = k; return k; }
   }catch(e){}
   return null; // never chosen: first run
 }
@@ -1135,9 +1144,22 @@ function setStoreKind(k){
   try{ localStorage.setItem(LS_STORE, k); }catch(e){}
 }
 function getStore(){
-  if(!_store) _store = (storeKind()==='local') ? new LocalStore() : new SheetsStore();
+  if(!_store){
+    var k = storeKind();
+    _store = k==='local' ? new LocalStore() : (k==='firebase' ? new FirebaseStore() : new SheetsStore());
+  }
   return _store;
 }
+/* A fresh handle for any backend (used for copy/migrate and counts). */
+function storeForKind(k){
+  return k==='local' ? new LocalStore() : (k==='firebase' ? new FirebaseStore() : new SheetsStore());
+}
+/* Labels and descriptions for each backend, in one place. */
+var STORE_META = {
+  local:   {label:'this device',   btn:'📱 This device',   desc:'Private to this browser on this device. Works offline — nothing leaves your device.'},
+  sheets:  {label:'Google Sheets', btn:'📊 Google Sheets', desc:'Shared through your Google Sheet. Everyone with the sheet sees the same data.'},
+  firebase:{label:'Firebase',      btn:'🔥 Firebase',      desc:'Cloud database. Your data is backed up off this device and loads from anywhere with a connection.'}
+};
 /* Sheets adapter: thin wrapper over the existing Apps Script transport. */
 function SheetsStore(){}
 SheetsStore.prototype.ping = function(){ return apiGet({action:'ping'}); };
@@ -1248,6 +1270,133 @@ LocalStore.prototype.setBudget = function(category, month, amount){
   var r = {category:category, month:month, amount:amount, bk:localBk(category, month), updated_at:localNow()};
   return this._one('Budgets', 'readwrite', function(st){ return st.put(r); });
 };
+/* ================= Firebase (Firestore) adapter =================
+   Cloud backend via the Firebase JS SDK (loaded lazily, only when used).
+   Each browser signs in anonymously, so every user gets a private silo:
+     users/{uid}/transactions, users/{uid}/budgets, users/{uid}/categories
+   NOTE: anonymous UIDs are per-browser, so this backs data up to the cloud
+   but does NOT sync across a user's devices. True cross-device sync / sharing
+   needs a real sign-in method (email, Google) — the layout below is ready for
+   it: swap the signInAnonymously() call in firebaseReady().
+   Paste your web app's firebaseConfig into FIREBASE_CONFIG to enable the
+   Firebase option; leave it null and the option stays hidden. The apiKey is a
+   public identifier, not a secret — security comes from Firestore rules +
+   Auth. See FIREBASE_SETUP.md for the console steps and rules. */
+var FIREBASE_CONFIG = null;
+/* Example:
+var FIREBASE_CONFIG = {
+  apiKey: "AIza…",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc…"
+}; */
+var FB_SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2/';
+function loadScriptOnce(src){
+  return new Promise(function(res, rej){
+    var done = false;
+    function ok(){ if(!done){ done = true; res(); } }
+    function bad(){ if(!done){ done = true; rej(new Error('Could not load the Firebase library. Check your connection and retry.')); } }
+    var s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = ok; s.onerror = bad;
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!done) bad(); }, 20000);
+  });
+}
+var _fbReady = null;
+function firebaseReady(){
+  if(_fbReady) return _fbReady;
+  _fbReady = (async function(){
+    if(!FIREBASE_CONFIG) throw new Error('Firebase is not set up in this copy of the app yet.');
+    if(typeof firebase==='undefined' || !firebase.firestore){
+      await loadScriptOnce(FB_SDK_BASE+'firebase-app-compat.js');
+      await loadScriptOnce(FB_SDK_BASE+'firebase-auth-compat.js');
+      await loadScriptOnce(FB_SDK_BASE+'firebase-firestore-compat.js');
+    }
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    var auth = firebase.auth();
+    try{
+      if(!auth.currentUser) await auth.signInAnonymously();
+    }catch(e){
+      throw new Error('Firebase sign-in failed. In the Firebase console, enable Anonymous sign-in (Authentication → Sign-in method).');
+    }
+    return {db: firebase.firestore(), uid: auth.currentUser.uid};
+  })();
+  _fbReady.catch(function(){ _fbReady = null; }); // failed attempt: let the next call retry
+  return _fbReady;
+}
+function firebaseConfigured(){ return !!FIREBASE_CONFIG; }
+function FirebaseStore(){ this._rp = null; }
+FirebaseStore.prototype._r = function(){
+  if(!this._rp) this._rp = firebaseReady();
+  return this._rp;
+};
+function fbCol(r, tab){ return r.db.collection('users').doc(r.uid).collection(tab.toLowerCase()); }
+function fbDocId(tab, row, id){
+  if(tab==='Transactions') return id ? String(id) : (row && row.id ? String(row.id) : 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+  if(tab==='Budgets') return 'b__'+encodeURIComponent(row.category||'')+'__'+encodeURIComponent(row.month||'');
+  return 'c__'+encodeURIComponent(row.name||('cat'+Date.now().toString(36)));
+}
+function fbClean(row){
+  var r = Object.assign({}, row);
+  delete r.id; delete r.bk; // ids live in the document ID; bk is a local-only key
+  return r;
+}
+FirebaseStore.prototype.ping = function(){
+  return this._r().then(function(){ return {ok:true}; });
+};
+FirebaseStore.prototype.list = function(tab){
+  return this._r().then(function(r){
+    return fbCol(r, tab).get().then(function(snap){
+      return snap.docs.map(function(doc){
+        var d = doc.data() || {};
+        d.id = doc.id;
+        return d;
+      });
+    });
+  });
+};
+FirebaseStore.prototype.append = function(tab, row){
+  return this._r().then(function(r){
+    var id = fbDocId(tab, row);
+    return fbCol(r, tab).doc(id).set(fbClean(row)).then(function(){ return id; });
+  });
+};
+FirebaseStore.prototype.appendMany = function(tab, rows){
+  return this._r().then(function(r){
+    var col = fbCol(r, tab), ids = [], batches = [], batch = r.db.batch(), n = 0;
+    rows.forEach(function(row){
+      var id = fbDocId(tab, row);
+      batch.set(col.doc(id), fbClean(row));
+      ids.push(id);
+      if(++n % 400 === 0){ batches.push(batch); batch = r.db.batch(); } // batch write limit is 500
+    });
+    batches.push(batch);
+    return batches.reduce(function(p, b){ return p.then(function(){ return b.commit(); }); }, Promise.resolve())
+      .then(function(){ return ids; });
+  });
+};
+FirebaseStore.prototype.update = function(tab, id, row){
+  return this._r().then(function(r){
+    return fbCol(r, tab).doc(fbDocId(tab, row, id)).set(fbClean(row)); // full replace, like the other stores
+  });
+};
+FirebaseStore.prototype.remove = function(tab, id){
+  return this._r().then(function(r){
+    return fbCol(r, tab).doc(String(id)).delete();
+  });
+};
+FirebaseStore.prototype.setBudget = function(category, month, amount){
+  return this._r().then(function(r){
+    var row = {category:category, month:month, amount:amount, updated_at:new Date().toISOString()};
+    return fbCol(r, 'Budgets').doc(fbDocId('Budgets', row)).set(row);
+  });
+};
+FirebaseStore.prototype.uid = function(){
+  return this._r().then(function(r){ return r.uid; });
+};
 /* Copy every tab from one store into another (used when switching storage). */
 async function migrateStores(fromStore, toStore){
   var tabs = ['Transactions','Budgets','Categories'], counts = {};
@@ -1333,6 +1482,7 @@ document.addEventListener('DOMContentLoaded', function(){
 async function boot(){
   updateUserChip();
   var kind = storeKind();
+  if(kind==='firebase' && !firebaseConfigured()) kind = null; // config removed: choose again
   if(!kind){
     if(state.apiUrl){ setStoreKind('sheets'); kind = 'sheets'; } // existing setup keeps working
     else{ showSetupPicker('local'); return; }                    // brand-new user: choose storage
@@ -1344,6 +1494,9 @@ async function boot(){
   }
 }
 function showSetupPicker(which){
+  var fbBtn = document.querySelector('#setup-store-seg [data-spick="firebase"]');
+  if(fbBtn) fbBtn.hidden = !firebaseConfigured();
+  if(which==='firebase' && !firebaseConfigured()) which = 'local';
   $('setup-screen').hidden = false;
   pickSetupStore(which);
 }
@@ -1381,11 +1534,11 @@ function pickSetupStore(which){
   document.querySelectorAll('#setup-store-seg button').forEach(function(b){
     b.classList.toggle('on', b.getAttribute('data-spick')===which);
   });
-  $('setup-sheets-box').hidden = which!=='sheets';
-  $('setup-local-box').hidden = which!=='local';
-  $('setup-store-desc').textContent = which==='local'
-    ? 'Private to this browser. Nothing to set up, works offline.'
-    : 'Shared through your Google Sheet — best when more than one person enters data.';
+  ['local','sheets','firebase'].forEach(function(k){
+    var box = $('setup-'+k+'-box');
+    if(box) box.hidden = (k!==which);
+  });
+  $('setup-store-desc').textContent = (STORE_META[which]||STORE_META.local).desc;
 }
 function wireSetup(){
   document.querySelectorAll('#setup-store-seg button').forEach(function(b){
@@ -1396,6 +1549,23 @@ function wireSetup(){
     toast('Using local storage on this device.');
     enterApp();
     if(!state.userName) await promptName();
+  });
+  var fbGo = $('setup-firebase-go');
+  if(fbGo) fbGo.addEventListener('click', async function(){
+    var btn = fbGo, orig = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Connecting…';
+    try{
+      await new FirebaseStore().ping();
+      setStoreKind('firebase');
+      toast('Connected to Firebase.');
+      enterApp();
+      if(!state.userName) await promptName();
+    }catch(err){
+      toast('Firebase connection failed: '+err.message, true);
+    }
+    btn.disabled = false;
+    btn.textContent = orig;
   });
   $('setup-connect').addEventListener('click', async function(){
     var url = $('setup-url').value.trim().replace(/\/$/,'');
@@ -1423,6 +1593,7 @@ function wireSetup(){
 /* Switch the active storage backend. Non-destructive: the other location keeps its data. */
 async function switchStoreKind(k){
   if(k===(storeKind()||'local')){ syncStoreSettings(); return; }
+  if(k==='firebase' && !firebaseConfigured()){ toast('Firebase is not set up in this copy of the app yet.', true); return; }
   setStoreKind(k);
   syncStoreSettings();
   if(k==='sheets' && !state.apiUrl){
@@ -1432,7 +1603,7 @@ async function switchStoreKind(k){
   toast('Switching storage…');
   try{
     await loadAll();
-    toast(k==='local' ? 'Now using storage on this device.' : 'Now using Google Sheets.');
+    toast(k==='local' ? 'Now using storage on this device.' : (k==='firebase' ? 'Now using Firebase.' : 'Now using Google Sheets.'));
     showScreen(state.screen);
   }catch(err){
     toast('Could not load from the new storage: '+err.message, true);
@@ -1441,28 +1612,76 @@ async function switchStoreKind(k){
 async function syncStoreSettings(){
   var k = storeKind() || 'local';
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
-    b.classList.toggle('on', b.getAttribute('data-spick')===k);
+    var bk = b.getAttribute('data-spick');
+    b.hidden = (bk==='firebase' && !firebaseConfigured());
+    b.classList.toggle('on', bk===k);
   });
-  $('set-store-desc').textContent = k==='local'
-    ? 'Private to this browser on this device. Works offline — nothing leaves your device.'
-    : 'Shared through your Google Sheet. Everyone with the sheet sees the same data.';
+  $('set-store-desc').textContent = (STORE_META[k]||STORE_META.local).desc;
   $('set-sheets-box').hidden = k!=='sheets';
+  $('set-firebase-box').hidden = k!=='firebase';
   var steps = $('set-steps-card');
   if(steps) steps.hidden = k!=='sheets';
-  /* Offer a one-tap copy when the other location holds data. */
-  var row = $('set-copy-row');
-  row.hidden = true;
-  var other = k==='local' ? 'sheets' : 'local';
-  try{
-    if(other==='sheets' && !state.apiUrl) return;
-    var otherStore = other==='local' ? new LocalStore() : new SheetsStore();
-    var n = (await otherStore.list('Transactions')).length;
-    if(n>0){
-      $('set-copy-from').textContent = (other==='local' ? 'this device' : 'Google Sheets')+' ('+n+' transactions)';
-      row.dataset.other = other;
-      row.hidden = false;
+  if(k==='firebase'){
+    var st = $('set-firebase-status');
+    st.textContent = 'Checking Firebase connection…';
+    try{
+      var fs = getStore();
+      await fs.ping();
+      var uid = await fs.uid();
+      st.textContent = 'Connected to Firebase (signed in as '+String(uid).slice(0,8)+'…). Your data is stored in the cloud.';
+    }catch(e){
+      st.textContent = 'Could not reach Firebase: '+e.message;
     }
-  }catch(e){ /* other side unreachable: no copy offered */ }
+  }
+  /* Migration: offer a one-tap copy from every other backend that holds data. */
+  var list = $('set-copy-list');
+  list.innerHTML = '';
+  ['local','sheets','firebase'].forEach(function(other){
+    if(other===k) return;
+    if(other==='firebase' && !firebaseConfigured()) return;
+    if(other==='sheets' && !state.apiUrl) return;
+    storeForKind(other).list('Transactions').then(function(rows){
+      if(!rows.length) return;
+      var wrap = el('div', {class:'btnrow'});
+      var b = el('button', {class:'btn ghost'});
+      b.textContent = 'Copy '+rows.length+' transactions from '+STORE_META[other].label;
+      b.addEventListener('click', function(){ copyFromStore(other, b); });
+      wrap.appendChild(b);
+      list.appendChild(wrap);
+    }).catch(function(){ /* other side unreachable: no copy offered */ });
+  });
+}
+/* Migrate data from another backend into the current one. Non-destructive:
+   the source keeps its data. */
+async function copyFromStore(other, btn){
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  try{
+    var from = storeForKind(other), to = getStore();
+    var srcTx = await from.list('Transactions');
+    if(!srcTx.length){ toast('Nothing to copy — '+STORE_META[other].label+' is empty.'); return; }
+    var dstTx = await to.list('Transactions');
+    var label = STORE_META[other].label;
+    var destLabel = (STORE_META[storeKind()]||STORE_META.local).label;
+    var ok;
+    if(dstTx.length){
+      ok = await confirmDialog('Your current storage ('+destLabel+') already holds '+dstTx.length+' transactions. Copying '+srcTx.length+' more from '+label+' may create duplicates. Continue?', 'Copy anyway');
+    }else{
+      ok = await confirmDialog('Copy '+srcTx.length+' transactions (plus budgets and categories) from '+label+' into '+destLabel+'?', 'Copy data');
+    }
+    if(!ok) return;
+    btn.innerHTML = '<span class="spin"></span> Copying…';
+    var counts = await migrateStores(from, to);
+    toast('Copied '+counts.Transactions+' transactions, '+counts.Budgets+' budgets, '+counts.Categories+' categories to '+destLabel+'.');
+    await loadAll();
+    await syncStoreSettings();
+    showScreen(state.screen);
+  }catch(err){
+    toast('Copy failed: '+err.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
 }
 async function backupJson(){
   var btn = $('set-backup');
@@ -1492,36 +1711,6 @@ function wireSettings(){
     b.addEventListener('click', function(){ switchStoreKind(b.getAttribute('data-spick')); });
   });
   $('set-backup').addEventListener('click', backupJson);
-  $('set-copy').addEventListener('click', async function(){
-    var other = $('set-copy-row').dataset.other || 'sheets';
-    var btn = $('set-copy'), orig = btn.innerHTML;
-    btn.disabled = true;
-    try{
-      var from = other==='local' ? new LocalStore() : new SheetsStore();
-      var to = getStore();
-      var srcTx = await from.list('Transactions');
-      if(!srcTx.length){ toast('Nothing to copy — the other location is empty.'); return; }
-      var dstTx = await to.list('Transactions');
-      var label = other==='local' ? 'this device' : 'Google Sheets';
-      var ok;
-      if(dstTx.length){
-        ok = await confirmDialog('Your current storage already holds '+dstTx.length+' transactions. Copying '+srcTx.length+' more from '+label+' may create duplicates. Continue?', 'Copy anyway');
-      }else{
-        ok = await confirmDialog('Copy '+srcTx.length+' transactions (plus budgets and categories) from '+label+' into your current storage?', 'Copy data');
-      }
-      if(!ok) return;
-      btn.innerHTML = '<span class="spin"></span> Copying…';
-      var counts = await migrateStores(from, to);
-      toast('Copied '+counts.Transactions+' transactions, '+counts.Budgets+' budgets, '+counts.Categories+' categories.');
-      await loadAll();
-      showScreen(state.screen);
-    }catch(err){
-      toast('Copy failed: '+err.message, true);
-    }finally{
-      btn.disabled = false;
-      btn.innerHTML = orig;
-    }
-  });
   $('set-test').addEventListener('click', async function(){
     var url = $('set-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Enter a URL first.', true); return; }
