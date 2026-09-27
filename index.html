@@ -79,9 +79,8 @@ body{
 .dl-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dl-pct{ flex:none; min-width:46px; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
 .chart-sub{ color:var(--muted); font-size:13px; margin:-6px 0 8px; }
-.chart-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
-.chart-pick-row h2{margin:0}
-.chart-pick-row select{max-width:48%;font-size:14px;padding:6px 8px}
+.chart-pick-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:2px}
+.chart-pick-row select{max-width:80%;font-size:15px;font-weight:700;padding:6px 8px}
 .donut-trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;justify-items:center}
 .donut-trio>div{width:100%;max-width:560px;min-width:0}
 .donut-trio-title{text-align:center;font-size:15px;margin:6px 0 0;color:var(--muted);font-weight:600}
@@ -415,7 +414,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div class="card">
         <div class="chart-pick-row">
-          <h2 id="dash-chart-title">Category Mix</h2>
           <select id="dash-chart-pick" aria-label="Choose a chart">
             <option value="catmix">Category Mix</option>
             <option value="merch">Top Merchants</option>
@@ -1251,7 +1249,6 @@ function renderDashChart(){
   var sel = $('dash-chart-pick');
   if(sel && sel.value!==pick) sel.value = pick;
   var meta = DASH_CHARTS[pick];
-  $('dash-chart-title').textContent = meta.title;
   var d = dashData, box = $('dash-chart');
   $('dash-chart-sub').textContent = meta.sub + (d ? ' \u00B7 '+d.rangeLabel : '');
   if(!d){ box.innerHTML=''; return; }
