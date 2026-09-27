@@ -181,6 +181,18 @@ textarea{resize:vertical; min-height:64px;}
   margin:16px -18px calc(-22px - env(safe-area-inset-bottom));
   padding:12px 18px calc(14px + env(safe-area-inset-bottom));
 }
+/* sticky action bar for full-page screens (e.g. the import preview): pins
+   just above the tab bar while its card scrolls, settles as the card's last
+   element when scrolled to the end */
+.stickybar-page{
+  position:sticky; bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index:5;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  border-radius:0 0 var(--radius) var(--radius);
+  box-shadow:0 -8px 18px rgba(10,20,15,.08);
+  margin:16px -14px -14px;
+  padding:12px 14px;
+}
 .linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
 /* floating search clone: appears fixed below the app header only after the
@@ -474,7 +486,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <thead><tr><th></th><th>Date</th><th>Description</th><th>Amount</th><th>Type</th><th>Account</th><th>Category</th></tr></thead>
           <tbody id="preview-body"></tbody>
         </table></div>
-        <div class="btnrow">
+        <div class="btnrow stickybar-page">
           <button class="btn ghost" id="preview-csv">Download CSV</button>
           <button class="btn" id="preview-import">Import to sheet</button>
         </div>
