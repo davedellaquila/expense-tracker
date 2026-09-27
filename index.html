@@ -572,6 +572,11 @@ function monthLocal(){
   var d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
+function prevMonthLocal(){
+  var d = new Date();
+  d.setDate(1); d.setMonth(d.getMonth()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
 function fmtDatePretty(ymd){
   if(!ymd) return '';
   var p = String(ymd).slice(0,10).split('-');
@@ -748,7 +753,7 @@ async function enterApp(){
   $('setup-screen').hidden = true;
   $('app').hidden = false;
   updateUserChip();
-  if(!$('dash-month').value) $('dash-month').value = monthLocal();
+  if(!$('dash-month').value) $('dash-month').value = prevMonthLocal();
   if(!$('f-month').value) $('f-month').value = monthLocal();
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
@@ -843,7 +848,7 @@ function wireDashboard(){
   $('dash-month').addEventListener('change', renderDashboard);
 }
 function renderDashboard(){
-  var ym = $('dash-month').value || monthLocal();
+  var ym = $('dash-month').value || prevMonthLocal();
   var rows = txnsForMonth(ym);
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
   var byCat = {};
