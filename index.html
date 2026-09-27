@@ -404,7 +404,20 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 <!-- ============ SETUP (shown when no API URL configured) ============ -->
 <div id="setup-screen" class="setupwrap" hidden>
   <h1>Expense Tracker</h1>
-  <p class="muted">Track income &amp; expenses, set budgets, and get tax-time summaries — with everything stored in your Google Sheet.</p>
+  <p class="muted">Track income &amp; expenses, set budgets, and get tax-time summaries.</p>
+  <label class="f">Where should your data live?</label>
+  <div class="seg" id="setup-store-seg">
+    <button type="button" data-spick="local">📱 This device</button>
+    <button type="button" data-spick="sheets">📊 Google Sheets</button>
+  </div>
+  <p class="muted" id="setup-store-desc"></p>
+  <div id="setup-local-box" hidden>
+    <div class="btnrow">
+      <button class="btn" id="setup-local-go">Start tracking</button>
+    </div>
+    <p class="muted">Your data stays in this browser on this device — private and available offline. It isn't shared or synced. Back it up from Setup → Data storage.</p>
+  </div>
+  <div id="setup-sheets-box" hidden>
   <div class="steps">
     <ol>
       <li>Open your <b>Expense Tracker</b> Google Sheet.</li>
@@ -421,6 +434,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <button class="btn" id="setup-connect">Save &amp; Connect</button>
   </div>
   <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
+  </div>
 </div>
 
 <!-- ============ APP ============ -->
@@ -749,14 +763,29 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <!-- SETTINGS -->
     <section id="screen-settings" class="screen" hidden>
       <div class="card">
-        <h2>Connection</h2>
-        <label class="f" for="set-url">Web app URL</label>
-        <input type="url" id="set-url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
-        <div class="btnrow">
-          <button class="btn ghost" id="set-test">Test connection</button>
-          <button class="btn" id="set-save">Save</button>
+        <h2>Data storage</h2>
+        <label class="f">Where your data lives</label>
+        <div class="seg" id="set-store-seg">
+          <button type="button" data-spick="local">📱 This device</button>
+          <button type="button" data-spick="sheets">📊 Google Sheets</button>
         </div>
-        <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
+        <p class="muted" id="set-store-desc"></p>
+        <div id="set-sheets-box">
+          <label class="f" for="set-url">Web app URL</label>
+          <input type="url" id="set-url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+          <div class="btnrow">
+            <button class="btn ghost" id="set-test">Test connection</button>
+            <button class="btn" id="set-save">Save</button>
+          </div>
+          <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
+        </div>
+        <div class="btnrow" id="set-copy-row" hidden>
+          <button class="btn ghost" id="set-copy">Copy data from <span id="set-copy-from"></span></button>
+        </div>
+        <div class="btnrow">
+          <button class="btn ghost" id="set-backup">Download backup (JSON)</button>
+        </div>
+        <p class="muted">Switching storage only changes where new reads and writes go — the data in the other location stays untouched until you copy it over.</p>
       </div>
       <div class="card">
         <h2>Who's entering?</h2>
@@ -773,7 +802,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <button data-theme-opt="system">🌓 System</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="set-steps-card">
         <h2>Setup steps</h2>
         <div class="steps" style="border:none; padding:0; margin:0;">
           <ol>
@@ -1066,6 +1095,161 @@ async function apiPost(body){
   }
   throw lastErr;
 }
+/* ================= storage adapters =================
+   A Store implements the same operations no matter where the data lives:
+     ping()                   -> {ok:true}
+     list(tab)                -> [row, ...]
+     append(tab, row)         -> id
+     appendMany(tab, rows)    -> [id, ...]
+     update(tab, id, row)     -> full-row replace
+     remove(tab, id)
+     setBudget(category, month, amount)
+   Tabs: 'Transactions' | 'Budgets' | 'Categories'.
+   - SheetsStore: the Apps Script web app (shared through your Google Sheet).
+   - LocalStore: IndexedDB in this browser (private, offline, per-device). */
+var LS_STORE = 'expenseTracker.storeKind'; // 'sheets' | 'local'
+var _storeKind = null, _store = null;
+function storeKind(){
+  if(_storeKind) return _storeKind;
+  try{
+    var k = localStorage.getItem(LS_STORE);
+    if(k==='sheets' || k==='local'){ _storeKind = k; return k; }
+  }catch(e){}
+  return null; // never chosen: first run
+}
+function setStoreKind(k){
+  _storeKind = k; _store = null;
+  try{ localStorage.setItem(LS_STORE, k); }catch(e){}
+}
+function getStore(){
+  if(!_store) _store = (storeKind()==='local') ? new LocalStore() : new SheetsStore();
+  return _store;
+}
+/* Sheets adapter: thin wrapper over the existing Apps Script transport. */
+function SheetsStore(){}
+SheetsStore.prototype.ping = function(){ return apiGet({action:'ping'}); };
+SheetsStore.prototype.list = function(tab){
+  return apiGet({action:'list', tab:tab}).then(function(j){ return j.rows || []; });
+};
+SheetsStore.prototype.append = function(tab, row){
+  return apiPost({action:'append', tab:tab, row:row}).then(function(j){ return j.ids[0]; });
+};
+SheetsStore.prototype.appendMany = function(tab, rows){
+  return apiPost({action:'appendMany', tab:tab, rows:rows}).then(function(j){ return j.ids; });
+};
+SheetsStore.prototype.update = function(tab, id, row){
+  return apiPost({action:'update', tab:tab, id:id, row:row});
+};
+SheetsStore.prototype.remove = function(tab, id){
+  return apiPost({action:'delete', tab:tab, id:id});
+};
+SheetsStore.prototype.setBudget = function(category, month, amount){
+  return apiPost({action:'setBudget', category:category, month:month, amount:amount});
+};
+/* Local adapter: IndexedDB. Same row shapes as the sheet tabs. */
+var LOCAL_OS = {Transactions:'transactions', Budgets:'budgets', Categories:'categories'};
+function localBk(category, month){ return category + ' ' + month; }
+function localStampId(row){
+  if(!row.id) row.id = 'x' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36);
+  return row.id;
+}
+function localNow(){
+  var d = new Date(), p = function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function LocalStore(){ this._dbp = null; }
+LocalStore.prototype._open = function(){
+  if(this._dbp) return this._dbp;
+  this._dbp = new Promise(function(res, rej){
+    if(!('indexedDB' in window)){ rej(new Error('This browser does not support local storage.')); return; }
+    var rq = indexedDB.open('expenseTracker', 1);
+    rq.onupgradeneeded = function(){
+      var db = rq.result;
+      if(!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', {keyPath:'id'});
+      if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets', {keyPath:'bk'});
+      if(!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', {keyPath:'name'});
+    };
+    rq.onsuccess = function(){ res(rq.result); };
+    rq.onerror = function(){ rej(rq.error || new Error('Could not open the local database.')); };
+  });
+  return this._dbp;
+};
+LocalStore.prototype._one = function(tab, mode, op){
+  var self = this;
+  return self._open().then(function(db){
+    return new Promise(function(res, rej){
+      var tx, st, rq;
+      try{
+        tx = db.transaction(LOCAL_OS[tab], mode);
+        st = tx.objectStore(LOCAL_OS[tab]);
+        rq = op(st);
+      }catch(e){ rej(e); return; }
+      rq.onsuccess = function(){ res(rq.result); };
+      rq.onerror = function(){ rej(rq.error || new Error('Local database error.')); };
+      tx.onerror = function(){ rej(tx.error || new Error('Local database error.')); };
+    });
+  });
+};
+LocalStore.prototype.ping = function(){ return Promise.resolve({ok:true}); };
+LocalStore.prototype.list = function(tab){
+  return this._one(tab, 'readonly', function(st){ return st.getAll(); }).then(function(rows){
+    if(tab==='Budgets') rows.forEach(function(r){ delete r.bk; });
+    return rows;
+  });
+};
+LocalStore.prototype.append = function(tab, row){
+  var r = Object.assign({}, row);
+  localStampId(r);
+  if(tab==='Budgets') r.bk = localBk(r.category, r.month);
+  return this._one(tab, 'readwrite', function(st){ return st.put(r); }).then(function(){ return r.id; });
+};
+LocalStore.prototype.appendMany = function(tab, rows){
+  var self = this;
+  var copies = rows.map(function(row){
+    var r = Object.assign({}, row);
+    localStampId(r);
+    if(tab==='Budgets') r.bk = localBk(r.category, r.month);
+    return r;
+  });
+  return self._open().then(function(db){
+    return new Promise(function(res, rej){
+      var tx = db.transaction(LOCAL_OS[tab], 'readwrite');
+      var st = tx.objectStore(LOCAL_OS[tab]);
+      copies.forEach(function(r){ st.put(r); });
+      tx.oncomplete = function(){ res(copies.map(function(r){ return r.id; })); };
+      tx.onerror = function(){ rej(tx.error || new Error('Local database error.')); };
+      tx.onabort = function(){ rej(tx.error || new Error('Local database error.')); };
+    });
+  });
+};
+LocalStore.prototype.update = function(tab, id, row){
+  var r = Object.assign({}, row);
+  if(tab==='Transactions') r.id = id;
+  else if(tab==='Budgets') r.bk = localBk(r.category, r.month);
+  return this._one(tab, 'readwrite', function(st){ return st.put(r); });
+};
+LocalStore.prototype.remove = function(tab, id){
+  return this._one(tab, 'readwrite', function(st){ return st.delete(id); });
+};
+LocalStore.prototype.setBudget = function(category, month, amount){
+  var r = {category:category, month:month, amount:amount, bk:localBk(category, month), updated_at:localNow()};
+  return this._one('Budgets', 'readwrite', function(st){ return st.put(r); });
+};
+/* Copy every tab from one store into another (used when switching storage). */
+async function migrateStores(fromStore, toStore){
+  var tabs = ['Transactions','Budgets','Categories'], counts = {};
+  for(var i=0;i<tabs.length;i++){
+    var rows = await fromStore.list(tabs[i]);
+    counts[tabs[i]] = rows.length;
+    if(!rows.length) continue;
+    if(tabs[i]==='Budgets'){
+      for(var k=0;k<rows.length;k++) await toStore.setBudget(rows[k].category, rows[k].month, num(rows[k].amount));
+    }else{
+      await toStore.appendMany(tabs[i], rows);
+    }
+  }
+  return counts;
+}
 /* Serialize save flows (update → reload → render → toast). Without this,
    two overlapping saves race: the slower one's reload can overwrite fresh
    state with stale data, so the UI shows old values after saving. */
@@ -1085,14 +1269,15 @@ function setRefreshing(on){
 async function loadAll(){
   setRefreshing(true);
   try{
+    var s = getStore();
     var r = await Promise.all([
-      apiGet({action:'list', tab:'Transactions'}),
-      apiGet({action:'list', tab:'Budgets'}),
-      apiGet({action:'list', tab:'Categories'})
+      s.list('Transactions'),
+      s.list('Budgets'),
+      s.list('Categories')
     ]);
-    state.transactions = r[0].rows || [];
-    state.budgets = r[1].rows || [];
-    state.categories = r[2].rows || [];
+    state.transactions = r[0];
+    state.budgets = r[1];
+    state.categories = r[2];
     state.dataLoaded = true;
   }finally{
     setRefreshing(false);
@@ -1115,6 +1300,7 @@ function showScreen(name){
     else if(name==='budgets') renderBudgets();
     else if(name==='tax') renderTax();
     else if(name==='reports') renderReports();
+    else if(name==='settings') syncStoreSettings();
   }
   window.scrollTo(0,0);
 }
@@ -1133,14 +1319,20 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 async function boot(){
   updateUserChip();
-  if(!state.apiUrl){
-    $('setup-screen').hidden = false;
-    return;
+  var kind = storeKind();
+  if(!kind){
+    if(state.apiUrl){ setStoreKind('sheets'); kind = 'sheets'; } // existing setup keeps working
+    else{ showSetupPicker('local'); return; }                    // brand-new user: choose storage
   }
+  if(kind==='sheets' && !state.apiUrl){ showSetupPicker('sheets'); return; }
   enterApp();
   if(!state.userName){
     await promptName();
   }
+}
+function showSetupPicker(which){
+  $('setup-screen').hidden = false;
+  pickSetupStore(which);
 }
 /* Keep the floating search bar parked below the sticky app header. */
 function syncHeadH(){
@@ -1172,7 +1364,26 @@ async function enterApp(){
 }
 
 /* ================= setup & settings ================= */
+function pickSetupStore(which){
+  document.querySelectorAll('#setup-store-seg button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-spick')===which);
+  });
+  $('setup-sheets-box').hidden = which!=='sheets';
+  $('setup-local-box').hidden = which!=='local';
+  $('setup-store-desc').textContent = which==='local'
+    ? 'Private to this browser. Nothing to set up, works offline.'
+    : 'Shared through your Google Sheet — best when more than one person enters data.';
+}
 function wireSetup(){
+  document.querySelectorAll('#setup-store-seg button').forEach(function(b){
+    b.addEventListener('click', function(){ pickSetupStore(b.getAttribute('data-spick')); });
+  });
+  $('setup-local-go').addEventListener('click', async function(){
+    setStoreKind('local');
+    toast('Using local storage on this device.');
+    enterApp();
+    if(!state.userName) await promptName();
+  });
   $('setup-connect').addEventListener('click', async function(){
     var url = $('setup-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Paste your Web app URL first.', true); return; }
@@ -1185,6 +1396,7 @@ function wireSetup(){
       if(!j.ok) throw new Error(j.error||'Ping failed');
       try{ localStorage.setItem(LS_API, url); }catch(e){}
       state.apiUrl = url;
+      setStoreKind('sheets');
       toast('Connected!');
       enterApp();
       if(!state.userName) await promptName();
@@ -1195,7 +1407,108 @@ function wireSetup(){
     btn.textContent = 'Save & Connect';
   });
 }
+/* Switch the active storage backend. Non-destructive: the other location keeps its data. */
+async function switchStoreKind(k){
+  if(k===(storeKind()||'local')){ syncStoreSettings(); return; }
+  setStoreKind(k);
+  syncStoreSettings();
+  if(k==='sheets' && !state.apiUrl){
+    toast('Paste your Web app URL below to connect Google Sheets.');
+    return;
+  }
+  toast('Switching storage…');
+  try{
+    await loadAll();
+    toast(k==='local' ? 'Now using storage on this device.' : 'Now using Google Sheets.');
+    showScreen(state.screen);
+  }catch(err){
+    toast('Could not load from the new storage: '+err.message, true);
+  }
+}
+async function syncStoreSettings(){
+  var k = storeKind() || 'local';
+  document.querySelectorAll('#set-store-seg button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-spick')===k);
+  });
+  $('set-store-desc').textContent = k==='local'
+    ? 'Private to this browser on this device. Works offline — nothing leaves your device.'
+    : 'Shared through your Google Sheet. Everyone with the sheet sees the same data.';
+  $('set-sheets-box').hidden = k!=='sheets';
+  var steps = $('set-steps-card');
+  if(steps) steps.hidden = k!=='sheets';
+  /* Offer a one-tap copy when the other location holds data. */
+  var row = $('set-copy-row');
+  row.hidden = true;
+  var other = k==='local' ? 'sheets' : 'local';
+  try{
+    if(other==='sheets' && !state.apiUrl) return;
+    var otherStore = other==='local' ? new LocalStore() : new SheetsStore();
+    var n = (await otherStore.list('Transactions')).length;
+    if(n>0){
+      $('set-copy-from').textContent = (other==='local' ? 'this device' : 'Google Sheets')+' ('+n+' transactions)';
+      row.dataset.other = other;
+      row.hidden = false;
+    }
+  }catch(e){ /* other side unreachable: no copy offered */ }
+}
+async function backupJson(){
+  var btn = $('set-backup');
+  btn.disabled = true;
+  try{
+    var s = getStore();
+    var data = {
+      exportedAt: new Date().toISOString(),
+      store: storeKind(),
+      transactions: await s.list('Transactions'),
+      budgets: await s.list('Budgets'),
+      categories: await s.list('Categories')
+    };
+    var d = new Date(), p = function(n){ return (n<10?'0':'')+n; };
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var a = el('a', {href:URL.createObjectURL(blob),
+      download:'expense-tracker-backup-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'.json'});
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 10000);
+    toast('Backup downloaded.');
+  }catch(err){
+    toast('Backup failed: '+err.message, true);
+  }finally{ btn.disabled = false; }
+}
 function wireSettings(){
+  document.querySelectorAll('#set-store-seg button').forEach(function(b){
+    b.addEventListener('click', function(){ switchStoreKind(b.getAttribute('data-spick')); });
+  });
+  $('set-backup').addEventListener('click', backupJson);
+  $('set-copy').addEventListener('click', async function(){
+    var other = $('set-copy-row').dataset.other || 'sheets';
+    var btn = $('set-copy'), orig = btn.innerHTML;
+    btn.disabled = true;
+    try{
+      var from = other==='local' ? new LocalStore() : new SheetsStore();
+      var to = getStore();
+      var srcTx = await from.list('Transactions');
+      if(!srcTx.length){ toast('Nothing to copy — the other location is empty.'); return; }
+      var dstTx = await to.list('Transactions');
+      var label = other==='local' ? 'this device' : 'Google Sheets';
+      var ok;
+      if(dstTx.length){
+        ok = await confirmDialog('Your current storage already holds '+dstTx.length+' transactions. Copying '+srcTx.length+' more from '+label+' may create duplicates. Continue?', 'Copy anyway');
+      }else{
+        ok = await confirmDialog('Copy '+srcTx.length+' transactions (plus budgets and categories) from '+label+' into your current storage?', 'Copy data');
+      }
+      if(!ok) return;
+      btn.innerHTML = '<span class="spin"></span> Copying…';
+      var counts = await migrateStores(from, to);
+      toast('Copied '+counts.Transactions+' transactions, '+counts.Budgets+' budgets, '+counts.Categories+' categories.');
+      await loadAll();
+      showScreen(state.screen);
+    }catch(err){
+      toast('Copy failed: '+err.message, true);
+    }finally{
+      btn.disabled = false;
+      btn.innerHTML = orig;
+    }
+  });
   $('set-test').addEventListener('click', async function(){
     var url = $('set-url').value.trim().replace(/\/$/,'');
     if(!url){ toast('Enter a URL first.', true); return; }
@@ -1242,6 +1555,7 @@ function wireSettings(){
     $('set-url').value = state.apiUrl || '';
     $('set-user').value = state.userName || '';
     applyTheme();
+    syncStoreSettings();
   });
 }
 
@@ -2280,7 +2594,7 @@ async function runBulkJob(job, opts){
       if(bf){ void bf.offsetWidth; bf.style.width='100%'; }
       var ok = true;
       try{
-        await withSaveLock(function(){ return apiPost({action:'update', tab:'Transactions', id:x.id, row:r.target}); });
+        await withSaveLock(function(){ return getStore().update('Transactions', x.id, r.target); });
         done++;
       }catch(e){ failed++; ok=false; }
       if(ok){
@@ -2607,7 +2921,7 @@ function openTxnForm(t){
         if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
         withSaveLock(async function(){
           try{
-            await apiPost({action:'delete', tab:'Transactions', id:t.id});
+            await getStore().remove('Transactions', t.id);
             await loadAll();
             if(state.screen==='transactions') renderTransactions();
             toast('Deleted.');
@@ -2690,26 +3004,26 @@ function openTxnForm(t){
       withSaveLock(async function(){
       try{
         if(inCat.value==='__new__' && !existCat){
-          await apiPost({action:'append', tab:'Categories', row:{name:newCatName, kind:curBp, tax_category:inTax.value||''}});
+          await getStore().append('Categories', {name:newCatName, kind:curBp, tax_category:inTax.value||''});
           state.categories.push({name:newCatName, kind:curBp, tax_category:inTax.value||''});
         }
         if(isEdit){
           rowData.id = t.id;
           rowData.created_at = t.created_at||'';
-          await apiPost({action:'update', tab:'Transactions', id:t.id, row:rowData});
+          await getStore().update('Transactions', t.id, rowData);
         }else{
-          await apiPost({action:'append', tab:'Transactions', row:rowData});
+          await getStore().append('Transactions', rowData);
         }
         for(var bi=0; bi<bulkIds.length; bi++){
           var bx = state.transactions.find(function(x){ return x.id===bulkIds[bi]; });
           if(!bx) continue;
-          await apiPost({action:'update', tab:'Transactions', id:bx.id, row:txnRowForUpdate(bx, newCatName)});
+          await getStore().update('Transactions', bx.id, txnRowForUpdate(bx, newCatName));
         }
         for(var ti=0; ti<bulkTypeIds.length; ti++){
           var tx = state.transactions.find(function(x){ return x.id===bulkTypeIds[ti]; });
           if(!tx) continue;
-          await apiPost({action:'update', tab:'Transactions', id:tx.id,
-            row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType})});
+          await getStore().update('Transactions', tx.id,
+            txnRowForUpdate(tx, tx.category||'', {txn_type:curType}));
         }
         await loadAll();
         if(state.screen==='transactions') renderTransactions();
@@ -3076,7 +3390,7 @@ function wireImport(){
     btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Importing…';
     await withSaveLock(async function(){
     try{
-      await apiPost({action:'appendMany', tab:'Transactions', rows:rows});
+      await getStore().appendMany('Transactions', rows);
       await loadAll();
       toast(rows.length+' transactions imported.');
       recordImportedFile(importFileInfo, rows.length);
@@ -3641,7 +3955,7 @@ function renderBudgets(){
       sv.disabled = true;
       await withSaveLock(async function(){
       try{
-        await apiPost({action:'setBudget', category:c, month:ym, amount:Math.round(v*100)/100});
+        await getStore().setBudget(c, ym, Math.round(v*100)/100);
         await loadAll();
         renderBudgets();
         toast('Budget saved for '+c+'.');
@@ -3887,7 +4201,7 @@ async function botSave(){
     for(var i=0;i<botProposal.rows.length;i++){
       var r = botProposal.rows[i];
       if(r.amount>0){
-        await apiPost({action:'setBudget', category:r.category, month:ym, amount:Math.round(r.amount*100)/100});
+        await getStore().setBudget(r.category, ym, Math.round(r.amount*100)/100);
         n++;
       }
     }
@@ -4082,13 +4396,13 @@ function renderReports(){
   var bpVal = acct==='all' ? '' : acct;
   var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
   var rows = txnsForRange(from, to, acct);
-  var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byMonth={}, byMerch={}, top=[];
+  var inc=0, exp=0, byCat={}, byCatN={}, byCatM={}, byInc={}, byMonth={}, byMerch={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
     var a = num(t.amount), m = (t.date||'').slice(0,7);
     if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
     if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; }
-    else { exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; top.push(t);
+    else { exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; (byCatM[c]||(byCatM[c]={}))[m]=1; top.push(t);
       var mk=String(t.merchant||t.description||'Unknown').trim()||'Unknown'; byMerch[mk]=(byMerch[mk]||0)+a;
       var wd=weekdayIdx(t.date); if(wd>=0) byDay[wd]+=a;
     }
@@ -4113,12 +4427,16 @@ function renderReports(){
       label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
   });
   // --- category table ---
+  // Monthly average is per active month: total / months the category actually had spending.
   var ct = $('rep-cattable');
   if(!cats.length){ ct.innerHTML=''; }
   else{
-    var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th></tr>';
-    cats.forEach(function(c){ h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+byCatN[c]+'</td><td style="text-align:right">'+Math.round(byCat[c]/exp*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>'; });
-    ct.innerHTML = h + '</table></div>';
+    var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th><th style="text-align:right">Avg / mo</th></tr>';
+    cats.forEach(function(c){
+      var activeMonths = Object.keys(byCatM[c]||{}).length || 1;
+      h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+byCatN[c]+'</td><td style="text-align:right">'+Math.round(byCat[c]/exp*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td><td style="text-align:right">'+money(byCat[c]/activeMonths)+'</td></tr>';
+    });
+    ct.innerHTML = h + '</table></div><p class="muted" style="font-size:12px; margin:6px 0 0">Avg / mo is averaged over the months each category had spending, not the full period.</p>';
   }
 
   // --- monthly trend: bars + cumulative line ---
