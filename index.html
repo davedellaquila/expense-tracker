@@ -313,6 +313,18 @@ textarea{resize:vertical; min-height:64px;}
 .spin{display:inline-block; width:18px; height:18px; border:2.5px solid var(--border);
   border-top-color:var(--blue); border-radius:50%; animation:sp 0.8s linear infinite; vertical-align:-4px;}
 @keyframes sp{to{transform:rotate(360deg)}}
+/* Small "Updating…" pill shown below the header while data reloads. */
+#refresh-pill{
+  position:fixed; left:50%; transform:translateX(-50%) translateY(-8px); z-index:70;
+  top:calc(var(--headH, 60px) + 8px + env(safe-area-inset-top));
+  background:var(--card); color:var(--text); border:1px solid var(--border);
+  padding:7px 14px; border-radius:20px; font-size:13.5px; font-weight:600;
+  box-shadow:0 2px 8px rgba(20,30,40,.12);
+  opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+  display:flex; align-items:center; gap:8px;
+}
+#refresh-pill.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#refresh-pill .spin{width:14px; height:14px; border-width:2px; vertical-align:0;}
 .loading{text-align:center; padding:40px 0; color:var(--muted);}
 
 /* ---------- import ---------- */
@@ -382,6 +394,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <h1>Expense Tracker</h1>
     <span class="user-chip" id="user-chip"></span>
   </header>
+  <div id="refresh-pill" aria-live="polite"><span class="spin"></span>Updating&hellip;</div>
 
   <main>
     <!-- DASHBOARD -->
@@ -987,16 +1000,28 @@ function withSaveLock(fn){
   saveLock = p.catch(function(){});
   return p;
 }
+var refreshCount = 0;
+function setRefreshing(on){
+  refreshCount += on ? 1 : -1;
+  if(refreshCount < 0) refreshCount = 0;
+  var pill = $('refresh-pill');
+  if(pill) pill.classList.toggle('show', refreshCount > 0);
+}
 async function loadAll(){
-  var r = await Promise.all([
-    apiGet({action:'list', tab:'Transactions'}),
-    apiGet({action:'list', tab:'Budgets'}),
-    apiGet({action:'list', tab:'Categories'})
-  ]);
-  state.transactions = r[0].rows || [];
-  state.budgets = r[1].rows || [];
-  state.categories = r[2].rows || [];
-  state.dataLoaded = true;
+  setRefreshing(true);
+  try{
+    var r = await Promise.all([
+      apiGet({action:'list', tab:'Transactions'}),
+      apiGet({action:'list', tab:'Budgets'}),
+      apiGet({action:'list', tab:'Categories'})
+    ]);
+    state.transactions = r[0].rows || [];
+    state.budgets = r[1].rows || [];
+    state.categories = r[2].rows || [];
+    state.dataLoaded = true;
+  }finally{
+    setRefreshing(false);
+  }
 }
 function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(n)?n:0; }
 
