@@ -499,6 +499,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
                   </select>
                   <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
                   <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
+                  <button class="linkbtn" id="f-undo" type="button" style="flex:none" hidden>Undo</button>
                 </div>
               </div>
             </div></div>
@@ -523,6 +524,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               </select>
               <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
               <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
+              <button class="linkbtn" id="f-undo-stick" type="button" style="flex:none" hidden>Undo</button>
             </div>
           </div>
         </div>
@@ -1117,6 +1119,7 @@ async function enterApp(){
   try{
     await loadAll();
     showScreen('dashboard');
+    maybeResumeBulkJob();
   }catch(err){
     if(instant){
       toast('Could not refresh data — showing your last saved view.', true);
@@ -1499,6 +1502,8 @@ function wireTransactions(){
   });
   $('f-reset').addEventListener('click', resetTxnFilters);
   $('f-reset-stick').addEventListener('click', resetTxnFilters);
+  $('f-undo').addEventListener('click', undoBulkUpdate);
+  $('f-undo-stick').addEventListener('click', undoBulkUpdate);
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
@@ -1537,6 +1542,7 @@ function wireTransactions(){
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
+  refreshUndoButtons(); // show Undo only when a completed bulk update exists
 }
 /* bulk selection + bulk update on the Transactions screen */
 var txnSelectMode = false;
@@ -1563,15 +1569,17 @@ function updateSelbar(){
   c.style.display = n ? 'none' : ''; // count is redundant once the Update button shows it
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
-/* live "Updated X of N (P%)" readout in the selection bar while a bulk update runs */
+/* live "Updated X of N (P%)" readout in the selection bar while a bulk job runs */
 function updateBulkProgress(){
   if(!bulkUpdating) return;
+  var verb = bulkUpdating.verb || 'Updated';
   var total = Object.keys(bulkUpdating.set).length;
   var done = Object.keys(bulkUpdating.done).length;
   var failed = Object.keys(bulkUpdating.failed).length;
-  var pct = total ? Math.round((done+failed)/total*100) : 0;
+  var skipped = bulkUpdating.skipped ? Object.keys(bulkUpdating.skipped).length : 0;
+  var pct = total ? Math.round((done+failed+skipped)/total*100) : 0;
   var c = $('selbar-count');
-  c.textContent = 'Updated ' + done + ' of ' + total + ' (' + pct + '%)';
+  c.textContent = verb + ' ' + done + ' of ' + total + ' (' + pct + '%)';
   c.style.display = '';
 }
 /* transaction list sorting (remembered across visits) */
@@ -1971,6 +1979,259 @@ function confirmBulkType(similar, fromType, toType){
 }
 /* Bulk update: change chosen fields on a set of selected transactions.
    Only fields the user sets are touched; everything else stays as-is. */
+/* ============ bulk update jobs: resume after reload + undo ============ */
+var BULK_JOB_KEY = 'expenseTracker.bulkJob';
+function persistBulkJob(job){
+  try{ localStorage.setItem(BULK_JOB_KEY, JSON.stringify(job)); }catch(e){}
+}
+function loadBulkJob(){
+  try{
+    var s = localStorage.getItem(BULK_JOB_KEY);
+    return s ? JSON.parse(s) : null;
+  }catch(e){ return null; }
+}
+function clearBulkJob(){
+  try{ localStorage.removeItem(BULK_JOB_KEY); }catch(e){}
+}
+function txnById(id){
+  for(var i=0;i<state.transactions.length;i++){
+    if(state.transactions[i].id===id) return state.transactions[i];
+  }
+  return null;
+}
+/* string-tolerant field comparison: numbers and numeric strings compare equal */
+function rowFieldsMatch(x, fields){
+  if(!x || !fields) return false;
+  for(var k in fields){
+    var a = x[k], b = fields[k];
+    if(a==null) a=''; if(b==null) b='';
+    if(String(a)!==String(b)) return false;
+  }
+  return true;
+}
+function applyRowFields(x, fields){
+  if(!x || !fields) return;
+  for(var k in fields){
+    if(k==='id'||k==='created_at') continue;
+    x[k] = fields[k];
+  }
+}
+/* Re-render a transaction card's dynamic bits from its (possibly mutated)
+   object, using the same formats as renderTransactions. The in-memory
+   object is the live reference held in state.transactions. */
+function refreshTxnCardEl(card, t){
+  if(!card || !t) return;
+  var dot = card.querySelector('.dot');
+  if(dot) dot.className = 'dot '+(t.txn_type==='income'?'in':'ex');
+  var t1 = card.querySelector('.t1');
+  if(t1) t1.textContent = t.merchant || t.description || '(no merchant)';
+  var t2 = card.querySelector('.t2');
+  if(t2){
+    var sub = (t.category||'Uncategorized')+' \u00b7 '+(t.business_personal||'Personal');
+    if(t.entered_by) sub += ' \u00b7 '+t.entered_by;
+    t2.textContent = sub;
+  }
+  var amt = card.querySelector('.amt');
+  if(amt){
+    amt.className = 'amt '+(t.txn_type==='income'?'pos':'neg');
+    amt.textContent = (t.txn_type==='income'?'+':'\u2212')+money(num(t.amount));
+  }
+}
+/* Build a resumable, undoable job for a fresh bulk update. `expected` is
+   computed up front (including the tax-category default); `before` is the
+   full pre-update row for undo / verify-failure revert; `target` is the
+   full row written to the backend. */
+function buildUpdateJob(ids, overrides){
+  var rows = [];
+  ids.forEach(function(id){
+    var x = txnById(id);
+    var ov = {};
+    for(var k in overrides) ov[k] = overrides[k];
+    var newCat = '';
+    if(x){
+      if(ov.category!==undefined && ov.tax_category===undefined && !(x.tax_category||'')){
+        var dflt = defaultTaxFor(ov.category);
+        if(dflt) ov.tax_category = dflt;
+      }
+      newCat = ov.category!==undefined ? ov.category : (x.category||'');
+    }
+    rows.push({
+      id:id,
+      before: x ? txnRowForUpdate(x, x.category||'', {}) : {},
+      expected: ov,
+      target: x ? txnRowForUpdate(x, newCat, ov) : null
+    });
+  });
+  var job = {
+    id:'bj_'+Date.now(), kind:'update',
+    startedAt:new Date().toISOString(), completedAt:null,
+    label:ids.length+' transaction'+(ids.length===1?'':'s'),
+    rows:rows, status:{}
+  };
+  rows.forEach(function(r){ job.status[r.id]='pending'; });
+  return job;
+}
+/* Runs a bulk write job: per-row progress UI, live card refresh, a final
+   reload + verify pass, then finalize. Shared by fresh updates, resume,
+   and undo.
+   job.rows: [{id, before, expected, target}]; job.status: id -> pending|done|failed|skipped.
+   opts: {verb, resume}. */
+async function runBulkJob(job, opts){
+  opts = opts||{};
+  var verb = opts.verb || (job.kind==='undo' ? 'Restored' : 'Updated');
+  var uset = {};
+  job.rows.forEach(function(r){ uset[r.id]=true; });
+  bulkUpdating = {set:uset, done:{}, failed:{}, skipped:{}, verb:verb};
+  bulkDoneIds = {}; bulkFailIds = {};
+  if(state.screen==='transactions') renderTransactions();
+  updateBulkProgress();
+  persistBulkJob(job);
+  var done=0, failed=0, skipped=0;
+  await withSaveLock(async function(){
+    for(var i=0;i<job.rows.length;i++){
+      var r = job.rows[i];
+      var st = job.status[r.id];
+      if(st==='done'){ done++; bulkUpdating.done[r.id]=true; continue; }
+      if(st==='skipped'){ skipped++; bulkUpdating.skipped[r.id]=true; continue; }
+      var x = txnById(r.id);
+      if(!x){
+        job.status[r.id]='failed'; bulkUpdating.failed[r.id]=true; failed++;
+        persistBulkJob(job); updateBulkProgress(); continue;
+      }
+      if(opts.resume && rowFieldsMatch(x, r.expected)){
+        // the write landed before the reload; no rewrite needed
+        job.status[r.id]='done'; bulkUpdating.done[r.id]=true; done++;
+        applyRowFields(x, r.expected);
+        var rb0 = bulkBars[r.id];
+        if(rb0){ rb0.className='bulkbar done'; rb0.parentNode.classList.add('bulk-done'); refreshTxnCardEl(rb0.parentNode, x); }
+        persistBulkJob(job); updateBulkProgress(); continue;
+      }
+      var bf = bulkFills[x.id];
+      if(bf){ void bf.offsetWidth; bf.style.width='100%'; }
+      var ok = true;
+      try{
+        await apiPost({action:'update', tab:'Transactions', id:x.id, row:r.target});
+        done++;
+      }catch(e){ failed++; ok=false; }
+      if(ok){
+        bulkUpdating.done[x.id]=true; job.status[x.id]='done';
+        applyRowFields(x, r.expected);
+      }else{
+        bulkUpdating.failed[x.id]=true; job.status[x.id]='failed';
+      }
+      persistBulkJob(job);
+      updateBulkProgress();
+      var bb = bulkBars[x.id];
+      if(bb){
+        bb.className='bulkbar '+(ok?'done':'fail');
+        bb.parentNode.classList.add(ok?'bulk-done':'bulk-fail');
+        if(ok) refreshTxnCardEl(bb.parentNode, x);
+      }
+      if(bf && !ok) bf.style.background='rgba(255,59,48,.20)';
+    }
+    var loadOk = true;
+    try{ await loadAll(); }catch(e){ loadOk=false; }
+    if(loadOk){
+      // Verify the writes actually landed. A "success" that didn't stick
+      // is reported as a failure, never as a success.
+      for(var v=0; v<job.rows.length; v++){
+        var r2 = job.rows[v], vid = r2.id;
+        if(job.status[vid]!=='done') continue;
+        var xt = txnById(vid);
+        if(xt && rowFieldsMatch(xt, r2.expected)) continue;
+        delete bulkUpdating.done[vid];
+        bulkUpdating.failed[vid]=true;
+        job.status[vid]='failed';
+        done--; failed++;
+        if(xt) applyRowFields(xt, r2.before); // card shows the old values again
+        persistBulkJob(job);
+        var vbb = bulkBars[vid];
+        if(vbb){
+          vbb.className='bulkbar fail';
+          vbb.parentNode.classList.remove('bulk-done');
+          vbb.parentNode.classList.add('bulk-fail');
+          if(xt) refreshTxnCardEl(vbb.parentNode, xt);
+        }
+        var vbf = bulkFills[vid];
+        if(vbf) vbf.style.background='rgba(255,59,48,.20)';
+      }
+    }
+  });
+  bulkDoneIds = {}; bulkFailIds = {};
+  for(var did in bulkUpdating.done) bulkDoneIds[did]=true;
+  for(var fid in bulkUpdating.failed) bulkFailIds[fid]=true;
+  updateBulkProgress(); // final numbers, then the bar resets below
+  bulkUpdating = null;
+  if(state.screen==='transactions') renderTransactions();
+  updateSelbar();
+  if(job.kind==='undo') clearBulkJob(); // one level of undo
+  else{ job.completedAt = new Date().toISOString(); persistBulkJob(job); }
+  refreshUndoButtons();
+  var total = job.rows.length;
+  if(failed) toast(verb+' '+done+' of '+total+' \u2014 '+failed+' failed.'+(skipped?' '+skipped+' skipped.':''), true);
+  else if(skipped) toast(verb+' '+done+' of '+total+' \u2014 '+skipped+' skipped (changed since the update).', true);
+  else toast(verb+' '+done+' transaction'+(done===1?'':'s')+'.');
+}
+/* Build the undo run for a completed update job. Strict rule: a row is
+   restored only if it still holds exactly what the update wrote; anything
+   else means it was touched since, so it is skipped rather than clobbered. */
+function buildUndoJob(updateJob){
+  var urows = [], ustatus = {};
+  updateJob.rows.forEach(function(r){
+    var x = txnById(r.id);
+    var skip = !x || !r.target;
+    if(!skip){
+      for(var k in r.target){
+        var a = x[k], b = r.target[k];
+        if(a==null) a=''; if(b==null) b='';
+        if(String(a)!==String(b)){ skip = true; break; }
+      }
+    }
+    urows.push({id:r.id, before:r.target, expected:r.before, target:r.before});
+    ustatus[r.id] = skip ? 'skipped' : 'pending';
+  });
+  return {
+    id:'bj_'+Date.now(), kind:'undo',
+    startedAt:new Date().toISOString(), completedAt:null,
+    label:updateJob.label, rows:urows, status:ustatus
+  };
+}
+async function undoBulkUpdate(){
+  if(bulkUpdating){ toast('A bulk update is already running.', true); return; }
+  var job = loadBulkJob();
+  if(!job || job.kind!=='update' || !job.completedAt || !job.rows || !job.rows.length){
+    toast('Nothing to undo.', true); return;
+  }
+  var n = job.rows.length;
+  var ok = await confirmDialog('Undo the last bulk update? '+n+' transaction'+(n===1?'':'s')+' will be restored to their previous values.', 'Undo');
+  if(!ok) return;
+  await runBulkJob(buildUndoJob(job), {verb:'Restored'});
+}
+function refreshUndoButtons(){
+  var job = loadBulkJob();
+  var show = !!(job && job.kind==='update' && job.completedAt && job.rows && job.rows.length);
+  var a = $('f-undo'), b = $('f-undo-stick');
+  if(a) a.hidden = !show;
+  if(b) b.hidden = !show;
+}
+/* After a reload with an unfinished job, offer to resume it. */
+async function maybeResumeBulkJob(){
+  var job = loadBulkJob();
+  if(!job || job.completedAt || !job.rows || !job.rows.length) return;
+  try{
+    var total = job.rows.length, doneN = 0;
+    job.rows.forEach(function(r){ if(job.status[r.id]==='done') doneN++; });
+    var what = job.kind==='undo' ? 'bulk undo' : 'bulk update';
+    var ok = await confirmDialog(
+      'A '+what+' of '+total+' transactions was interrupted ('+doneN+' applied). Resume it now?',
+      'Resume');
+    if(ok) await runBulkJob(job, {resume:true});
+    else clearBulkJob();
+  }catch(e){
+    toast('Could not resume the interrupted bulk update.', true);
+  }
+  refreshUndoButtons();
+}
 function openBulkUpdate(ids){
   openSheet(function(sh, close){
     sh.appendChild(el('h2',null,'Update '+ids.length+' transaction'+(ids.length===1?'':'s')));
@@ -2042,83 +2303,7 @@ function openBulkUpdate(ids){
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
       close(); // dismiss the sheet right away; progress shows on the rows themselves
-      var uset = {};
-      ids.forEach(function(id){ uset[id]=true; });
-      bulkUpdating = {set:uset, done:{}, failed:{}};
-      bulkDoneIds = {}; bulkFailIds = {};
-      if(state.screen==='transactions') renderTransactions();
-      updateBulkProgress();
-      var done = 0, failed = 0;
-      var expected = {}; // id -> per-row expected field values, for verify-after-write
-      await withSaveLock(async function(){
-        for(var i=0;i<ids.length;i++){
-          var x = null;
-          for(var j=0;j<state.transactions.length;j++){
-            if(state.transactions[j].id===ids[i]){ x = state.transactions[j]; break; }
-          }
-          if(x){
-            var bf = bulkFills[x.id];
-            if(bf){ void bf.offsetWidth; bf.style.width = '100%'; }
-            var ok = true;
-            var ov = {};
-            for(var k in overrides) ov[k] = overrides[k];
-            if(ov.category!==undefined && ov.tax_category===undefined && !(x.tax_category||'')){
-              var dflt = defaultTaxFor(ov.category);
-              if(dflt) ov.tax_category = dflt;
-            }
-            expected[x.id] = ov;
-            var newCat = ov.category!==undefined ? ov.category : (x.category||'');
-            try{
-              await apiPost({action:'update', tab:'Transactions', id:x.id, row:txnRowForUpdate(x, newCat, ov)});
-              done++;
-            }catch(e){ failed++; ok = false; }
-            if(ok) bulkUpdating.done[x.id]=true; else bulkUpdating.failed[x.id]=true;
-            updateBulkProgress();
-            var bb = bulkBars[x.id];
-            if(bb){ bb.className = 'bulkbar '+(ok?'done':'fail'); bb.parentNode.classList.add(ok?'bulk-done':'bulk-fail'); }
-            if(bf && !ok) bf.style.background = 'rgba(255,59,48,.20)';
-          }
-        }
-        var loadOk = true;
-        try{ await loadAll(); }catch(e){ loadOk = false; }
-        if(loadOk){
-          // Verify the writes actually landed. A "success" that didn't stick
-          // is reported as a failure, never as a success.
-          for(var v=0; v<ids.length; v++){
-            var vid = ids[v];
-            if(!bulkUpdating.done[vid]) continue;
-            var xt = null;
-            for(var w=0; w<state.transactions.length; w++){
-              if(state.transactions[w].id===vid){ xt = state.transactions[w]; break; }
-            }
-            var exp = expected[vid]||{};
-            var mismatch = !xt;
-            if(!mismatch){
-              for(var fk in exp){
-                if(String(xt[fk]||'')!==String(exp[fk])){ mismatch = true; break; }
-              }
-            }
-            if(mismatch){
-              delete bulkUpdating.done[vid];
-              bulkUpdating.failed[vid] = true;
-              done--; failed++;
-              var vbb = bulkBars[vid];
-              if(vbb){ vbb.className = 'bulkbar fail'; vbb.parentNode.classList.remove('bulk-done'); vbb.parentNode.classList.add('bulk-fail'); }
-              var vbf = bulkFills[vid];
-              if(vbf) vbf.style.background = 'rgba(255,59,48,.20)';
-            }
-          }
-        }
-      });
-      bulkDoneIds = {}; bulkFailIds = {};
-      for(var did in bulkUpdating.done) bulkDoneIds[did]=true;
-      for(var fid in bulkUpdating.failed) bulkFailIds[fid]=true;
-      updateBulkProgress(); // final numbers, then the bar resets below
-      bulkUpdating = null;
-      if(state.screen==='transactions') renderTransactions();
-      updateSelbar();
-      if(failed) toast('Updated '+done+' of '+ids.length+' \u2014 '+failed+' failed.', true);
-      else toast('Updated '+done+' transaction'+(done===1?'':'s')+'.');
+      await runBulkJob(buildUpdateJob(ids, overrides), {verb:'Updated'});
     };
   });
 }
