@@ -211,6 +211,11 @@ textarea{resize:vertical; min-height:64px;}
 .seg button.on{background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .filters{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
 .filters .full{grid-column:1 / -1;}
+/* "All" quick-reset chip grouped with a filter menu: blue = no filter (All),
+   dimmed = a specific item is chosen; tapping it resets the menu to All. */
+.allchip{flex:none; border:1px solid var(--border); background:var(--bg); color:var(--muted);
+  border-radius:14px; padding:8px 11px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;}
+.allchip.on{background:var(--blue); border-color:var(--blue); color:#fff;}
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   border:none; border-radius:12px; padding:12px 18px; font-size:15.5px; font-weight:700;
@@ -479,10 +484,20 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               <option value="custom">Custom…</option>
             </select></div>
           <div><label class="f" style="margin-top:0" for="f-type">Type</label>
-            <select id="f-type"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="allchip on" id="allchip-f-type" data-for="f-type" type="button">All</button>
+              <select id="f-type" style="flex:1;min-width:0"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option></select>
+            </div></div>
           <div><label class="f" style="margin-top:0" for="f-bp">Account</label>
-            <select id="f-bp"><option value="">All</option><option>Business</option><option>Personal</option></select></div>
-          <div><label class="f" style="margin-top:0" for="f-cat">Category</label><select id="f-cat"><option value="">All</option></select></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="allchip on" id="allchip-f-bp" data-for="f-bp" type="button">All</button>
+              <select id="f-bp" style="flex:1;min-width:0"><option value="">All</option><option>Business</option><option>Personal</option></select>
+            </div></div>
+          <div><label class="f" style="margin-top:0" for="f-cat">Category</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="allchip on" id="allchip-f-cat" data-for="f-cat" type="button">All</button>
+              <select id="f-cat" style="flex:1;min-width:0"><option value="">All</option></select>
+            </div></div>
           <div id="f-custom" class="full" style="display:none;gap:8px">
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
@@ -1480,6 +1495,12 @@ function allCategories(){
   state.transactions.forEach(function(t){ if(t.category) s[t.category]=true; });
   return Object.keys(s).sort();
 }
+function syncAllChips(){
+  ['f-type','f-bp','f-cat'].forEach(function(id){
+    var chip = document.getElementById('allchip-'+id), sel = document.getElementById(id);
+    if(chip && sel) chip.classList.toggle('on', sel.value==='');
+  });
+}
 function wireTransactions(){
   ['f-preset','f-from','f-to','f-type','f-bp','f-cat'].forEach(function(id){
     // a manual filter edit replaces any chart drill-down: the visible
@@ -1491,6 +1512,16 @@ function wireTransactions(){
     });
   });
   $('f-q').addEventListener('input', function(){ renderTransactions(); syncSearchClear(); });
+  // "All" chips: one tap resets the paired menu to All without opening it
+  document.querySelectorAll('.allchip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      var sel = document.getElementById(chip.getAttribute('data-for'));
+      if(sel && sel.value!==''){
+        sel.value = '';
+        sel.dispatchEvent(new Event('change'));
+      }
+    });
+  });
   $('f-q-clear').addEventListener('click', function(){
     $('f-q').value = ''; var si = $('f-q-stick'); if(si) si.value = '';
     renderTransactions(); syncSearchClear(); $('f-q').focus();
@@ -1756,6 +1787,7 @@ function renderTransactions(){
   });
 
   renderDrillChip();
+  syncAllChips();
   var rows = state.transactions.filter(txnVisible);
   var sortMode = txnSortRows(rows);
 
