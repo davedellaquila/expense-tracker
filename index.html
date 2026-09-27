@@ -548,7 +548,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
         <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
         <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
-        <button class="btn small ghost" id="selbar-done" type="button">Done</button>
+        <button class="btn small" id="selbar-done" type="button">Done</button>
       </div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
     </section>
@@ -2207,9 +2207,11 @@ async function runBulkJob(job, opts){
   else if(skipped) toast(verb+' '+done+' of '+total+' \u2014 '+skipped+' skipped (changed since the update).', true);
   else toast(verb+' '+done+' transaction'+(done===1?'':'s')+'.');
   }finally{
-    // never leave the Update button stuck disabled
+    // Never leave the Update button stuck on its spinner: if anything above
+    // threw, the normal reset never ran, so restore the bar state here.
     if(progBtn) progBtn.disabled = false;
     bulkUpdating = null;
+    try{ updateSelbar(); }catch(e){}
   }
 }
 /* Build the undo run for a completed update job. Strict rule: a row is
