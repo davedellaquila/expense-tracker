@@ -79,6 +79,9 @@ body{
 .dl-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dl-pct{ color:var(--muted); font-variant-numeric:tabular-nums; }
 .chart-sub{ color:var(--muted); font-size:13px; margin:-6px 0 8px; }
+.chart-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
+.chart-pick-row h2{margin:0}
+.chart-pick-row select{max-width:48%;font-size:14px;padding:6px 8px}
 
 /* ---------- header ---------- */
 .app-header{
@@ -375,15 +378,20 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="stat"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
         <div class="stat"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
-      <div class="duo-grid">
-        <div class="card"><h2>Income</h2><p class="chart-sub" id="dash-donut-inc-sub">By category</p><div id="dash-donut-inc"></div></div>
-        <div class="card"><h2>Expenses</h2><p class="chart-sub" id="dash-donut-exp-sub">By category</p><div id="dash-donut-exp"></div></div>
-      </div>
-      <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants this month</p><div id="dash-merch"></div></div>
-      <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="dash-week"></div></div>
       <div class="card">
-        <h2>Budget vs Actual</h2>
-        <div id="dash-budgets"></div>
+        <div class="chart-pick-row">
+          <h2 id="dash-chart-title">Category Mix</h2>
+          <select id="dash-chart-pick" aria-label="Choose a chart">
+            <option value="catmix">Category Mix</option>
+            <option value="inc">Income by Category</option>
+            <option value="merch">Top Merchants</option>
+            <option value="week">Weekday Pattern</option>
+            <option value="trend">Monthly Trend</option>
+            <option value="budget">Budget vs Actual</option>
+          </select>
+        </div>
+        <p class="chart-sub" id="dash-chart-sub"></p>
+        <div id="dash-chart"></div>
       </div>
     </section>
 
@@ -734,6 +742,12 @@ function weekdayIdx(dateStr){
   var d = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
   return isNaN(d.getTime()) ? -1 : (d.getDay()+6)%7;
 }
+/* Chip label for an aggregated "Other" donut slice: name the categories inside it. */
+function otherDrillLabel(names){
+  var shown = names.slice(0,2).join(', ');
+  if(names.length>2) shown += ' +'+(names.length-2)+' more';
+  return 'Other: ' + shown;
+}
 var toastTimer = null;
 function toast(msg, isErr){
   var t = $('toast');
@@ -1057,6 +1071,10 @@ function wireDashboard(){
   $('dash-from').addEventListener('change', renderDashboard);
   $('dash-to').addEventListener('change', renderDashboard);
   $('dash-acct').addEventListener('change', renderDashboard);
+  $('dash-chart-pick').addEventListener('change', function(){
+    try{ localStorage.setItem(DASH_CHART_KEY, this.value); }catch(e){}
+    renderDashChart();
+  });
 }
 function renderDashboard(){
   var range = presetRange('dash-preset','dash-from','dash-to');
@@ -1065,9 +1083,14 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {};
+  var byCatInc = {}, byCatExp = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
+    var m = String(t.date||'').slice(0,7);
+    if(m.length>=7){
+      if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
+      if(t.txn_type==='income') byMonth[m].inc += a; else byMonth[m].exp += a;
+    }
     if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
       var ci = repDisplayCat(t);
       byCatInc[ci] = (byCatInc[ci]||0)+a;
@@ -1096,79 +1119,115 @@ function renderDashboard(){
     var wd = weekdayIdx(t.date);
     if(wd>=0) byDay[wd] += num(t.amount);
   });
-/* Chip label for an aggregated "Other" donut slice: name the categories inside it. */
-function otherDrillLabel(names){
-  var shown = names.slice(0,2).join(', ');
-  if(names.length>2) shown += ' +'+(names.length-2)+' more';
-  return 'Other: ' + shown;
+  // stash computed data, then render whichever chart is picked
+  dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
+              byCatInc:byCatInc, byCatExp:byCatExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+  renderDashChart();
+  saveDashCache(); // persist filters + data so the home page restores instantly
 }
+
+/* ---- home page chart picker ----
+   One chart viewport; the menu chooses which chart renders. The pick persists. */
+var dashData = null;
+var DASH_CHART_KEY = 'expenseTracker.dashChart';
+var DASH_CHARTS = {
+  catmix: {title:'Category Mix',       sub:'Share of total spend'},
+  inc:    {title:'Income by Category', sub:'By category'},
+  merch:  {title:'Top Merchants',      sub:'Largest merchants'},
+  week:   {title:'Weekday Pattern',    sub:'Spend by day of week'},
+  trend:  {title:'Monthly Trend',      sub:'Spend by month'},
+  budget: {title:'Budget vs Actual',   sub:'Budgeted vs spent'}
+};
+function dashChartPick(){
+  try{ return localStorage.getItem(DASH_CHART_KEY) || 'catmix'; }catch(e){ return 'catmix'; }
+}
+function renderDashChart(){
+  var pick = dashChartPick();
+  if(!DASH_CHARTS[pick]) pick = 'catmix';
+  var sel = $('dash-chart-pick');
+  if(sel && sel.value!==pick) sel.value = pick;
+  var meta = DASH_CHARTS[pick];
+  $('dash-chart-title').textContent = meta.title;
+  var d = dashData, box = $('dash-chart');
+  $('dash-chart-sub').textContent = meta.sub + (d ? ' \u00B7 '+d.rangeLabel : '');
+  if(!d){ box.innerHTML=''; return; }
+  var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel;
   function dashDrill(extra){
     var o = {type:'expense', bp:bpVal};
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
   }
-  var catsI = Object.keys(byCatInc).sort(function(a,b){ return byCatInc[b]-byCatInc[a]; });
-  var catsE = Object.keys(byCatExp).sort(function(a,b){ return byCatExp[b]-byCatExp[a]; });
-  $('dash-donut-inc-sub').textContent = 'By category · '+rangeLabel;
-  $('dash-donut-exp-sub').textContent = 'By category · '+rangeLabel;
-  repDonut($('dash-donut-inc'), catsI.map(function(c){ return {name:c, value:byCatInc[c]}; }), function(it){
-    dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
-  }, 'No income in this period.');
-  repDonut($('dash-donut-exp'), catsE.map(function(c){ return {name:c, value:byCatExp[c]}; }), function(it){
-    dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
-  }, 'No expenses in this period.');
-  var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
-  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
-    dashDrill({q: it.name});
-  });
-  repWeekday($('dash-week'), byDay, function(i){
-    dashDrill({weekday:i, label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
-  });
-
-  // budgets progress (aggregated across the selected period)
-  var bb = $('dash-budgets'); bb.innerHTML='';
+  if(pick==='catmix'){
+    var catsE = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; });
+    repDonut(box, catsE.map(function(c){ return {name:c, value:d.byCatExp[c]}; }), function(it){
+      dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
+        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+    }, 'No expenses in this period.');
+  } else if(pick==='inc'){
+    var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
+    repDonut(box, catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
+      dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
+        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
+    }, 'No income in this period.');
+  } else if(pick==='merch'){
+    var merch = Object.keys(d.byMerch).sort(function(a,b){ return d.byMerch[b]-d.byMerch[a]; }).slice(0,8);
+    repHBars(box, merch.map(function(k){ return {name:k, value:d.byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
+      dashDrill({q: it.name});
+    });
+  } else if(pick==='week'){
+    repWeekday(box, d.byDay, function(i){
+      dashDrill({weekday:i, label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
+    });
+  } else if(pick==='trend'){
+    var months = Object.keys(d.byMonth).sort();
+    repTrend(box, months.map(function(m){
+      return {key:m, label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: d.byMonth[m].exp};
+    }), function(it){
+      dashDrill({singleMonth: it.key});
+    });
+  } else if(pick==='budget'){
+    renderDashBudgets(box, d);
+  }
+}
+function renderDashBudgets(box, d){
+  box.innerHTML='';
+  var from=d.from, to=d.to, rows=d.rows;
   var bMap = budgetsForRange(from, to);
   var bCats = Object.keys(bMap).sort(function(a,b){ return a.localeCompare(b); });
-  if(!bCats.length){ emptyInto(bb,'🎯', from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.'); }
-  else{
-    // overall proposed vs actual across all budgeted categories
-    var totB = 0, totS = 0;
-    var perCat = bCats.map(function(bc){
-      var spent = 0;
-      rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===bc) spent += num(t.amount); });
-      totB += bMap[bc]; totS += spent;
-      return {c:bc, amt:bMap[bc], spent:spent};
-    });
-    var sumWrap = el('div',{class:'barrow'});
-    var sumTop = el('div',{class:'top'});
-    sumTop.appendChild(el('b',null,'Total'));
-    var sumLbl = el('span',null,money(totS)+' of '+money(totB)+' budgeted');
-    if(totS>totB) sumLbl.className='neg';
-    sumTop.appendChild(sumLbl);
-    sumWrap.appendChild(sumTop);
-    var sumBar = el('div',{class:'bar'+(totS>totB?' over':'')});
-    var sumFill = el('div');
-    sumFill.style.width = (totB>0 ? Math.min(100, totS/totB*100) : 0)+'%';
-    sumBar.appendChild(sumFill); sumWrap.appendChild(sumBar);
-    bb.appendChild(sumWrap);
-    perCat.forEach(function(p){
-      var wrap = el('div',{class:'barrow'});
-      var top = el('div',{class:'top'});
-      top.appendChild(el('b',null,p.c));
-      var lbl = el('span',null,money(p.spent)+' of '+money(p.amt));
-      if(p.spent>p.amt) lbl.className='neg';
-      top.appendChild(lbl);
-      wrap.appendChild(top);
-      var bar = el('div',{class:'bar'+(p.spent>p.amt?' over':'')});
-      var fill = el('div'); fill.style.width = (p.amt>0?Math.min(100, p.spent/p.amt*100):0)+'%'; bar.appendChild(fill);
-      wrap.appendChild(bar);
-      bb.appendChild(wrap);
-    });
-  }
-  saveDashCache(); // persist filters + data so the home page restores instantly
+  if(!bCats.length){ emptyInto(box,'🎯', from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.'); return; }
+  var totB = 0, totS = 0;
+  var perCat = bCats.map(function(bc){
+    var spent = 0;
+    rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===bc) spent += num(t.amount); });
+    totB += bMap[bc]; totS += spent;
+    return {c:bc, amt:bMap[bc], spent:spent};
+  });
+  var sumWrap = el('div',{class:'barrow'});
+  var sumTop = el('div',{class:'top'});
+  sumTop.appendChild(el('b',null,'Total'));
+  var sumLbl = el('span',null,money(totS)+' of '+money(totB)+' budgeted');
+  if(totS>totB) sumLbl.className='neg';
+  sumTop.appendChild(sumLbl);
+  sumWrap.appendChild(sumTop);
+  var sumBar = el('div',{class:'bar'+(totS>totB?' over':'')});
+  var sumFill = el('div');
+  sumFill.style.width = (totB>0 ? Math.min(100, totS/totB*100) : 0)+'%';
+  sumBar.appendChild(sumFill); sumWrap.appendChild(sumBar);
+  box.appendChild(sumWrap);
+  perCat.forEach(function(p){
+    var wrap = el('div',{class:'barrow'});
+    var top = el('div',{class:'top'});
+    top.appendChild(el('b',null,p.c));
+    var lbl = el('span',null,money(p.spent)+' of '+money(p.amt));
+    if(p.spent>p.amt) lbl.className='neg';
+    top.appendChild(lbl);
+    wrap.appendChild(top);
+    var bar = el('div',{class:'bar'+(p.spent>p.amt?' over':'')});
+    var fill = el('div'); fill.style.width = (p.amt>0?Math.min(100, p.spent/p.amt*100):0)+'%'; bar.appendChild(fill);
+    wrap.appendChild(bar);
+    box.appendChild(wrap);
+  });
 }
 
 /* ---- dashboard instant cache + filter persistence ----
