@@ -158,6 +158,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar #selbar-count{flex:none; font-weight:700; font-size:14.5px;}
 .selbar .btn{margin:0;}
 .txn.selrow.checked{background:var(--th-bg); border-color:var(--blue);}
+/* bulk-update result highlight: green once a row's update has landed */
+.txn.bulk-done{background:rgba(52,199,89,.16);}
+.txn.bulk-fail{background:rgba(255,59,48,.13);}
 .txn .selbox{width:20px; height:20px; flex:none; accent-color:var(--blue); pointer-events:none;}
 /* bulk-update per-row progress thermometer */
 .bulkbar{position:absolute; left:4px; top:8px; bottom:8px; width:4px;
@@ -1446,6 +1449,8 @@ function wireTransactions(){
 var txnSelectMode = false;
 var txnSelected = {}; // id -> true
 var bulkUpdating = null; // {set:{id:true}, done:{}, failed:{}} while a bulk update runs
+var bulkDoneIds = {}; // ids tinted green after the last bulk update finished
+var bulkFailIds = {}; // ids tinted red after the last bulk update finished
 var bulkBars = {}; // id -> .bulkbar element, rebuilt on every renderTransactions
 function txnSelCount(){ return Object.keys(txnSelected).length; }
 function setTxnSelectMode(on){
@@ -1637,6 +1642,8 @@ function renderTransactions(){
       b.appendChild(bbar);
       bulkBars[t.id] = bbar;
     }
+    if(bulkDoneIds[t.id]) b.classList.add('bulk-done');
+    if(bulkFailIds[t.id]) b.classList.add('bulk-fail');
     list.appendChild(b);
   });
 }
@@ -1903,6 +1910,7 @@ function openBulkUpdate(ids){
       var uset = {};
       ids.forEach(function(id){ uset[id]=true; });
       bulkUpdating = {set:uset, done:{}, failed:{}};
+      bulkDoneIds = {}; bulkFailIds = {};
       if(state.screen==='transactions') renderTransactions();
       var done = 0, failed = 0;
       var expected = {}; // id -> per-row expected field values, for verify-after-write
@@ -1928,7 +1936,7 @@ function openBulkUpdate(ids){
             }catch(e){ failed++; ok = false; }
             if(ok) bulkUpdating.done[x.id]=true; else bulkUpdating.failed[x.id]=true;
             var bb = bulkBars[x.id];
-            if(bb) bb.className = 'bulkbar '+(ok?'done':'fail');
+            if(bb){ bb.className = 'bulkbar '+(ok?'done':'fail'); bb.parentNode.classList.add(ok?'bulk-done':'bulk-fail'); }
           }
         }
         var loadOk = true;
@@ -1955,11 +1963,14 @@ function openBulkUpdate(ids){
               bulkUpdating.failed[vid] = true;
               done--; failed++;
               var vbb = bulkBars[vid];
-              if(vbb) vbb.className = 'bulkbar fail';
+              if(vbb){ vbb.className = 'bulkbar fail'; vbb.parentNode.classList.remove('bulk-done'); vbb.parentNode.classList.add('bulk-fail'); }
             }
           }
         }
       });
+      bulkDoneIds = {}; bulkFailIds = {};
+      for(var did in bulkUpdating.done) bulkDoneIds[did]=true;
+      for(var fid in bulkUpdating.failed) bulkFailIds[fid]=true;
       bulkUpdating = null;
       if(state.screen==='transactions') renderTransactions();
       updateSelbar();
