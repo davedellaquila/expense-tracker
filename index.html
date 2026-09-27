@@ -82,6 +82,9 @@ body{
 .chart-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
 .chart-pick-row h2{margin:0}
 .chart-pick-row select{max-width:48%;font-size:14px;padding:6px 8px}
+.donut-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.donut-trio-title{text-align:center;font-size:14px;margin:6px 0 0;color:var(--muted);font-weight:600}
+@media (max-width:640px){.donut-trio{grid-template-columns:1fr}}
 
 /* ---------- header ---------- */
 .app-header{
@@ -383,7 +386,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <h2 id="dash-chart-title">Category Mix</h2>
           <select id="dash-chart-pick" aria-label="Choose a chart">
             <option value="catmix">Category Mix</option>
-            <option value="inc">Income by Category</option>
             <option value="merch">Top Merchants</option>
             <option value="week">Weekday Pattern</option>
             <option value="trend">Monthly Trend</option>
@@ -1093,7 +1095,7 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byCatNExp = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -1101,14 +1103,17 @@ function renderDashboard(){
       if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
       if(t.txn_type==='income') byMonth[m].inc += a; else byMonth[m].exp += a;
     }
-    if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
-      var ci = repDisplayCat(t);
-      byCatInc[ci] = (byCatInc[ci]||0)+a;
+    var dc = repDisplayCat(t);
+    if(dc==='Transfers'){
+      var xc = t.category||'Uncategorized';
+      byCatXfer[xc] = (byCatXfer[xc]||0)+a;
+    }
+    else if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
+      byCatInc[dc] = (byCatInc[dc]||0)+a;
     }
     else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
-      var ce = repDisplayCat(t);
-      byCatExp[ce] = (byCatExp[ce]||0)+a;
-      byCatNExp[ce] = (byCatNExp[ce]||0)+1;
+      byCatExp[dc] = (byCatExp[dc]||0)+a;
+      byCatNExp[dc] = (byCatNExp[dc]||0)+1;
     }
   });
   var net = inc-exp;
@@ -1132,7 +1137,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatNExp:byCatNExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashChart();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -1143,7 +1148,6 @@ var dashData = null;
 var DASH_CHART_KEY = 'expenseTracker.dashChart';
 var DASH_CHARTS = {
   catmix: {title:'Category Mix',       sub:'Share of total spend'},
-  inc:    {title:'Income by Category', sub:'By category'},
   merch:  {title:'Top Merchants',      sub:'Largest merchants'},
   week:   {title:'Weekday Pattern',    sub:'Spend by day of week'},
   trend:  {title:'Monthly Trend',      sub:'Spend by month'},
@@ -1170,26 +1174,37 @@ function renderDashChart(){
     drillToTransactions(o);
   }
   if(pick==='catmix'){
+    box.innerHTML = '<div class="donut-trio">'+
+      '<div><h3 class="donut-trio-title">Income</h3><div data-dd="inc"></div></div>'+
+      '<div><h3 class="donut-trio-title">Expenses</h3><div data-dd="exp"></div></div>'+
+      '<div><h3 class="donut-trio-title">Transfers</h3><div data-dd="xfer"></div></div>'+
+      '</div><div data-dd-table></div>';
+    var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
     var catsE = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; });
-    repDonut(box, catsE.map(function(c){ return {name:c, value:d.byCatExp[c]}; }), function(it){
+    var catsX = Object.keys(d.byCatXfer).sort(function(a,b){ return d.byCatXfer[b]-d.byCatXfer[a]; });
+    repDonut(box.querySelector('[data-dd="inc"]'), catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
+      dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
+        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
+    }, 'No income in this period.');
+    repDonut(box.querySelector('[data-dd="exp"]'), catsE.map(function(c){ return {name:c, value:d.byCatExp[c]}; }), function(it){
       dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
         label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
     }, 'No expenses in this period.');
+    repDonut(box.querySelector('[data-dd="xfer"]'), catsX.map(function(c){ return {name:c, value:d.byCatXfer[c]}; }), function(it){
+      var raws = (it.names && it.names.length ? it.names : [it.name]);
+      dashDrill({type:'', xferOnly:true, rawCats: raws,
+        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Transfers \u00B7 ' + rangeLabel});
+    }, 'No transfers in this period.');
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
-    box.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE));
-    var catRows = box.querySelectorAll('[data-catrow]');
+    var tblBox = box.querySelector('[data-dd-table]');
+    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE));
+    var catRows = tblBox.querySelectorAll('[data-catrow]');
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-catrow');
         dashDrill({type:'expense', dispCats:[c], label: c + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
       });
     })(catRows[ri]);
-  } else if(pick==='inc'){
-    var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
-    repDonut(box, catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
-      dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
-    }, 'No income in this period.');
   } else if(pick==='merch'){
     var merch = Object.keys(d.byMerch).sort(function(a,b){ return d.byMerch[b]-d.byMerch[a]; }).slice(0,8);
     repHBars(box, merch.map(function(k){ return {name:k, value:d.byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
@@ -1335,6 +1350,8 @@ function txnVisible(t){
   if(bp && t.business_personal!==bp) return false;
   if(cat && t.category!==cat) return false;
   if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
+  if(txnDrill && txnDrill.xferOnly && repDisplayCat(t)!=='Transfers') return false;
+  if(txnDrill && txnDrill.rawCats && txnDrill.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
   if(txnDrill && txnDrill.weekday!=null){
     if(weekdayIdx(t.date)!==txnDrill.weekday) return false;
   }
@@ -1386,9 +1403,10 @@ function setCatFilter(name){
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var ranged = !!(o.from || o.to);
-  txnDrill = (ranged || o.dispCats || o.weekday!=null)
+  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly)
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
-       dispCats:o.dispCats||null, label:o.label||'Report selection'}
+       dispCats:o.dispCats||null, label:o.label||'Report selection',
+       xferOnly:!!o.xferOnly, rawCats:o.rawCats||null}
     : null;
   if(from && to){
     $('f-preset').value = 'custom';
