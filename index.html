@@ -1620,6 +1620,13 @@ var bulkFills = {}; // id -> .bulkfill sweep element, rebuilt on every renderTra
 function txnSelCount(){ return Object.keys(txnSelected).length; }
 function setTxnSelectMode(on){
   txnSelectMode = on;
+  if(on){
+    // pre-select everything currently visible (filters/search apply)
+    txnSelected = {};
+    state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
+  }else{
+    txnSelected = {};
+  }
   $('f-select').textContent = on ? 'Done' : 'Bulk update';
   $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
   $('selbar').hidden = !on;
@@ -1634,7 +1641,6 @@ function updateSelbar(){
   c.style.display = n ? 'none' : ''; // count is redundant once the Update button shows it
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
-/* live "Updated X of N (P%)" readout in the selection bar while a bulk job runs */
 /* Row state across all in-flight bulk jobs: 'done' | 'failed' | 'pending' | null */
 function bulkJobRowState(id){
   var pending = null;
