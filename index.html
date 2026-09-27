@@ -499,10 +499,26 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
       </div>
       <div class="searchstick" id="searchstick" hidden>
-        <div style="display:flex;align-items:center;gap:2px">
-          <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="flex:1;min-width:0;margin:0">
-          <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
-          <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
+          <div style="min-width:0">
+            <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
+            <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0">
+          </div>
+          <div style="min-width:0">
+            <label class="f" style="margin-top:0" for="f-sort-stick">Sort</label>
+            <div style="display:flex;align-items:center;gap:6px;min-width:0">
+              <select id="f-sort-stick" aria-label="Sort transactions" style="flex:1;min-width:0;font-size:14px;padding:9px 6px">
+                <option value="date-desc">Newest</option>
+                <option value="date-asc">Oldest</option>
+                <option value="amount-desc">Amount ↓</option>
+                <option value="amount-asc">Amount ↑</option>
+                <option value="merchant-asc">Merchant A–Z</option>
+                <option value="merchant-desc">Merchant Z–A</option>
+              </select>
+              <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
+              <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
+            </div>
+          </div>
         </div>
       </div>
       <div id="txn-drill"></div>
@@ -1462,6 +1478,16 @@ function wireTransactions(){
       renderTransactions();
     });
   }
+  var fsortStick = $('f-sort-stick');
+  if(fsortStick){
+    fsortStick.value = txnSortPick();
+    fsortStick.addEventListener('change', function(){
+      if(fsort) fsort.value = this.value;
+      try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
+      renderTransactions();
+    });
+    if(fsort) fsort.addEventListener('change', function(){ fsortStick.value = this.value; });
+  }
   $('f-preset').addEventListener('change', function(){
     $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
   });
@@ -1481,6 +1507,10 @@ function wireTransactions(){
       stick.hidden = !offTop;
       if(offTop && document.activeElement!==stickInput && stickInput.value!==origInput.value){
         stickInput.value = origInput.value;
+      }
+      var stickSort = $('f-sort-stick');
+      if(offTop && stickSort && stickSort.value !== $('f-sort').value){
+        stickSort.value = $('f-sort').value;
       }
     }, {threshold:0}).observe(origInput);
   }
