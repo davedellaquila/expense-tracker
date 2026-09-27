@@ -171,6 +171,16 @@ textarea{resize:vertical; min-height:64px;}
 .btn.small{width:auto; padding:8px 14px; font-size:14px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
+/* sticky action bar: floats at the bottom of a sheet while scrolling,
+   settles as the last element when scrolled to the end */
+.stickybar{
+  position:sticky; bottom:0; z-index:5;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  box-shadow:0 -8px 18px rgba(10,20,15,.08);
+  margin:16px -18px calc(-22px - env(safe-area-inset-bottom));
+  padding:12px 18px calc(14px + env(safe-area-inset-bottom));
+}
 .linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
 .iconbtn{
@@ -1510,7 +1520,7 @@ function openTxnForm(t){
     refreshCats();
     taxCategoryOptions(inTax, (t&&t.tax_category)||defaultTaxFor(inCat.value));
 
-    var row = el('div',{class:'btnrow'});
+    var row = el('div',{class:'btnrow stickybar'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.onclick = close;
     var save = el('button',{class:'btn',type:'button'}, isEdit?'Save':'Add');
