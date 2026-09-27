@@ -183,6 +183,14 @@ textarea{resize:vertical; min-height:64px;}
 }
 .linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
+/* sticky search bar above the transaction list */
+.searchstick{
+  position:sticky; top:var(--headH, 64px); z-index:15;
+  background:var(--bg);
+  padding:6px 0 10px;
+  margin-top:-6px;
+}
+.searchstick input{margin:0; box-shadow:0 3px 12px rgba(10,20,15,.10);}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
   background:var(--card); color:var(--danger); cursor:pointer; margin:0;
@@ -387,9 +395,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
-          <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
-            <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off"></div>
+          </div>
         </div>
+      </div>
+      <div class="searchstick">
+        <input type="text" id="f-q" placeholder="🔍 Search merchant, description, notes…" autocomplete="off" aria-label="Search transactions">
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
@@ -866,10 +876,17 @@ async function boot(){
     await promptName();
   }
 }
+/* Keep the floating search bar parked below the sticky app header. */
+function syncHeadH(){
+  var h = document.querySelector('.app-header');
+  if(h) document.documentElement.style.setProperty('--headH', h.offsetHeight+'px');
+}
 async function enterApp(){
   $('setup-screen').hidden = true;
   $('app').hidden = false;
   updateUserChip();
+  syncHeadH(); // sticky offset for the floating search bar
+  window.addEventListener('resize', syncHeadH);
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var instant = loadDashCache(); // render home page instantly from cache if available
