@@ -2239,7 +2239,15 @@ async function maybeResumeBulkJob(){
     var ok = await confirmDialog(
       'A '+what+' of '+total+' transactions was interrupted ('+doneN+' applied). Resume it now?',
       'Resume');
-    if(ok) await runBulkJob(job, {resume:true});
+    if(ok){
+      // show the update button panel with the job's rows selected, so the
+      // progress readout and the spinner in the Update button are visible
+      showScreen('transactions');
+      txnSelected = {};
+      job.rows.forEach(function(r){ if(txnById(r.id)) txnSelected[r.id] = true; });
+      setTxnSelectMode(true);
+      await runBulkJob(job, {resume:true});
+    }
     else clearBulkJob();
   }catch(e){
     toast('Could not resume the interrupted bulk update.', true);
