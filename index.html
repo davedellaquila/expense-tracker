@@ -779,6 +779,15 @@ async function apiPost(body){
   if(!j.ok) throw new Error(j.error || 'Request failed.');
   return j;
 }
+/* Serialize save flows (update → reload → render → toast). Without this,
+   two overlapping saves race: the slower one's reload can overwrite fresh
+   state with stale data, so the UI shows old values after saving. */
+var saveLock = Promise.resolve();
+function withSaveLock(fn){
+  var p = saveLock.then(fn, fn);
+  saveLock = p.catch(function(){});
+  return p;
+}
 async function loadAll(){
   var r = await Promise.all([
     apiGet({action:'list', tab:'Transactions'}),
@@ -1488,13 +1497,15 @@ function openTxnForm(t){
       del.onclick = async function(){
         var ok = await confirmDialog('Delete this transaction? This cannot be undone.');
         if(!ok) return;
-        try{
-          await apiPost({action:'delete', tab:'Transactions', id:t.id});
-          close();
-          await loadAll();
-          showScreen('transactions');
-          toast('Deleted.');
-        }catch(err){ toast('Delete failed: '+err.message, true); }
+        await withSaveLock(async function(){
+          try{
+            await apiPost({action:'delete', tab:'Transactions', id:t.id});
+            close();
+            await loadAll();
+            showScreen('transactions');
+            toast('Deleted.');
+          }catch(err){ toast('Delete failed: '+err.message, true); }
+        });
       };
       sh.appendChild(row); sh.appendChild(del);
     } else {
@@ -1544,6 +1555,7 @@ function openTxnForm(t){
           bulkTypeIds = resT;
         }
       }
+      await withSaveLock(async function(){
       save.disabled = true;
       save.innerHTML = '<span class="spin"></span> Saving…';
       try{
@@ -1579,6 +1591,7 @@ function openTxnForm(t){
         save.disabled = false;
         save.textContent = isEdit?'Save':'Add';
       }
+      });
     };
   });
 }
@@ -1933,16 +1946,18 @@ function wireImport(){
     // Rows without a category import as Uncategorized — nothing is forced.
     var btn = $('preview-import');
     btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Importing…';
+    await withSaveLock(async function(){
     try{
       await apiPost({action:'appendMany', tab:'Transactions', rows:rows});
+      await loadAll();
       toast(rows.length+' transactions imported.');
       recordImportedFile(importFileInfo, rows.length);
       clearPreview();
       $('csv-file').value=''; $('pdf-file').value='';
       $('csv-name').textContent=''; $('pdf-name').textContent='';
       $('csv-mapping').hidden = true;
-      await loadAll();
     }catch(err){ toast('Import failed: '+err.message, true); }
+    });
     btn.disabled = false; btn.textContent = 'Import to sheet';
   });
 
@@ -2421,12 +2436,14 @@ function renderBudgets(){
       var v = num(inp.value);
       if(!(v>0)){ toast('Enter a budget amount greater than zero.', true); return; }
       sv.disabled = true;
+      await withSaveLock(async function(){
       try{
         await apiPost({action:'setBudget', category:c, month:ym, amount:Math.round(v*100)/100});
         await loadAll();
         renderBudgets();
         toast('Budget saved for '+c+'.');
       }catch(err){ toast('Save failed: '+err.message, true); }
+      });
       sv.disabled = false;
     };
     ctl.appendChild(inp); ctl.appendChild(sv);
@@ -2661,6 +2678,7 @@ function botSuggest(){
 async function botSave(){
   var ym = $('bud-month').value || monthLocal();
   var btn = $('bot-save'); btn.disabled = true;
+  await withSaveLock(async function(){
   try{
     var n = 0;
     for(var i=0;i<botProposal.rows.length;i++){
@@ -2673,6 +2691,7 @@ async function botSave(){
     await loadAll(); renderBudgets();
     toast('Saved '+n+' category budgets for '+fmtMonthPretty(ym)+'.');
   }catch(err){ toast('Save failed: '+err.message, true); }
+  });
   btn.disabled = false;
 }
 function botReset(){
