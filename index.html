@@ -1526,7 +1526,7 @@ function wireTransactions(){
   });
   $('selbar-update').addEventListener('click', function(){
     var ids = Object.keys(txnSelected);
-    if(!ids.length){ toast('No transactions selected.'); return; }
+    if(!ids.length){ toast('No transactions selected.', true); return; }
     openBulkUpdate(ids);
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
