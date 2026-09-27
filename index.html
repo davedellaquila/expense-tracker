@@ -208,6 +208,7 @@ textarea{resize:vertical; min-height:64px;}
 .btn:active{opacity:.85;}
 .btn.ghost{background:var(--bg); color:var(--text); border:1px solid var(--border);}
 .btn.danger{background:var(--danger);}
+.btn.go{background:var(--accent);}
 .btn.small{width:auto; padding:8px 14px; font-size:14px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
@@ -912,7 +913,7 @@ function confirmDialog(message, okLabel){
       sh.appendChild(el('p',{class:'muted'},message));
       var row = el('div',{class:'btnrow'});
       var no = el('button',{class:'btn ghost'},'Cancel');
-      var yes = el('button',{class:'btn'+(okLabel?'':' danger')}, okLabel||'Delete');
+      var yes = el('button',{class:'btn'+(okLabel?' go':' danger')}, okLabel||'Delete');
       no.onclick = function(){ done(); resolve(false); };
       yes.onclick = function(){ done(); resolve(true); };
       row.appendChild(no); row.appendChild(yes);
