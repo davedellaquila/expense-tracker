@@ -748,6 +748,16 @@ function otherDrillLabel(names){
   if(names.length>2) shown += ' +'+(names.length-2)+' more';
   return 'Other: ' + shown;
 }
+/* Category list table under a category-mix donut (same columns as Reports). */
+function catMixTable(byCat, byCatN, total){
+  var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+  if(!cats.length || !total) return '';
+  var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th></tr>';
+  cats.forEach(function(c){
+    h += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td></tr>';
+  });
+  return h + '</table></div>';
+}
 var toastTimer = null;
 function toast(msg, isErr){
   var t = $('toast');
@@ -1083,7 +1093,7 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatNExp = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -1098,6 +1108,7 @@ function renderDashboard(){
     else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       var ce = repDisplayCat(t);
       byCatExp[ce] = (byCatExp[ce]||0)+a;
+      byCatNExp[ce] = (byCatNExp[ce]||0)+1;
     }
   });
   var net = inc-exp;
@@ -1121,7 +1132,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatNExp:byCatNExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashChart();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -1164,6 +1175,8 @@ function renderDashChart(){
       dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
         label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
     }, 'No expenses in this period.');
+    var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
+    box.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE));
   } else if(pick==='inc'){
     var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
     repDonut(box, catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
