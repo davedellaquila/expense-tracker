@@ -183,18 +183,19 @@ textarea{resize:vertical; min-height:64px;}
 }
 .linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
-/* sticky search bar: visually the bottom row of the filter card at rest,
-   sticks below the app header once the other filters scroll away */
-#txn-filtercard{margin-bottom:0; border-radius:var(--radius) var(--radius) 0 0; border-bottom:none; padding-bottom:6px;}
+/* floating search clone: appears fixed below the app header only after the
+   in-card search box scrolls off the top of the page */
 .searchstick{
-  position:sticky; top:var(--headH, 64px); z-index:15;
+  position:fixed; z-index:15;
+  top:calc(var(--headH, 64px) + 6px);
+  left:50%; transform:translateX(-50%);
+  width:min(732px, calc(100vw - 28px));
   background:var(--card);
-  border:1px solid var(--border); border-top:none;
-  border-radius:0 0 var(--radius) var(--radius);
-  box-shadow:0 8px 16px rgba(10,20,15,.08);
-  padding:0 14px 14px;
-  margin-bottom:12px;
+  border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:0 10px 24px rgba(10,20,15,.14);
+  padding:10px 14px;
 }
+.searchstick[hidden]{display:none;}
 .searchstick input{margin:0;}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
@@ -376,7 +377,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 
     <!-- TRANSACTIONS -->
     <section id="screen-transactions" class="screen" hidden>
-      <div class="card" id="txn-filtercard">
+      <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <h2 style="margin:0">Filters</h2>
           <button class="linkbtn" id="f-reset" type="button">Reset</button>
@@ -400,12 +401,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
-          </div>
+          <div class="full"><label class="f" style="margin-top:0" for="f-q">Search</label>
+            <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off"></div>
         </div>
       </div>
-      <div class="searchstick">
-        <label class="f" style="margin-top:0" for="f-q">Search</label>
-        <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off" aria-label="Search transactions">
+      <div class="searchstick" id="searchstick" hidden>
+        <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions">
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
@@ -1189,9 +1190,27 @@ function wireTransactions(){
     $('f-bp').value = '';
     $('f-cat').value = '';
     $('f-q').value = '';
+    $('f-q-stick').value = '';
     txnDrill = null; // also clear any chart drill selection
     renderTransactions();
   });
+  // floating search clone: typing here drives the real filter
+  $('f-q-stick').addEventListener('input', function(){
+    $('f-q').value = this.value;
+    renderTransactions();
+  });
+  // show the floating clone only once the in-card search has scrolled off above
+  var stick = $('searchstick'), stickInput = $('f-q-stick'), origInput = $('f-q');
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(entries){
+      var r = entries[0].boundingClientRect;
+      var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='transactions';
+      stick.hidden = !offTop;
+      if(offTop && document.activeElement!==stickInput && stickInput.value!==origInput.value){
+        stickInput.value = origInput.value;
+      }
+    }, {threshold:0}).observe(origInput);
+  }
   $('txn-add').addEventListener('click', function(){ openTxnForm(null); });
 }
 function txnVisible(t){
@@ -1252,6 +1271,7 @@ function drillToTransactions(o){
   $('f-cat').value = (o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
     ? o.dispCats[0] : '';
   $('f-q').value = o.q || '';
+  var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
   showScreen('transactions');
 }
 function renderTransactions(){
