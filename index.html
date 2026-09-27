@@ -1490,10 +1490,10 @@ function openTxnForm(t){
         if(!ok) return;
         try{
           await apiPost({action:'delete', tab:'Transactions', id:t.id});
-          toast('Deleted.');
           close();
           await loadAll();
           showScreen('transactions');
+          toast('Deleted.');
         }catch(err){ toast('Delete failed: '+err.message, true); }
       };
       sh.appendChild(row); sh.appendChild(del);
@@ -1570,10 +1570,10 @@ function openTxnForm(t){
             row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType})});
         }
         var nUpdated = bulkIds.length + bulkTypeIds.length;
-        toast(isEdit ? (nUpdated ? 'Saved. Updated '+(nUpdated+1)+' transactions.' : 'Saved.') : 'Added.');
         close();
         await loadAll();
         showScreen('transactions');
+        toast(isEdit ? (nUpdated ? 'Saved. Updated '+(nUpdated+1)+' transactions.' : 'Saved.') : 'Added.');
       }catch(err){
         toast('Save failed: '+err.message, true);
         save.disabled = false;
@@ -2423,9 +2423,9 @@ function renderBudgets(){
       sv.disabled = true;
       try{
         await apiPost({action:'setBudget', category:c, month:ym, amount:Math.round(v*100)/100});
-        toast('Budget saved for '+c+'.');
         await loadAll();
         renderBudgets();
+        toast('Budget saved for '+c+'.');
       }catch(err){ toast('Save failed: '+err.message, true); }
       sv.disabled = false;
     };
@@ -2670,8 +2670,8 @@ async function botSave(){
         n++;
       }
     }
-    toast('Saved '+n+' category budgets for '+fmtMonthPretty(ym)+'.');
     await loadAll(); renderBudgets();
+    toast('Saved '+n+' category budgets for '+fmtMonthPretty(ym)+'.');
   }catch(err){ toast('Save failed: '+err.message, true); }
   btn.disabled = false;
 }
