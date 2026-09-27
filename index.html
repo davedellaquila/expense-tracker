@@ -451,6 +451,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <div><label class="f" style="margin-top:0" for="f-bp">Account</label>
             <select id="f-bp"><option value="">All</option><option>Business</option><option>Personal</option></select></div>
           <div><label class="f" style="margin-top:0" for="f-cat">Category</label><select id="f-cat"><option value="">All</option></select></div>
+          <div><label class="f" style="margin-top:0" for="f-sort">Sort</label>
+            <select id="f-sort">
+              <option value="date-desc" selected>Newest first</option>
+              <option value="date-asc">Oldest first</option>
+              <option value="amount-desc">Amount: high to low</option>
+              <option value="amount-asc">Amount: low to high</option>
+              <option value="merchant-asc">Merchant A–Z</option>
+              <option value="merchant-desc">Merchant Z–A</option>
+            </select></div>
           <div id="f-custom" class="full" style="display:none;gap:8px">
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
@@ -1408,6 +1417,14 @@ function wireTransactions(){
     });
   });
   $('f-q').addEventListener('input', renderTransactions);
+  var fsort = $('f-sort');
+  if(fsort){
+    fsort.value = txnSortPick();
+    fsort.addEventListener('change', function(){
+      try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
+      renderTransactions();
+    });
+  }
   $('f-preset').addEventListener('change', function(){
     $('f-custom').style.display = $('f-preset').value==='custom' ? 'flex' : 'none';
   });
@@ -1471,8 +1488,29 @@ function updateSelbar(){
   $('selbar-count').textContent = n + ' selected';
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
-function txnVisible(t){
-  var ty = $('f-type').value, bp = $('f-bp').value,
+/* transaction list sorting (remembered across visits) */
+var TXN_SORT_KEY = 'expenseTracker.txnSort';
+function txnSortPick(){
+  try{ return localStorage.getItem(TXN_SORT_KEY) || 'date-desc'; }catch(e){ return 'date-desc'; }
+}
+function txnSortRows(rows){
+  var s = txnSortPick(), dir = 1, key;
+  if(s==='date-asc'){ key = function(t){ return String(t.date||''); }; }
+  else if(s==='amount-desc'){ key = function(t){ return num(t.amount); }; dir = -1; }
+  else if(s==='amount-asc'){ key = function(t){ return num(t.amount); }; }
+  else if(s==='merchant-asc'){ key = function(t){ return String(t.merchant||t.description||'').toLowerCase(); }; }
+  else if(s==='merchant-desc'){ key = function(t){ return String(t.merchant||t.description||'').toLowerCase(); }; dir = -1; }
+  else { key = function(t){ return String(t.date||''); }; dir = -1; } // date-desc default
+  rows.sort(function(a,b){
+    var ka = key(a), kb = key(b), c;
+    if(typeof ka==='number' && typeof kb==='number') c = ka-kb;
+    else c = String(ka).localeCompare(String(kb));
+    if(c) return dir<0 ? -c : c;
+    return String(b.date||'').localeCompare(String(a.date||'')); // tiebreak: newest first
+  });
+  return s;
+}
+function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
       cat = $('f-cat').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
   if(txnDrill && txnDrill.from){
@@ -1598,7 +1636,7 @@ function renderTransactions(){
 
   renderDrillChip();
   var rows = state.transactions.filter(txnVisible);
-  rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  var sortMode = txnSortRows(rows);
 
   var list = $('txn-list'); list.innerHTML='';
   bulkBars = {};
@@ -1606,11 +1644,14 @@ function renderTransactions(){
   if(!rows.length){ emptyInto(list,'🧾','No transactions match. Tap + to add one.'); return; }
 
   var lastDay = '';
+  var groupByDate = (sortMode==='date-desc' || sortMode==='date-asc');
   rows.forEach(function(t){
-    var day = String(t.date||'').slice(0,10);
-    if(day!==lastDay){
-      lastDay = day;
-      list.appendChild(el('div',{class:'datehead'}, fmtDatePretty(day)));
+    if(groupByDate){
+      var day = String(t.date||'').slice(0,10);
+      if(day!==lastDay){
+        lastDay = day;
+        list.appendChild(el('div',{class:'datehead'}, fmtDatePretty(day)));
+      }
     }
     var b, cb = null;
     if(txnSelectMode){
