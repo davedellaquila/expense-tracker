@@ -451,6 +451,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div><label class="f" for="map-date">Date column</label><select id="map-date"></select></div>
             <div><label class="f" for="map-desc">Description column</label><select id="map-desc"></select></div>
             <div><label class="f" for="map-amt">Amount column</label><select id="map-amt"></select></div>
+            <div><label class="f" for="map-acct">Account column (optional)</label><select id="map-acct"></select></div>
             <div><label class="f" for="map-mode">Amount style</label>
               <select id="map-mode"><option value="single">Single column (negative = expense)</option><option value="debitcredit">Separate debit / credit columns</option></select></div>
             <div id="map-debit-wrap" hidden><label class="f" for="map-debit">Debit column</label><select id="map-debit"></select></div>
@@ -2335,6 +2336,30 @@ function buildCsvMapping(){
   }
   fill($('map-date'),gDate); fill($('map-desc'),gText);
   fill($('map-amt'),gMoney); fill($('map-debit'),gMoney); fill($('map-credit'),gMoney);
+  // account column: header says "account", or cells look like masked account numbers
+  var gAcct = -1;
+  for(var ac=0;ac<ncols;ac++){
+    if(/account/i.test(firstIsHeader ? String(rows[0][ac]||'') : '')){ gAcct = ac; break; }
+  }
+  if(gAcct<0){
+    var abest=-1, abn=0;
+    for(var ac2=0;ac2<ncols;ac2++){
+      var an=0;
+      for(var ak=0;ak<Math.min(20,dataRows.length);ak++){
+        if(/x{2,}\s*\d{3,4}|\b\d{4}\b/i.test(String(dataRows[ak][ac2]||''))) an++;
+      }
+      if(an>abn){ abn=an; abest=ac2; }
+    }
+    if(abn>=Math.min(3,dataRows.length)) gAcct = abest;
+  }
+  var acctSel = $('map-acct');
+  acctSel.innerHTML='';
+  acctSel.appendChild(el('option',{value:''},'\u2014 none \u2014'));
+  labels.forEach(function(l,i){
+    var o=el('option',{value:String(i)},(i+1)+': '+l);
+    if(i===gAcct) o.selected=true;
+    acctSel.appendChild(o);
+  });
   $('csv-mapping').hidden = false;
   $('map-mode').value='single';
   $('map-debit-wrap').hidden = true; $('map-credit-wrap').hidden = true;
@@ -2345,6 +2370,8 @@ function buildPreviewFromCsv(){
   var dataRows = firstIsHeader ? csvData.slice(1) : csvData;
   var cDate=+$('map-date').value, cDesc=+$('map-desc').value, cAmt=+$('map-amt').value;
   var mode=$('map-mode').value, cDeb=+$('map-debit').value, cCre=+$('map-credit').value;
+  var cAcct=$('map-acct').value; // '' = none
+  var fileHint=(typeof csvFileInfo!=='undefined'&&csvFileInfo&&csvFileInfo.name)||'';
   var out=[], notices=[];
   dataRows.forEach(function(r){
     if(!r || !r.length) return;
@@ -2363,12 +2390,22 @@ function buildPreviewFromCsv(){
       if(hasD){ rawAmt = deb; type='expense'; } else { rawAmt = cre; type='income'; }
     }
     if(!desc && !isFinite(rawAmt)) return;
+    var pm = 'Other';
+    if(type==='expense'){
+      var acctText = cAcct==='' ? '' : String(r[+cAcct]||'').trim();
+      pm = paymentMethodFromAccount(acctText, fileHint) || 'Other';
+    }
     out.push({
       date: date||'', description: desc||'(no description)',
       amount: Math.abs(Math.round(rawAmt*100)/100),
-      txn_type: type, business_personal:'Personal', category:'', include:true
+      txn_type: type, business_personal:'Personal', category:'', include:true,
+      payment_method: pm
     });
   });
+  var pmUsed = {};
+  out.forEach(function(r){ if(r.payment_method && r.payment_method!=='Other') pmUsed[r.payment_method]=1; });
+  var pmKeys = Object.keys(pmUsed);
+  if(pmKeys.length) notices.push('Payment method set from account info: '+pmKeys.slice(0,3).join(', ')+(pmKeys.length>3?';\u2026':''));
   var noDate = out.filter(function(r){return !r.date;}).length;
   if(noDate) notices.push(noDate+' row(s) had dates we could not parse — fix them in the preview (YYYY-MM-DD).');
   importRows = out;
@@ -2537,15 +2574,54 @@ function wfPaymentMethod(lines){
   var num = (joined.match(/x{2,}\d{3,4}/i) || [])[0];
   var card = (joined.match(/\bcard\s*\d{4}/i) || [])[0];
   var label = (nick || num || card || '').trim();
-  return 'Wells Fargo' + (label ? ' ' + label : '');
+  if(label && !/\d/.test(label)) return 'Wells Fargo '+label; // nickname only
+  return paymentMethodFromAccount(label, 'Wells Fargo');
+}
+/* Derive a payment_method label from an account identifier seen during import.
+   Uses the account number (last 4) when no nickname is known. `hint` is an
+   optional bank name or filename used only to identify the bank. */
+function paymentMethodFromAccount(text, hint){
+  var t = String(text||'').trim();
+  var src = t + ' ' + String(hint||'');
+  var bank = /wells\s*fargo/i.test(src) ? 'Wells Fargo'
+    : /capital\s*one/i.test(src) ? 'Capital One'
+    : /citibank|\bciti\b/i.test(src) ? 'Citibank' : null;
+  if(!t) return bank; // nothing to read: bank name alone, or null
+  var m, last4 = null, masked = null;
+  if((m = t.match(/(x{2,})\s*-?\s*(\d{3,4})/i))){ masked = m[1].toLowerCase(); last4 = m[2]; }
+  else if((m = t.match(/ending\s+in\D{0,10}(\d{3,4})/i))) last4 = m[1];
+  else if((m = t.match(/\bcard\D{0,6}(\d{4})/i))) last4 = m[1];
+  else if((m = t.match(/(\d{3,4})\s*$/))) last4 = m[1];
+  var isCard = /\bcard\b|\bcredit\b/i.test(t);
+  if(bank === 'Wells Fargo'){
+    if(last4) return isCard ? 'Wells Fargo Card '+last4 : 'Wells Fargo '+(masked||'xxxx')+last4;
+    return 'Wells Fargo';
+  }
+  if(bank === 'Capital One') return last4 ? 'Capital One '+last4 : 'Capital One';
+  if(bank === 'Citibank') return last4 ? 'Citibank '+last4 : 'Citibank';
+  if(last4) return (masked||'xxxx')+last4; // unknown bank: the number is the label
+  return null;
+}
+function capOnePaymentMethod(lines){
+  var joined = lines.join(' ');
+  var m = joined.match(/account\s+ending\s+in\D{0,10}(\d{3,4})/i)
+         || joined.match(/ending\s+in\D{0,10}(\d{3,4})/i);
+  return paymentMethodFromAccount(m ? m[1] : '', 'Capital One');
+}
+function citiPaymentMethod(lines){
+  var joined = lines.join(' ');
+  var m = joined.match(/ending\s+in\D{0,10}(\d{3,4})/i)
+         || joined.match(/x{2,}\s*-?\s*\d{3,4}/i);
+  return paymentMethodFromAccount(m ? m[0] : '', 'Citibank');
 }
 function parsePdfTransactions(lines, bank, year, stmtMonth){
   var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
   var bankName = bank && bank.name;
-  var stmtPayMethod = bankName==='Capital One' ? 'Capital One'
-    : bankName==='Wells Fargo' ? wfPaymentMethod(lines) : null;
+  var stmtPayMethod = bankName==='Capital One' ? capOnePaymentMethod(lines)
+    : bankName==='Wells Fargo' ? wfPaymentMethod(lines)
+    : bankName==='Citibank' ? citiPaymentMethod(lines) : null;
   function setSection(line){
     if(!bank) return false;
     var i;
