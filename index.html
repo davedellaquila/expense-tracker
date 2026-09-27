@@ -82,9 +82,9 @@ body{
 .chart-pick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
 .chart-pick-row h2{margin:0}
 .chart-pick-row select{max-width:48%;font-size:14px;padding:6px 8px}
-.donut-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.donut-trio-title{text-align:center;font-size:14px;margin:6px 0 0;color:var(--muted);font-weight:600}
-@media (max-width:640px){.donut-trio{grid-template-columns:1fr}}
+.donut-trio{display:grid;grid-template-columns:1fr;gap:10px;justify-items:center}
+.donut-trio>div{width:100%;max-width:560px}
+.donut-trio-title{text-align:center;font-size:15px;margin:6px 0 0;color:var(--muted);font-weight:600}
 
 /* ---------- header ---------- */
 .app-header{
@@ -3026,22 +3026,22 @@ function repDonut(el, items, onSlice, emptyMsg){
   var topSum = top.reduce(function(s,i){ return s+i.value; }, 0);
   if(total-topSum > 0.005) top.push({name:'Other', value:total-topSum,
     names: items.slice(7).map(function(i){ return i.name; })});
-  var W=560, H=290, cx=280, cy=145, r=112, inner=66, start=-Math.PI/2, svg='';
+  var W=840, H=435, cx=420, cy=217, r=168, inner=99, start=-Math.PI/2, svg='';
   top.forEach(function(it, i){
     var angle = (it.value/total)*Math.PI*2, end = start+angle, color = REP_PALETTE[i%REP_PALETTE.length];
     if(it.value>0) svg += '<path d="'+repDonutPath(cx,cy,r,inner,start,end)+'" fill="'+color+'" opacity="0.92"'+(onSlice?' class="rep-click" data-slice="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></path>';
     it._color = color;
     start = end;
   });
-  svg += '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="22" font-weight="700" class="cx-text">'+money(total)+'</text>';
-  svg += '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="12" class="cx-mut">total</text>';
+  svg += '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="33" font-weight="700" class="cx-text">'+money(total)+'</text>';
+  svg += '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="18" class="cx-mut">total</text>';
   var leg = '<div class="donut-legend">';
   top.forEach(function(it, i){
     leg += '<div class="dl-row'+(onSlice?' rep-click':'')+'"'+(onSlice?' data-slice="'+i+'"':'')+'><span class="dl-swatch" style="background:'+it._color+'"></span>'+
            '<span class="dl-name">'+esc(it.name)+'</span>'+
            '<span class="dl-pct">'+Math.round(it.value/total*100)+'%</span></div>';
   });
-  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img" style="max-width:340px; margin:0 auto">'+svg+'</svg>'+leg+'</div>';
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img" style="max-width:510px; margin:0 auto">'+svg+'</svg>'+leg+'</div>';
   if(onSlice){
     var sn = el.querySelectorAll('[data-slice]');
     for(var si=0; si<sn.length; si++)(function(n){
