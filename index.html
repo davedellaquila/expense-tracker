@@ -183,14 +183,19 @@ textarea{resize:vertical; min-height:64px;}
 }
 .linkbtn{background:none; border:none; color:var(--blue); font-size:14px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
-/* sticky search bar above the transaction list */
+/* sticky search bar: visually the bottom row of the filter card at rest,
+   sticks below the app header once the other filters scroll away */
+#txn-filtercard{margin-bottom:0; border-radius:var(--radius) var(--radius) 0 0; border-bottom:none; padding-bottom:6px;}
 .searchstick{
   position:sticky; top:var(--headH, 64px); z-index:15;
-  background:var(--bg);
-  padding:6px 0 10px;
-  margin-top:-6px;
+  background:var(--card);
+  border:1px solid var(--border); border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);
+  box-shadow:0 8px 16px rgba(10,20,15,.08);
+  padding:0 14px 14px;
+  margin-bottom:12px;
 }
-.searchstick input{margin:0; box-shadow:0 3px 12px rgba(10,20,15,.10);}
+.searchstick input{margin:0;}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
   background:var(--card); color:var(--danger); cursor:pointer; margin:0;
@@ -371,7 +376,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 
     <!-- TRANSACTIONS -->
     <section id="screen-transactions" class="screen" hidden>
-      <div class="card">
+      <div class="card" id="txn-filtercard">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <h2 style="margin:0">Filters</h2>
           <button class="linkbtn" id="f-reset" type="button">Reset</button>
@@ -399,7 +404,8 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
       </div>
       <div class="searchstick">
-        <input type="text" id="f-q" placeholder="🔍 Search merchant, description, notes…" autocomplete="off" aria-label="Search transactions">
+        <label class="f" style="margin-top:0" for="f-q">Search</label>
+        <input type="text" id="f-q" placeholder="Merchant, description, notes…" autocomplete="off" aria-label="Search transactions">
       </div>
       <div id="txn-drill"></div>
       <div id="txn-list"></div>
