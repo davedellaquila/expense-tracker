@@ -1466,7 +1466,6 @@ function setTxnSelectMode(on){
 function updateSelbar(){
   var n = txnSelCount();
   $('selbar-count').textContent = n + ' selected';
-  $('selbar-update').disabled = !n;
 }
 function txnVisible(t){
   var ty = $('f-type').value, bp = $('f-bp').value,
