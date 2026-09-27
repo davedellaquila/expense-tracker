@@ -822,8 +822,7 @@ var toastTimer = null;
 function toast(msg, isErr){
   var t = $('toast');
   t.textContent = msg;
-  var sheetOpen = $('modal-root') && $('modal-root').children.length>0;
-  t.className = (isErr ? 'err show' : 'show') + (sheetOpen ? ' top' : '');
+  t.className = (isErr ? 'err show top' : 'show top');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ t.className=''; }, 3400);
 }
