@@ -1224,8 +1224,8 @@ function defaultTaxFor(categoryName){
 }
 
 /* bulk recategorize: review similar transactions before applying */
-function txnRowForUpdate(x, newCategory){
-  return {
+function txnRowForUpdate(x, newCategory, overrides){
+  var r = {
     id: x.id,
     date: x.date||'',
     merchant: x.merchant||'',
@@ -1240,6 +1240,8 @@ function txnRowForUpdate(x, newCategory){
     entered_by: x.entered_by||'',
     created_at: x.created_at||''
   };
+  if(overrides) for(var k in overrides) r[k] = overrides[k];
+  return r;
 }
 /* Merchant key: groups variant descriptions of the same merchant, e.g.
    "AMAZON MKTPL*U750Z4RQ3" and "AMAZON MKTPL*X92K1" -> "amazon mktpl com billwa";
@@ -1285,6 +1287,61 @@ function confirmBulkRecat(similar, newCat){
         lab.appendChild(cb);
         lab.appendChild(el('span',{class:'recmain'}, (x.date||'????-??-??')+' · '+(x.merchant||x.description||'(no description)')));
         lab.appendChild(el('span',{class:'muted',style:'flex:none;font-size:12px'}, (x.category||'Uncategorized')+' → '+newCat));
+        lab.appendChild(el('span',{class:'recamt'}, money(num(x.amount))));
+        list.appendChild(lab);
+        return {cb:cb, id:x.id};
+      });
+      sh.appendChild(list);
+      var row = el('div',{class:'btnrow'});
+      var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+      var justOne = el('button',{class:'btn ghost',type:'button'},'Just this one');
+      var apply = el('button',{class:'btn',type:'button'},'Update selected');
+      cancel.onclick = function(){ done(); resolve(null); };
+      justOne.onclick = function(){ done(); resolve([]); };
+      apply.onclick = function(){
+        done();
+        resolve(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
+      };
+      row.appendChild(cancel); row.appendChild(justOne); row.appendChild(apply);
+      sh.appendChild(row);
+    });
+  });
+}
+
+/* Type change: "similar" = same merchant key, same amount (cents), same
+   original type. Matched on the transaction's ORIGINAL values, since the
+   candidates are the ones that still look like it did before the edit. */
+function findTypeSimilarTxns(t){
+  var mkey = merchantKey(t.merchant||t.description);
+  if(!mkey) return [];
+  var amt = Math.round(num(t.amount)*100);
+  var otype = t.txn_type||'';
+  var res = state.transactions.filter(function(x){
+    return x.id!==t.id &&
+      (x.txn_type||'')===otype &&
+      Math.round(num(x.amount)*100)===amt &&
+      merchantKey(x.merchant||x.description)===mkey;
+  });
+  res.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  return res;
+}
+function capType(s){ return s==='income' ? 'Income' : 'Expense'; }
+function confirmBulkType(similar, fromType, toType){
+  return new Promise(function(resolve){
+    openSheet(function(sh, done){
+      sh.appendChild(el('h2',null,'Change type for similar too?'));
+      sh.appendChild(el('p',{class:'muted'},
+        similar.length+' other transaction'+(similar.length===1?'':'s')+
+        ' from the same merchant for the same amount '+(similar.length===1?'is':'are')+
+        ' also marked '+capType(fromType)+'. Tick the ones to also change to '+capType(toType)+'.'));
+      var list = el('div',{class:'reclist'});
+      var boxes = similar.map(function(x){
+        var lab = el('label',{class:'recrow'});
+        var cb = el('input',{type:'checkbox'});
+        cb.checked = true;
+        lab.appendChild(cb);
+        lab.appendChild(el('span',{class:'recmain'}, (x.date||'????-??-??')+' · '+(x.merchant||x.description||'(no description)')));
+        lab.appendChild(el('span',{class:'muted',style:'flex:none;font-size:12px'}, capType(fromType)+' → '+capType(toType)));
         lab.appendChild(el('span',{class:'recamt'}, money(num(x.amount))));
         list.appendChild(lab);
         return {cb:cb, id:x.id};
@@ -1433,6 +1490,16 @@ function openTxnForm(t){
           bulkIds = res;
         }
       }
+      // changing the type: offer to flip similar (same merchant + amount) too
+      var bulkTypeIds = [];
+      if(isEdit && curType !== (t.txn_type||'')){
+        var typeSimilar = findTypeSimilarTxns(t);
+        if(typeSimilar.length){
+          var resT = await confirmBulkType(typeSimilar, t.txn_type||'', curType);
+          if(resT===null) return; // user cancelled — leave the form as-is
+          bulkTypeIds = resT;
+        }
+      }
       save.disabled = true;
       save.innerHTML = '<span class="spin"></span> Saving…';
       try{
@@ -1452,7 +1519,14 @@ function openTxnForm(t){
           if(!bx) continue;
           await apiPost({action:'update', tab:'Transactions', id:bx.id, row:txnRowForUpdate(bx, newCatName)});
         }
-        toast(isEdit ? (bulkIds.length ? 'Saved. Updated '+(bulkIds.length+1)+' transactions.' : 'Saved.') : 'Added.');
+        for(var ti=0; ti<bulkTypeIds.length; ti++){
+          var tx = state.transactions.find(function(x){ return x.id===bulkTypeIds[ti]; });
+          if(!tx) continue;
+          await apiPost({action:'update', tab:'Transactions', id:tx.id,
+            row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType})});
+        }
+        var nUpdated = bulkIds.length + bulkTypeIds.length;
+        toast(isEdit ? (nUpdated ? 'Saved. Updated '+(nUpdated+1)+' transactions.' : 'Saved.') : 'Added.');
         close();
         await loadAll();
         showScreen('transactions');
