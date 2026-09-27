@@ -286,10 +286,9 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="stat"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
         <div class="stat"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
-      <div class="card">
-        <h2>Spending by category</h2>
-        <div id="dash-chart"></div>
-      </div>
+      <div class="card"><h2>Category Mix</h2><p class="chart-sub">Share of spend this month</p><div id="dash-donut"></div></div>
+      <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants this month</p><div id="dash-merch"></div></div>
+      <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="dash-week"></div></div>
       <div class="card">
         <h2>Budgets</h2>
         <div id="dash-budgets"></div>
@@ -856,7 +855,7 @@ function renderDashboard(){
     var a = num(t.amount), bp = t.business_personal;
     if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a; }
     else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
-      var c = t.category||'Uncategorized';
+      var c = repDisplayCat(t);
       byCat[c] = (byCat[c]||0)+a;
     }
   });
@@ -870,40 +869,20 @@ function renderDashboard(){
   $('stat-expense-split').textContent = 'Biz '+money(expB)+' · Per '+money(expP);
   $('stat-net-split').textContent = fmtMonthPretty(ym);
 
-  // category chart (inline SVG)
-  var chart = $('dash-chart'); chart.innerHTML='';
-  var cats = Object.keys(byCat).sort(function(a,b){return byCat[b]-byCat[a];}).slice(0,8);
-  if(!cats.length){ emptyInto(chart,'📊','No expenses this month.'); }
-  else{
-    var max = byCat[cats[0]] || 1;
-    var NS='http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(NS,'svg');
-    var rowH=34, W=100;
-    svg.setAttribute('width','100%');
-    svg.setAttribute('height', String(cats.length*rowH+6));
-    svg.setAttribute('viewBox','0 0 '+W+' '+(cats.length*rowH+6));
-    cats.forEach(function(c,i){
-      var g = document.createElementNS(NS,'g');
-      var y = i*rowH+4;
-      var w = Math.max(2, (byCat[c]/max)*(W-34));
-      var r = document.createElementNS(NS,'rect');
-      r.setAttribute('x','0'); r.setAttribute('y',String(y+14));
-      r.setAttribute('width',String(w)); r.setAttribute('height','9');
-      r.setAttribute('rx','4.5'); r.setAttribute('fill','#177a52');
-      var t1 = document.createElementNS(NS,'text');
-      t1.setAttribute('x','0'); t1.setAttribute('y',String(y+10));
-      t1.setAttribute('font-size','12'); t1.setAttribute('class','cx-text');
-      t1.textContent = (c.length>26?c.slice(0,25)+'…':c);
-      var t2 = document.createElementNS(NS,'text');
-      t2.setAttribute('x',String(W)); t2.setAttribute('y',String(y+10));
-      t2.setAttribute('font-size','12'); t2.setAttribute('class','cx-mut');
-      t2.setAttribute('text-anchor','end');
-      t2.textContent = money(byCat[c]);
-      g.appendChild(r); g.appendChild(t1); g.appendChild(t2);
-      svg.appendChild(g);
-    });
-    chart.appendChild(svg);
-  }
+  // best charts: category mix donut, top merchants, weekday pattern
+  var byMerch = {}, byDay = [0,0,0,0,0,0,0]; // Mon..Sun
+  rows.forEach(function(t){
+    if(t.txn_type==='income') return;
+    var mk = String(t.merchant||t.description||'Unknown').trim()||'Unknown';
+    byMerch[mk] = (byMerch[mk]||0) + num(t.amount);
+    var d = new Date((t.date||'')+'T12:00:00');
+    if(!isNaN(d)) byDay[(d.getDay()+6)%7] += num(t.amount);
+  });
+  var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+  repDonut($('dash-donut'), cats.map(function(c){ return {name:c, value:byCat[c]}; }));
+  var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,8);
+  repHBars($('dash-merch'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses this month.');
+  repWeekday($('dash-week'), byDay);
 
   // budgets progress
   var bb = $('dash-budgets'); bb.innerHTML='';
