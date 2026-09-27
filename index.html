@@ -197,6 +197,12 @@ input[type=text],input[type=number],input[type=date],input[type=month],input[typ
 }
 /* month pickers have a wide intrinsic minimum; let them shrink inside flex/grid columns */
 input[type=month]{min-width:0;}
+/* clear (×) button inside search boxes */
+.clearbtn{position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  width:22px; height:22px; border:none; border-radius:50%; padding:0;
+  background:var(--seg-bg); color:var(--muted); font-size:15px; line-height:1;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;}
+.clearbtn[hidden]{display:none;}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue-soft); border-color:var(--blue);}
 textarea{resize:vertical; min-height:64px;}
 .seg{display:flex; background:var(--seg-bg); border-radius:12px; padding:3px; gap:3px;}
@@ -485,7 +491,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
               <div style="min-width:0">
                 <label class="f" style="margin-top:0" for="f-q">Search</label>
-                <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0">
+                <div style="position:relative">
+                  <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0;padding-right:34px">
+                  <button class="clearbtn" id="f-q-clear" type="button" aria-label="Clear search" hidden>×</button>
+                </div>
               </div>
               <div style="min-width:0">
                 <label class="f" style="margin-top:0" for="f-sort">Sort</label>
@@ -510,7 +519,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
           <div style="min-width:0">
             <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
-            <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0">
+            <div style="position:relative">
+              <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0;padding-right:34px">
+              <button class="clearbtn" id="f-q-clear-stick" type="button" aria-label="Clear search" hidden>×</button>
+            </div>
           </div>
           <div style="min-width:0">
             <label class="f" style="margin-top:0" for="f-sort-stick">Sort</label>
@@ -1479,7 +1491,15 @@ function wireTransactions(){
       renderTransactions();
     });
   });
-  $('f-q').addEventListener('input', renderTransactions);
+  $('f-q').addEventListener('input', function(){ renderTransactions(); syncSearchClear(); });
+  $('f-q-clear').addEventListener('click', function(){
+    $('f-q').value = ''; var si = $('f-q-stick'); if(si) si.value = '';
+    renderTransactions(); syncSearchClear(); $('f-q').focus();
+  });
+  $('f-q-clear-stick').addEventListener('click', function(){
+    $('f-q-stick').value = ''; $('f-q').value = '';
+    renderTransactions(); syncSearchClear(); $('f-q-stick').focus();
+  });
   var fsort = $('f-sort');
   if(fsort){
     fsort.value = txnSortPick();
@@ -1508,7 +1528,7 @@ function wireTransactions(){
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
-    renderTransactions();
+    renderTransactions(); syncSearchClear();
   });
   // show the floating clone only once the in-card search has scrolled off above
   var stick = $('searchstick'), stickInput = $('f-q-stick'), origInput = $('f-q');
@@ -1519,6 +1539,7 @@ function wireTransactions(){
       stick.hidden = !offTop;
       if(offTop && document.activeElement!==stickInput && stickInput.value!==origInput.value){
         stickInput.value = origInput.value;
+        syncSearchClear();
       }
       var stickSort = $('f-sort-stick');
       if(offTop && stickSort && stickSort.value !== $('f-sort').value){
@@ -1718,7 +1739,14 @@ function drillToTransactions(o){
   var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
   showScreen('transactions');
 }
+/* show/hide the × clear buttons in the two search boxes */
+function syncSearchClear(){
+  var q = $('f-q'), qs = $('f-q-stick'), c = $('f-q-clear'), cs = $('f-q-clear-stick');
+  if(c && q) c.hidden = !q.value;
+  if(cs && qs) cs.hidden = !qs.value;
+}
 function renderTransactions(){
+  syncSearchClear();
   var fcat = $('f-cat');
   var keep = fcat.value;
   fcat.innerHTML='';
