@@ -1163,7 +1163,9 @@ function renderDrillChip(){
   chip.appendChild(x);
   td.appendChild(chip);
 }
-/* Jump to the Transactions screen showing exactly the drilled selection. */
+/* Jump to the Transactions screen showing exactly the drilled selection.
+   The visible filters are set to match what was clicked (period, type,
+   account, category, search) so the selection is transparent and editable. */
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var ranged = !!(o.from || o.to);
@@ -1171,14 +1173,18 @@ function drillToTransactions(o){
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
        dispCats:o.dispCats||null, label:o.label||'Report selection'}
     : null;
-  if(o.singleMonth){
+  if(from && to){
     $('f-preset').value = 'custom';
-    $('f-from').value = o.singleMonth; $('f-to').value = o.singleMonth;
+    $('f-from').value = from; $('f-to').value = to;
     $('f-custom').style.display = 'flex';
   }
   $('f-type').value = o.type || '';
   $('f-bp').value = o.bp || '';
-  $('f-cat').value = '';
+  // single-category drill: show it in the Category filter (multi-category
+  // "Other" slices and display-only names like Transfers stay on the chip)
+  var cats = allCategories();
+  $('f-cat').value = (o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
+    ? o.dispCats[0] : '';
   $('f-q').value = o.q || '';
   showScreen('transactions');
 }
