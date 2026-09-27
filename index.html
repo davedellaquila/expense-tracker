@@ -1485,7 +1485,9 @@ function setTxnSelectMode(on){
 }
 function updateSelbar(){
   var n = txnSelCount();
-  $('selbar-count').textContent = n + ' selected';
+  var c = $('selbar-count');
+  c.textContent = n + ' selected';
+  c.style.display = n ? 'none' : ''; // count is redundant once the Update button shows it
   $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
 }
 /* transaction list sorting (remembered across visits) */
