@@ -1628,7 +1628,7 @@ function showSetupPicker(which){
   var fbBtn = document.querySelector('#setup-store-seg [data-spick="firebase"]');
   if(fbBtn){
     var cfg = firebaseConfigured();
-    fbBtn.disabled = !cfg;
+    fbBtn.style.opacity = cfg ? '' : '0.45';
     fbBtn.title = cfg ? '' : 'Firebase is not set up in this copy of the app yet — see FIREBASE_SETUP.md.';
   }
   if(which==='firebase' && !firebaseConfigured()) which = 'local';
@@ -1666,7 +1666,6 @@ async function enterApp(){
 
 /* ================= setup & settings ================= */
 function pickSetupStore(which){
-  if(which==='firebase' && !firebaseConfigured()) which = 'local';
   document.querySelectorAll('#setup-store-seg button').forEach(function(b){
     b.classList.toggle('on', b.getAttribute('data-spick')===which);
   });
@@ -1674,6 +1673,10 @@ function pickSetupStore(which){
     var box = $('setup-'+k+'-box');
     if(box) box.hidden = (k!==which);
   });
+  if(which==='firebase'){
+    var fbNote = document.querySelector('#setup-firebase-box .muted');
+    if(fbNote && !firebaseConfigured()) fbNote.textContent = 'Firebase is not set up in this copy of the app yet — see FIREBASE_SETUP.md in the repo.';
+  }
   $('setup-store-desc').textContent = (STORE_META[which]||STORE_META.local).desc;
 }
 function wireSetup(){
@@ -1750,7 +1753,7 @@ async function syncStoreSettings(){
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
     var bk = b.getAttribute('data-spick');
     var noCfg = (bk==='firebase' && !firebaseConfigured());
-    b.disabled = noCfg;
+    b.style.opacity = noCfg ? '0.45' : '';
     b.title = noCfg ? 'Firebase is not set up in this copy of the app yet — see FIREBASE_SETUP.md.' : '';
     b.classList.toggle('on', bk===k);
   });
