@@ -595,6 +595,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <span id="selbar-count">0 selected</span>
         <button class="btn small ghost" id="selbar-all" type="button">All</button>
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
+        <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
         <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
         <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         <button class="btn small" id="selbar-done" type="button">Done</button>
@@ -2339,6 +2340,12 @@ function wireTransactions(){
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
   $('selbar-undo').addEventListener('click', undoBulkUpdate);
+  $('selbar-delete').addEventListener('click', function(){
+    var ids = Object.keys(txnSelected);
+    if(!ids.length){ toast('No transactions selected.', true); return; }
+    confirmDialog('Delete '+ids.length+' transaction'+(ids.length===1?'':'s')+'? This cannot be undone.', 'Delete')
+      .then(function(ok){ if(ok) runBulkDelete(ids); });
+  });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
   refreshUndoButtons(); // show Undo only when a completed bulk update exists
 }
@@ -2431,6 +2438,48 @@ function updateJobBar(rec){
   var txt = rec.running+' '+done+' of '+total+' ('+pct+'%)';
   if(failed) txt += ' · '+failed+' failed';
   rec.subEl.textContent = txt;
+}
+/* Bulk delete: remove every selected transaction, serialized through the save
+   lock, with a slim progress bar and Stop. Not undoable — confirmed up front. */
+async function runBulkDelete(ids){
+  var txns = [];
+  ids.forEach(function(k){
+    var x = txnById(k) || txnById(Number(k)); // tolerate numeric ids
+    if(x && String(x.id).indexOf('tmp-')!==0) txns.push(x);
+  });
+  var skipped = ids.length - txns.length;
+  if(!txns.length){
+    toast(skipped ? 'Nothing to delete — the selected rows are still saving.' : 'No transactions selected.', true);
+    return;
+  }
+  var rec = {job:{rows:txns}, verb:'Deleted', title:'Deleting '+txns.length+' transactions',
+             running:'Deleting', doneIds:{}, failIds:{}, skipIds:{}, stopRequested:false, stopped:false};
+  activeBulkJobs.push(rec); renderJobBars();
+  txnSelected = {}; renderTransactions(); updateSelbar(); // clear the batch; the bar stays usable
+  var done=0, failed=0, i, t;
+  try{
+    for(i=0;i<txns.length;i++){
+      if(rec.stopRequested){ rec.stopped=true; break; }
+      t = txns[i];
+      try{
+        await withSaveLock(function(){ return getStore().remove('Transactions', t.id); });
+        state.transactions = state.transactions.filter(function(x){ return x!==t; });
+        rec.doneIds[t.id]=true; done++;
+      }catch(e){ rec.failIds[t.id]=true; failed++; }
+      if(i%10===9 && state.screen==='transactions') renderTransactions();
+      updateJobBar(rec);
+    }
+    try{ await loadAll(); }catch(e){}
+  }finally{
+    var ai = activeBulkJobs.indexOf(rec); if(ai>=0) activeBulkJobs.splice(ai,1);
+    renderJobBars();
+    if(state.screen==='transactions') renderTransactions();
+    updateSelbar();
+    var total = txns.length;
+    if(rec.stopped) toast('Stopped — '+done+' of '+total+' deleted.', true);
+    else if(failed) toast('Deleted '+done+' of '+total+' — '+failed+' failed.'+(skipped?' '+skipped+' skipped.':''), true);
+    else toast('Deleted '+done+' transaction'+(done===1?'':'s')+'.'+(skipped?' '+skipped+' skipped.':''));
+  }
 }
 /* transaction list sorting (remembered across visits) */
 var TXN_SORT_KEY = 'expenseTracker.txnSort';
