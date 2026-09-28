@@ -1684,6 +1684,7 @@ async function enterApp(){
   updateUserChip();
   syncHeadH(); // sticky offset for the floating search bar
   window.addEventListener('resize', syncHeadH);
+  window.addEventListener('resize', syncFloatingPad);
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var instant = loadDashCache(); // render home page instantly from cache if available
@@ -2406,6 +2407,7 @@ function setTxnSelectMode(on){
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
   updateSelbar();
+  syncFloatingPad();
 }
 function updateSelbar(){
   var n = txnSelCount();
@@ -2424,6 +2426,27 @@ function bulkJobRowState(id){
     if(rec.job.status && rec.job.status[id]!==undefined) pending = 'pending';
   }
   return pending;
+}
+/* Keep the list scrollable clear of the floating selection bar and any
+   in-flight job bars — no row stays trapped underneath them. Called whenever
+   the selection bar shows/hides, job bars change, or the window resizes. */
+function syncFloatingPad(){
+  var mainEl = document.querySelector('main');
+  if(!mainEl) return;
+  var need = 0;
+  var selbar = $('selbar');
+  if(selbar && !selbar.hidden){
+    // selbar bottom sits (tabbar-h + 10px) above the viewport bottom
+    need = Math.max(need, selbar.offsetHeight + 10 + 12);
+  }
+  var wrap = $('jobbars');
+  if(wrap && wrap.children.length){
+    // job bars stack above the selection bar
+    need = Math.max(need, wrap.offsetHeight + 80 + 12);
+  }
+  mainEl.style.paddingBottom = need
+    ? 'calc(var(--tabbar-h) + ' + need + 'px + env(safe-area-inset-bottom))'
+    : '';
 }
 /* One slim progress bar per in-flight bulk job, stacked above the selection bar.
    Each bar carries its own Stop button; the selection bar stays fully usable. */
@@ -2451,14 +2474,7 @@ function renderJobBars(){
     rec.barEl = bar;
     updateJobBar(rec);
   });
-  /* Pad the page so the list can scroll clear of the floating bars —
-     no row stays trapped underneath them. Cleared when the last bar goes. */
-  var mainEl = document.querySelector('main');
-  if(mainEl){
-    mainEl.style.paddingBottom = activeBulkJobs.length
-      ? 'calc(var(--tabbar-h) + ' + (wrap.offsetHeight + 96) + 'px + env(safe-area-inset-bottom))'
-      : '';
-  }
+  syncFloatingPad();
 }
 function updateJobBar(rec){
   if(!rec.subEl) return;
