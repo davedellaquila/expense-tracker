@@ -846,6 +846,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           </ol>
         </div>
       </div>
+      <p class="muted" id="build-stamp" style="text-align:center"></p>
     </section>
   </main>
 
@@ -1013,7 +1014,10 @@ function emptyInto(node, big, msg){
   node.appendChild(d);
 }
 /* modal helpers */
-function openSheet(build){
+/* onDismiss runs when the user taps outside the sheet. Promise-based callers
+   use it to settle the promise — otherwise the awaiting code would hang
+   forever with the sheet gone and no toast. */
+function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
   var ov = el('div',{class:'overlay'});
@@ -1022,7 +1026,26 @@ function openSheet(build){
   ov.appendChild(sh);
   root.appendChild(ov);
   function close(){ root.innerHTML=''; }
-  ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+  ov.addEventListener('click', function(e){
+    if(e.target===ov){ if(onDismiss) onDismiss(); else close(); }
+  });
+  build(sh, close);
+  return close;
+}
+/* Stacked variant: lays a sheet above the current one instead of replacing
+   it, for confirmations launched from inside another sheet. The returned
+   close removes only its own overlay, leaving the underlying sheet — and the
+   form the user was filling in — intact. onDismiss runs when the user taps
+   outside the sheet. */
+function openSheetStacked(build, onDismiss){
+  var root = $('modal-root');
+  var ov = el('div',{class:'overlay'});
+  var sh = el('div',{class:'sheet'});
+  sh.appendChild(el('div',{class:'grab'}));
+  ov.appendChild(sh);
+  root.appendChild(ov);
+  function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
+  ov.addEventListener('click', function(e){ if(e.target===ov){ if(onDismiss) onDismiss(); else close(); } });
   build(sh, close);
   return close;
 }
@@ -1038,12 +1061,12 @@ function confirmDialog(message, okLabel){
       yes.onclick = function(){ done(); resolve(true); };
       row.appendChild(no); row.appendChild(yes);
       sh.appendChild(row);
-    });
+    }, function(){ close(); resolve(false); }); // tapping outside the sheet cancels too
   });
 }
 function promptName(){
   return new Promise(function(resolve){
-    openSheet(function(sh, done){
+    var dismissP = openSheet(function(sh, done){
       sh.appendChild(el('h2',null,"Who's entering expenses?"));
       sh.appendChild(el('p',{class:'muted'},'Your name is saved on every transaction, so Dave and Nancy can share one sheet.'));
       var qp = el('div',{class:'quickpick'});
@@ -1061,11 +1084,14 @@ function promptName(){
       sh.appendChild(lf); sh.appendChild(inp);
       var row = el('div',{class:'btnrow'}); row.appendChild(save); sh.appendChild(row);
       setTimeout(function(){ inp.focus(); },300);
-    });
+    }, function(){ dismissP(); resolve(state.userName||''); }); // tapping outside settles too
   });
 }
 
 /* ================= state ================= */
+/* Build stamp: update on every deploy (date + short commit hash). Shown at
+   the bottom of Settings so a stale cached copy is instantly recognizable. */
+var BUILD_STAMP = '2026-09-27 20:50 PDT · similar-fix';
 var state = {
   apiUrl: null, userName: null,
   transactions: [], budgets: [], categories: [],
@@ -1196,6 +1222,10 @@ SheetsStore.prototype.appendMany = function(tab, rows){
 };
 SheetsStore.prototype.update = function(tab, id, row){
   return apiPost({action:'update', tab:tab, id:id, row:row});
+};
+SheetsStore.prototype.updateMany = function(tab, updates){
+  // updates: [{id, row}]. One server round trip for the whole batch.
+  return apiPost({action:'updateMany', tab:tab, updates:updates});
 };
 SheetsStore.prototype.remove = function(tab, id){
   return apiPost({action:'delete', tab:tab, id:id});
@@ -1757,6 +1787,8 @@ async function switchStoreKind(k){
   }
 }
 async function syncStoreSettings(){
+  var bs = $('build-stamp');
+  if(bs) bs.textContent = 'Build ' + BUILD_STAMP;
   var k = storeKind() || 'local';
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
     var bk = b.getAttribute('data-spick');
@@ -2773,6 +2805,35 @@ function txnRowForUpdate(x, newCategory, overrides){
   if(overrides) for(var k in overrides) r[k] = overrides[k];
   return r;
 }
+/* Write several transaction updates in one server round trip when the store
+   supports batching; otherwise fall back to one update per row (older server
+   or local/Firebase stores). */
+async function bulkWriteTxns(writes){
+  var st = getStore();
+  var payload = writes.map(function(w){ return {id:w.id, row:w.row}; });
+  if(st.updateMany){
+    try{
+      var r = await st.updateMany('Transactions', payload);
+    }catch(e){
+      if(/Unknown action/.test(String((e&&e.message)||''))){
+        for(var i=0;i<payload.length;i++) await st.update('Transactions', payload[i].id, payload[i].row);
+        return;
+      }
+      throw e;
+    }
+    if(r && r.notFound && r.notFound.length) throw new Error('Row not found: '+r.notFound[0]);
+    return;
+  }
+  for(var j=0;j<payload.length;j++) await st.update('Transactions', payload[j].id, payload[j].row);
+}
+/* Ids from a bulkWrites list whose expected fields are not present after a
+   reload — i.e. the write did not stick. */
+function bulkWritesFailed(bulkWrites){
+  return bulkWrites.filter(function(w){
+    var xt = txnById(w.id);
+    return !xt || !rowFieldsMatch(xt, w.expect);
+  }).map(function(w){ return w.id; });
+}
 /* Merchant key: groups variant descriptions of the same merchant, e.g.
    "AMAZON MKTPL*U750Z4RQ3" and "AMAZON MKTPL*X92K1" -> "amazon mktpl com billwa";
    "Purchase authorized on 08/30 SQ *Pine Grove" -> "sq pine grove a pine grove c". */
@@ -2796,6 +2857,7 @@ function findSimilarTxns(t, rowData){
   if(!mkey) return [];
   var res = state.transactions.filter(function(x){
     return x.id!==t.id &&
+      String(x.id).indexOf('tmp-')!==0 && // still saving: leave it alone
       x.txn_type===rowData.txn_type &&
       merchantKey(x.merchant||x.description)===mkey;
   });
@@ -2804,7 +2866,10 @@ function findSimilarTxns(t, rowData){
 }
 function confirmBulkRecat(similar, newCat){
   return new Promise(function(resolve){
-    openSheet(function(sh, done){
+    // Stacked above the edit form: cancelling leaves the form (and its entries) intact.
+    var dismiss = null;
+    function finish(val){ if(dismiss) dismiss(); resolve(val); }
+    dismiss = openSheetStacked(function(sh){
       sh.appendChild(el('h2',null,'Update similar too?'));
       sh.appendChild(el('p',{class:'muted'},
         similar.length+' other transaction'+(similar.length===1?'':'s')+' from the same merchant. '+
@@ -2826,15 +2891,14 @@ function confirmBulkRecat(similar, newCat){
       var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
       var justOne = el('button',{class:'btn ghost',type:'button'},'Just this one');
       var apply = el('button',{class:'btn',type:'button'},'Update selected');
-      cancel.onclick = function(){ done(); resolve(null); };
-      justOne.onclick = function(){ done(); resolve([]); };
+      cancel.onclick = function(){ finish(null); };
+      justOne.onclick = function(){ finish([]); };
       apply.onclick = function(){
-        done();
-        resolve(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
+        finish(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
       };
       row.appendChild(cancel); row.appendChild(justOne); row.appendChild(apply);
       sh.appendChild(row);
-    });
+    }, function(){ finish(null); }); // tapping outside the sheet cancels too
   });
 }
 
@@ -2848,6 +2912,7 @@ function findTypeSimilarTxns(t){
   var otype = t.txn_type||'';
   var res = state.transactions.filter(function(x){
     return x.id!==t.id &&
+      String(x.id).indexOf('tmp-')!==0 && // still saving: leave it alone
       (x.txn_type||'')===otype &&
       Math.round(num(x.amount)*100)===amt &&
       merchantKey(x.merchant||x.description)===mkey;
@@ -2865,7 +2930,10 @@ function typeMeta(ty){
 }
 function confirmBulkType(similar, fromType, toType){
   return new Promise(function(resolve){
-    openSheet(function(sh, done){
+    // Stacked above the edit form: cancelling leaves the form (and its entries) intact.
+    var dismiss = null;
+    function finish(val){ if(dismiss) dismiss(); resolve(val); }
+    dismiss = openSheetStacked(function(sh){
       sh.appendChild(el('h2',null,'Change type for similar too?'));
       sh.appendChild(el('p',{class:'muted'},
         similar.length+' other transaction'+(similar.length===1?'':'s')+
@@ -2888,15 +2956,14 @@ function confirmBulkType(similar, fromType, toType){
       var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
       var justOne = el('button',{class:'btn ghost',type:'button'},'Just this one');
       var apply = el('button',{class:'btn',type:'button'},'Update selected');
-      cancel.onclick = function(){ done(); resolve(null); };
-      justOne.onclick = function(){ done(); resolve([]); };
+      cancel.onclick = function(){ finish(null); };
+      justOne.onclick = function(){ finish([]); };
       apply.onclick = function(){
-        done();
-        resolve(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
+        finish(boxes.filter(function(b){ return b.cb.checked; }).map(function(b){ return b.id; }));
       };
       row.appendChild(cancel); row.appendChild(justOne); row.appendChild(apply);
       sh.appendChild(row);
-    });
+    }, function(){ finish(null); }); // tapping outside the sheet cancels too
   });
 }
 /* Bulk update: change chosen fields on a set of selected transactions.
@@ -3502,20 +3569,34 @@ function openTxnForm(t){
         }else{
           await getStore().append('Transactions', rowData);
         }
-        for(var bi=0; bi<bulkIds.length; bi++){
-          var bx = state.transactions.find(function(x){ return x.id===bulkIds[bi]; });
-          if(!bx) continue;
-          await getStore().update('Transactions', bx.id, txnRowForUpdate(bx, newCatName));
-        }
-        for(var ti=0; ti<bulkTypeIds.length; ti++){
-          var tx = state.transactions.find(function(x){ return x.id===bulkTypeIds[ti]; });
-          if(!tx) continue;
-          await getStore().update('Transactions', tx.id,
-            txnRowForUpdate(tx, tx.category||'', {txn_type:curType}));
-        }
+        // Similar-transaction writes go out as one batch, not N slow singles:
+        // a single round trip can't die halfway and leave the batch half-applied.
+        var bulkWrites = [];
+        bulkIds.forEach(function(id){
+          var bx = state.transactions.find(function(x){ return x.id===id; });
+          if(bx) bulkWrites.push({id:bx.id, row:txnRowForUpdate(bx, newCatName), expect:{category:newCatName}});
+        });
+        bulkTypeIds.forEach(function(id){
+          var tx = state.transactions.find(function(x){ return x.id===id; });
+          if(tx) bulkWrites.push({id:tx.id, row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType}), expect:{txn_type:curType}});
+        });
+        if(bulkWrites.length) await bulkWriteTxns(bulkWrites);
         await loadAll();
+        // Verify the similar-row writes actually stuck (a "success" that didn't
+        // stick is a failure): retry once, then report honestly.
+        var bulkFailed = bulkWritesFailed(bulkWrites);
+        if(bulkFailed.length){
+          await bulkWriteTxns(bulkWrites.filter(function(w){ return bulkFailed.indexOf(w.id)>=0; }));
+          await loadAll();
+          bulkFailed = bulkWritesFailed(bulkWrites);
+        }
         if(state.screen==='transactions') renderTransactions();
-        toast(txnToast(isEdit?'Saved':'Added', rowData, nUpdated));
+        if(bulkFailed.length){
+          toast(txnToast(isEdit?'Saved':'Added', rowData, nUpdated-bulkFailed.length) +
+            ' — ' + bulkFailed.length + ' similar update(s) did not stick; please retry.', true);
+        }else{
+          toast(txnToast(isEdit?'Saved':'Added', rowData, nUpdated));
+        }
       }catch(err){
         try{ await loadAll(); }catch(e2){}
         if(state.screen==='transactions') renderTransactions();

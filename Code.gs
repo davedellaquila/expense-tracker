@@ -149,6 +149,28 @@ function doPost(e) {
       return jsonOut_({ ok: true });
     }
 
+    if (action === 'updateMany') {
+      // Batch update: one execution, one id->row scan, instead of N separate
+      // update calls. Used for "update similar transactions too" so a slow
+      // connection can't leave the batch half-applied.
+      var sheetM = getSheet_(body.tab);
+      var headersM = TABS[body.tab];
+      var updates = body.updates || [];
+      var allM = sheetM.getDataRange().getValues();
+      var rowById = {};
+      for (var rm = 1; rm < allM.length; rm++) rowById[String(allM[rm][0])] = rm + 1;
+      var missing = [];
+      updates.forEach(function (u) {
+        var rn = rowById[String(u.id)];
+        if (!rn) { missing.push(u.id); return; }
+        var nur = u.row || {};
+        nur.id = u.id;
+        var mvals = headersM.map(function (h) { return nur[h] !== undefined ? nur[h] : ''; });
+        sheetM.getRange(rn, 1, 1, headersM.length).setValues([mvals]);
+      });
+      return jsonOut_({ ok: true, updated: updates.length - missing.length, notFound: missing });
+    }
+
     if (action === 'delete') {
       var sheetD = getSheet_(body.tab);
       var rowNumD = findRowById_(sheetD, body.id);
