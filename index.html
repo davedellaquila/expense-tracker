@@ -1303,7 +1303,14 @@ LocalStore.prototype.setBudget = function(category, month, amount){
    Firebase option; leave it null and the option stays hidden. The apiKey is a
    public identifier, not a secret — security comes from Firestore rules +
    Auth. See FIREBASE_SETUP.md for the console steps and rules. */
-var FIREBASE_CONFIG = null;
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAD6KD8ZB_JdysXDlmSOLeL29Nne6n2eJ4",
+  authDomain: "expense-tracker-510000.firebaseapp.com",
+  projectId: "expense-tracker-510000",
+  storageBucket: "expense-tracker-510000.firebasestorage.app",
+  messagingSenderId: "836690119763",
+  appId: "1:836690119763:web:28a51327470f3949accaa6"
+};
 /* Example:
 var FIREBASE_CONFIG = {
   apiKey: "AIza…",

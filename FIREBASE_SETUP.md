@@ -1,7 +1,7 @@
 # Firebase setup (one-time, ~10 minutes)
 
-The app's Firebase option stays hidden until you paste a web config into
-`FIREBASE_CONFIG` in `index.html`. One Firebase project serves every user of
+The app's Firebase option appears greyed out until you paste a web config into
+`FIREBASE_CONFIG` in `index.html` (tapping it explains the setup isn't done yet). One Firebase project serves every user of
 the app — each browser signs in anonymously and gets a private data silo, so
 no per-user setup is needed.
 
