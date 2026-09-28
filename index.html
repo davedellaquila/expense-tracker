@@ -142,7 +142,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   padding:10px 12px; margin-bottom:8px; cursor:pointer; font-size:15px; color:var(--text);}
 .txn:active{background:var(--th-bg);}
 .txn .dot{width:10px; height:10px; border-radius:50%; flex:none;}
-.txn .dot.in{background:var(--accent);} .txn .dot.ex{background:var(--danger);}
+.txn .dot.in{background:var(--accent);} .txn .dot.ex{background:var(--danger);} .txn .dot.tr{background:var(--muted);}
 .txn .mid{flex:1; min-width:0;}
 .txn .t1{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .txn .t2{font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -519,7 +519,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <div><label class="f" style="margin-top:0" for="f-type">Type</label>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="allchip on" id="allchip-f-type" data-for="f-type" type="button">All</button>
-              <select id="f-type" style="flex:1;min-width:0"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option></select>
+              <select id="f-type" style="flex:1;min-width:0"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option><option value="transfer">Transfer</option></select>
             </div></div>
           <div><label class="f" style="margin-top:0" for="f-bp">Account</label>
             <div style="display:flex;gap:6px;align-items:center">
@@ -656,7 +656,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <p class="muted" style="font-size:12px;margin:6px 0">Categories are auto-guessed — <span class="confbadge high">auto · high</span> is confident, <span class="confbadge medium">auto · med</span> deserves a glance, <span class="confbadge low">no guess</span> needs your pick. Nothing is forced: rows without a category import as Uncategorized.</p>
         <div class="applyall">
           <div><label for="aa-type">Set all: type</label>
-            <select id="aa-type"><option value="">—</option><option value="income">Income</option><option value="expense">Expense</option></select></div>
+            <select id="aa-type"><option value="">—</option><option value="income">Income</option><option value="expense">Expense</option><option value="transfer">Transfer</option></select></div>
           <div><label for="aa-bp">Set all: account</label>
             <select id="aa-bp"><option value="">—</option><option>Business</option><option>Personal</option></select></div>
           <div><label for="aa-cat">Set all: category</label><select id="aa-cat"><option value="">—</option></select></div>
@@ -992,7 +992,7 @@ function toast(msg, isErr){
 function txnToast(verb, rd, nUpdated){
   var parts = [];
   if(rd.merchant) parts.push(rd.merchant);
-  parts.push((rd.txn_type==='income'?'+':'\u2212') + money(num(rd.amount)));
+  parts.push(typeMeta(rd.txn_type).sign + money(num(rd.amount)));
   if(rd.category) parts.push(rd.category);
   var msg = verb + '. ' + parts.join(' \u00B7 ');
   if(nUpdated) msg += ' \u00B7 updated ' + (nUpdated+1) + ' transactions';
@@ -2038,17 +2038,17 @@ function renderDashboard(){
     var m = String(t.date||'').slice(0,7);
     if(m.length>=7){
       if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
-      if(t.txn_type==='income') byMonth[m].inc += a; else byMonth[m].exp += a;
+      if(t.txn_type==='income') byMonth[m].inc += a; else if(t.txn_type==='expense') byMonth[m].exp += a;
     }
     var dc = repDisplayCat(t);
-    if(dc==='Transfers'){
+    if(t.txn_type==='transfer' || dc==='Transfers'){
       var xc = t.category||'Uncategorized';
       byCatXfer[xc] = (byCatXfer[xc]||0)+a;
     }
     else if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
       byCatInc[dc] = (byCatInc[dc]||0)+a;
     }
-    else { exp+=a; if(bp==='Business')expB+=a; else expP+=a;
+    else if(t.txn_type==='expense'){ exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       byCatExp[dc] = (byCatExp[dc]||0)+a;
       byCatNExp[dc] = (byCatNExp[dc]||0)+1;
       if(m.length>=7) (byCatMExp[dc]||(byCatMExp[dc]={}))[m]=1;
@@ -2067,7 +2067,7 @@ function renderDashboard(){
   // best charts: category mix donut, top merchants, weekday pattern
   var byMerch = {}, byDay = [0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
-    if(t.txn_type==='income') return;
+    if(t.txn_type!=='expense') return;
     var mk = String(t.merchant||t.description||'Unknown').trim()||'Unknown';
     byMerch[mk] = (byMerch[mk]||0) + num(t.amount);
     var wd = weekdayIdx(t.date);
@@ -2171,7 +2171,7 @@ function renderDashBudgets(box, d){
   var totB = 0, totS = 0;
   var perCat = bCats.map(function(bc){
     var spent = 0;
-    rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===bc) spent += num(t.amount); });
+    rows.forEach(function(t){ if(t.txn_type==='expense' && t.category===bc) spent += num(t.amount); });
     totB += bMap[bc]; totS += spent;
     return {c:bc, amt:bMap[bc], spent:spent};
   });
@@ -2663,15 +2663,16 @@ function renderTransactions(){
     }else{
       b = el('button',{class:'txn',type:'button'});
     }
-    b.appendChild(el('span',{class:'dot '+(t.txn_type==='income'?'in':'ex')}));
+    b.appendChild(el('span',{class:'dot '+typeMeta(t.txn_type).dot}));
     var mid = el('div',{class:'mid'});
     mid.appendChild(el('div',{class:'t1'}, t.merchant || t.description || '(no merchant)'));
     var sub = (t.category||'Uncategorized') + ' · ' + (t.business_personal||'Personal');
     if(t.entered_by) sub += ' · ' + t.entered_by;
     mid.appendChild(el('div',{class:'t2'}, sub));
     b.appendChild(mid);
-    var amt = el('span',{class:'amt '+(t.txn_type==='income'?'pos':'neg')},
-      (t.txn_type==='income'?'+':'−') + money(num(t.amount)));
+    var tmRow = typeMeta(t.txn_type);
+    var amt = el('span',{class:'amt '+tmRow.amtCls},
+      tmRow.sign + money(num(t.amount)));
     b.appendChild(amt);
     if(txnSelectMode){
       b.addEventListener('click', function(){
@@ -2848,7 +2849,14 @@ function findTypeSimilarTxns(t){
   res.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
   return res;
 }
-function capType(s){ return s==='income' ? 'Income' : 'Expense'; }
+function capType(s){ return s==='income' ? 'Income' : s==='transfer' ? 'Transfer' : 'Expense'; }
+/* Display metadata per transaction type: label, row dot color, amount styling, sign prefix.
+   Transfers are neutral — neither income nor expense. */
+function typeMeta(ty){
+  if(ty==='income') return {label:'Income', dot:'in', amtCls:'pos', sign:'+'};
+  if(ty==='transfer') return {label:'Transfer', dot:'tr', amtCls:'', sign:''};
+  return {label:'Expense', dot:'ex', amtCls:'neg', sign:'\u2212'};
+}
 function confirmBulkType(similar, fromType, toType){
   return new Promise(function(resolve){
     openSheet(function(sh, done){
@@ -2950,7 +2958,7 @@ function applyRowFields(x, fields){
 function refreshTxnCardEl(card, t){
   if(!card || !t) return;
   var dot = card.querySelector('.dot');
-  if(dot) dot.className = 'dot '+(t.txn_type==='income'?'in':'ex');
+  if(dot) dot.className = 'dot '+typeMeta(t.txn_type).dot;
   var t1 = card.querySelector('.t1');
   if(t1) t1.textContent = t.merchant || t.description || '(no merchant)';
   var t2 = card.querySelector('.t2');
@@ -2961,8 +2969,9 @@ function refreshTxnCardEl(card, t){
   }
   var amt = card.querySelector('.amt');
   if(amt){
-    amt.className = 'amt '+(t.txn_type==='income'?'pos':'neg');
-    amt.textContent = (t.txn_type==='income'?'+':'\u2212')+money(num(t.amount));
+    var tmRef = typeMeta(t.txn_type);
+    amt.className = 'amt '+tmRef.amtCls;
+    amt.textContent = tmRef.sign+money(num(t.amount));
   }
 }
 /* Build a resumable, undoable job for a fresh bulk update. `expected` is
@@ -3222,6 +3231,7 @@ function openBulkUpdate(ids){
     var sType = noChangeSelect();
     sType.appendChild(el('option',{value:'income'},'Income'));
     sType.appendChild(el('option',{value:'expense'},'Expense'));
+    sType.appendChild(el('option',{value:'transfer'},'Transfer'));
     changeRow('Type', sType);
     var sBp = noChangeSelect();
     sBp.appendChild(el('option',{value:'Personal'},'Personal'));
@@ -3306,17 +3316,18 @@ function openTxnForm(t){
   openSheet(function(sh, close){
     sh.appendChild(el('h2',null, isEdit?'Edit transaction':'Add transaction'));
 
-    var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income');
-    typeSeg.appendChild(bExp); typeSeg.appendChild(bInc);
+    var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income'), bTrf=el('button',{type:'button'},'Transfer');
+    typeSeg.appendChild(bExp); typeSeg.appendChild(bInc); typeSeg.appendChild(bTrf);
     var bpSeg = el('div',{class:'seg'}), bPer=el('button',{type:'button'},'Personal'), bBiz=el('button',{type:'button'},'Business');
     bpSeg.appendChild(bPer); bpSeg.appendChild(bBiz);
     var curType = (t&&t.txn_type)||'expense', curBp = (t&&t.business_personal)||'Personal';
     function paintSeg(){
-      bExp.classList.toggle('on',curType==='expense'); bInc.classList.toggle('on',curType==='income');
+      bExp.classList.toggle('on',curType==='expense'); bInc.classList.toggle('on',curType==='income'); bTrf.classList.toggle('on',curType==='transfer');
       bPer.classList.toggle('on',curBp==='Personal'); bBiz.classList.toggle('on',curBp==='Business');
     }
     bExp.onclick=function(){curType='expense';paintSeg();};
     bInc.onclick=function(){curType='income';paintSeg();};
+    bTrf.onclick=function(){curType='transfer';paintSeg();};
     bPer.onclick=function(){curBp='Personal';paintSeg();refreshCats();};
     bBiz.onclick=function(){curBp='Business';paintSeg();refreshCats();};
     paintSeg();
@@ -3689,8 +3700,8 @@ function renderPreview(){
     var td3 = el('td'); td3.appendChild(aIn); tr.appendChild(td3);
 
     var tSel = el('select');
-    ['income','expense'].forEach(function(v){
-      var o=el('option',{value:v}, v==='income'?'Income':'Expense');
+    ['income','expense','transfer'].forEach(function(v){
+      var o=el('option',{value:v}, capType(v));
       if(r.txn_type===v) o.selected=true; tSel.appendChild(o);
     });
     tSel.addEventListener('change', function(){ r.txn_type = tSel.value; });
@@ -4425,7 +4436,7 @@ function renderBudgets(){
   var totalBud = Object.keys(bmap).reduce(function(s,k){ return s+num(bmap[k]); }, 0);
   cats.forEach(function(c){
     var spent = 0;
-    rows.forEach(function(t){ if(t.txn_type!=='income' && t.category===c) spent += num(t.amount); });
+    rows.forEach(function(t){ if(t.txn_type==='expense' && t.category===c) spent += num(t.amount); });
     var amt = bmap[c]||0;
     var share = (amt>0 && totalBud>0) ? amt/totalBud : 0;
     var wrap = el('div',{class:'barrow'});
@@ -4528,7 +4539,7 @@ function botPropose(){
   var sums = {}, lasts = {}, income = 0;
   prior.forEach(function(m, idx){
     txnsForMonth(m).forEach(function(t){
-      if(repDisplayCat(t)==='Transfers') return;
+      if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
       if(t.txn_type==='income'){ income += num(t.amount); return; }
       var c = t.category || 'Uncategorized';
       sums[c] = (sums[c]||0) + num(t.amount);
@@ -4727,14 +4738,14 @@ function wireTax(){
   $('tax-csv-biz').addEventListener('click', function(){
     var y = $('tax-year').value;
     var rows = state.transactions.filter(function(t){
-      return String(t.date||'').slice(0,4)===String(y) && t.txn_type!=='income' && t.business_personal==='Business';
+      return String(t.date||'').slice(0,4)===String(y) && t.txn_type==='expense' && t.business_personal==='Business';
     });
     downloadCsv('business-tax-'+y+'.csv', TXN_HEADERS, rows);
   });
   $('tax-csv-per').addEventListener('click', function(){
     var y = $('tax-year').value;
     var rows = state.transactions.filter(function(t){
-      return String(t.date||'').slice(0,4)===String(y) && t.txn_type!=='income' && t.business_personal==='Personal';
+      return String(t.date||'').slice(0,4)===String(y) && t.txn_type==='expense' && t.business_personal==='Personal';
     });
     downloadCsv('personal-tax-'+y+'.csv', TXN_HEADERS, rows);
   });
@@ -4904,7 +4915,7 @@ function renderReports(){
     var a = num(t.amount), m = (t.date||'').slice(0,7);
     if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
     if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; }
-    else { exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; (byCatM[c]||(byCatM[c]={}))[m]=1; top.push(t);
+    else if(t.txn_type==='expense'){ exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; (byCatM[c]||(byCatM[c]={}))[m]=1; top.push(t);
       var mk=String(t.merchant||t.description||'Unknown').trim()||'Unknown'; byMerch[mk]=(byMerch[mk]||0)+a;
       var wd=weekdayIdx(t.date); if(wd>=0) byDay[wd]+=a;
     }
@@ -4915,7 +4926,7 @@ function renderReports(){
   $('rep-title').textContent = 'Expense report';
   $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
   $('rep-stats').innerHTML =
-    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type!=='income';}).length + ' transactions') +
+    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions') +
     statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions') +
     statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit') +
     statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months');
@@ -5011,10 +5022,10 @@ function renderTaxGroup(node, rows){
 function renderTax(){
   var y = String($('tax-year').value || new Date().getFullYear());
   var biz = state.transactions.filter(function(t){
-    return String(t.date||'').slice(0,4)===y && t.txn_type!=='income' && t.business_personal==='Business';
+    return String(t.date||'').slice(0,4)===y && t.txn_type==='expense' && t.business_personal==='Business';
   });
   var per = state.transactions.filter(function(t){
-    return String(t.date||'').slice(0,4)===y && t.txn_type!=='income' && t.business_personal==='Personal' &&
+    return String(t.date||'').slice(0,4)===y && t.txn_type==='expense' && t.business_personal==='Personal' &&
       (PERSONAL_DEDUCTION_CATS.indexOf(t.tax_category)!==-1);
   });
   renderTaxGroup($('tax-biz'), biz);

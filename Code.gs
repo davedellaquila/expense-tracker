@@ -22,7 +22,7 @@ var TABS = {
                  'payment_method', 'notes', 'entered_by', 'created_at'],
   Budgets:      ['category', 'month', 'amount', 'updated_at'],
   Categories:   ['name', 'kind', 'tax_category']
-  // txn_type: "income" | "expense"
+  // txn_type: "income" | "expense" | "transfer"
   // business_personal: "Business" | "Personal"
 };
 
