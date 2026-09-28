@@ -3486,6 +3486,7 @@ var CAT_RULES = [
    cats:['Travel','Vacation'], conf:'medium'},
   {re:/netflix|spotify|hulu|disney\+|apple\.com\/bill|prime\s*membership/i, cats:['Subscriptions','Entertainment','Memberships'], conf:'medium'},
   {re:/cinema|\btheater\b|\btheatre\b|concert|ticketmaster/i, cats:['Entertainment'], conf:'medium'},
+  {re:/daily\s*cash/i, cats:['Income','Cashback','Rewards'], conf:'high'},
   {re:/payroll|direct\s*deposit|paycheck|\bsalary\b/i, cats:['Income','Paycheck','Salary'], conf:'medium'}
 ];
 function guessCategory(desc){
@@ -3986,7 +3987,11 @@ var BANK_PROFILES = [
   { name:'Capital One',
     detect:[/capital\s*one/i],
     incomeSections:[/payments?\s*and\s*credits?/i,/\bcredits?\b/i,/\bpayments?\b/i,/\brefunds?\b/i],
-    expenseSections:[/\bpurchases?\b/i,/\btransactions?\b/i,/\bfees?\b/i,/\bcash\s*advances?\b/i,/\binterest\s*charged\b/i] }
+    expenseSections:[/\bpurchases?\b/i,/\btransactions?\b/i,/\bfees?\b/i,/\bcash\s*advances?\b/i,/\binterest\s*charged\b/i] },
+  { name:'Apple Card',
+    detect:[/apple\s*card/i],
+    incomeSections:[/\bpayments?\b/i,/\brefunds?\b/i,/\bcredits?\b/i],
+    expenseSections:[/\btransactions?\b/i,/\bpurchases?\b/i,/\binterest\b/i,/\bfees?\b/i] }
 ];
 
 function pdfLibReady(){
@@ -4109,13 +4114,29 @@ function guessTypeFromDesc(desc){
   if(/purchase authorized|purchase with cash back|\bchecks?\b|withdrawal|bill pay|online pmt|\bfee\b|moneylink|\bmtg\b|mortgage|\bloan\b|\bpymts?\b|\bpayment\b|premium/.test(d)) return 'expense';
   return null;
 }
-/* Dave's rule for Capital One / Wells Fargo statement imports: assume every
-   transaction is an expense, except refunds and payments (credits). */
+/* Dave's rule for Capital One / Wells Fargo / Apple Card statement imports:
+   assume every transaction is an expense, except refunds and payments (credits). */
 function stmtDefaultType(bankName, desc){
   var d = String(desc||'').toLowerCase();
   if(/purchase return|refund/.test(d)) return 'income';
-  if(bankName==='Capital One' && /\bpayments?\b/.test(d)) return 'income';
+  if((bankName==='Capital One'||bankName==='Apple Card') && /\bpayments?\b/.test(d)) return 'income';
   return guessTypeFromDesc(d) || 'expense';
+}
+/* Apple Card transaction lines carry the Daily Cash columns ahead of the charge:
+   "01/14/2025 AT&T 1% $3.50 $350.28" — the charge is the LAST amount on the line
+   and the first is the Daily Cash earned. Other statements print "amount balance",
+   where the charge is the FIRST. Returns the charge token, a description cleaned
+   of the Daily Cash columns, and the Daily Cash amount (if any). */
+function pdfPickAmount(moneyPart, desc, bankName){
+  var toks = moneyPart.trim().split(/\s+/);
+  if(bankName!=='Apple Card') return {amtTok: toks[0], desc: desc, dailyCash: null};
+  var d = String(desc||''), dailyCash = null;
+  if(toks.length>1 && /\s\d+%\s*$/.test(d)){
+    d = d.replace(/\s*\d+%\s*$/,'');
+    var dc = parseMoney(toks[0]);
+    if(isFinite(dc) && dc>0) dailyCash = Math.round(dc*100)/100;
+  }
+  return {amtTok: toks[toks.length-1], desc: d.trim(), dailyCash: dailyCash};
 }
 /* Wells Fargo payment-method label: prefer the account nickname, fall back to
    the (masked) account number, e.g. "Wells Fargo Prime Checking" or
@@ -4173,7 +4194,8 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
   var bankName = bank && bank.name;
   var stmtPayMethod = bankName==='Capital One' ? capOnePaymentMethod(lines)
     : bankName==='Wells Fargo' ? wfPaymentMethod(lines)
-    : bankName==='Citibank' ? citiPaymentMethod(lines) : null;
+    : bankName==='Citibank' ? citiPaymentMethod(lines)
+    : bankName==='Apple Card' ? 'Apple Card' : null;
   function setSection(line){
     if(!bank) return false;
     var i;
@@ -4184,13 +4206,14 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
   lines.forEach(function(line){
     // Transaction lines take priority: a description may contain words
     // like "deposit" or "check" that also appear in section headers.
-    var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null, explicitYear=false;
+    var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null, explicitYear=false, dailyCashAmt=null;
     if(m){
       mm=m[1].padStart(2,'0'); dd=m[2].padStart(2,'0');
       if(m[3]){ var y2=parseInt(m[3],10); yy = m[3].length===2 ? (y2<50?2000+y2:1900+y2) : y2; explicitYear=true; }
       else if(stmtMonth){ yy = txnYearForMonth(parseInt(m[1],10), stmtMonth, year); }
       desc = m[4].trim();
-      amtTok = m[5].trim().split(/\s+/)[0];
+      var _pa = pdfPickAmount(m[5], desc, bankName);
+      desc = _pa.desc; amtTok = _pa.amtTok; dailyCashAmt = _pa.dailyCash;
     }else{
       var a = TXN_RE_ALPHA.exec(line);
       if(a){
@@ -4199,18 +4222,18 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
           mm=String(mon).padStart(2,'0'); dd=a[2].padStart(2,'0');
           if(stmtMonth){ yy = txnYearForMonth(mon, stmtMonth, year); }
           desc = a[3].trim();
-          amtTok = a[4].trim().split(/\s+/)[0];
+          var _pa2 = pdfPickAmount(a[4], desc, bankName);
+          desc = _pa2.desc; amtTok = _pa2.amtTok; dailyCashAmt = _pa2.dailyCash;
         }
       }
     }
     if(mm){
-      // amount token may be "amt bal" — take the first
       var amt = parseMoney(amtTok);
       if(!isFinite(amt)) return;
       var type;
       if(section==='income') type='income';
       else if(section==='expense') type='expense';
-      else if(bankName==='Capital One' || bankName==='Wells Fargo') type = stmtDefaultType(bankName, desc);
+      else if(bankName==='Capital One' || bankName==='Wells Fargo' || bankName==='Apple Card') type = stmtDefaultType(bankName, desc);
       else type = guessTypeFromDesc(desc) || (amt<0 ? 'expense' : 'income');
       lastTxn = {
         date: yy+'-'+mm+'-'+dd,
@@ -4220,6 +4243,16 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
         _defYear: !explicitYear
       };
       out.push(lastTxn);
+      if(dailyCashAmt){
+        // Apple Card Daily Cash earned on this purchase — separate income row.
+        out.push({
+          date: yy+'-'+mm+'-'+dd,
+          description: 'Daily Cash - '+desc, amount: dailyCashAmt,
+          txn_type:'income', business_personal:'Personal', category:'', include:true,
+          payment_method:'Other',
+          _defYear: !explicitYear
+        });
+      }
       return;
     }
     if(setSection(line)) return;
