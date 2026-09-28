@@ -2715,6 +2715,12 @@ function taxCategoryOptions(sel, current){
 }
 function categoryOptionsFor(sel, bpKind, current){
   sel.innerHTML='';
+  // Explicit empty option: a transaction with no stored category must show
+  // "Uncategorized" — otherwise the browser pre-selects the first category
+  // in the list and the form would display (and save) a wrong category.
+  var oUnc = el('option',{value:''},'Uncategorized');
+  if(!current) oUnc.selected = true;
+  sel.appendChild(oUnc);
   var list = state.categories.filter(function(c){
     return !bpKind || c.kind===bpKind;
   }).sort(function(a,b){
@@ -3421,7 +3427,9 @@ function openTxnForm(t){
       if(!inDate.value){ toast('Pick a date.', true); return; }
       if(!(amt>0)){ toast('Enter an amount greater than zero.', true); return; }
       var typedCat = inCat.value==='__new__' ? inNewCat.value.trim() : inCat.value;
-      if(!typedCat){ toast(inCat.value==='__new__' ? 'Type a name for the new category.' : 'Choose a category.', true); return; }
+      if(inCat.value==='__new__' && !typedCat){ toast('Type a name for the new category.', true); return; }
+      // An empty category is allowed — it displays as Uncategorized, matching
+      // the transaction list and imported rows.
       // fold case-only duplicates into the existing category name
       var newCatName = typedCat;
       var existCat = state.categories.find(function(c){ return c.name.toLowerCase()===typedCat.toLowerCase(); });
