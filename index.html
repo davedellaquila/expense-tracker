@@ -124,6 +124,27 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 .stat .value{font-size:19px; font-weight:800; margin:4px 0 2px; letter-spacing:-.3px;}
 .stat .split{font-size:11.5px; color:var(--muted); line-height:1.5;}
+/* bills calendar */
+.bill-cal{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.bill-cal .dow{font-size:11px; color:var(--muted); text-align:center; font-weight:700; padding:4px 0;}
+.bill-cal .day{position:relative; min-height:44px; border:1px solid var(--border); border-radius:8px; padding:4px 2px; font-size:12px; text-align:center; cursor:pointer; background:var(--card);}
+.bill-cal .day.other{opacity:0.35;}
+.bill-cal .day.today{border-color:var(--accent); font-weight:800;}
+.bill-cal .day.sel{background:var(--accent-faint);}
+.bill-cal .day .dots{display:flex; gap:2px; justify-content:center; margin-top:3px; flex-wrap:wrap;}
+.bill-cal .day .dot{width:6px; height:6px; border-radius:99px; background:var(--accent);}
+.bill-cal .day .dot.over{background:var(--danger);}
+.bill-cal .day .n{font-size:10px; color:var(--muted);}
+/* bills list */
+.bill-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border);}
+.bill-row:last-child{border-bottom:none;}
+.bill-row .bi{flex:1; min-width:0;}
+.bill-row .bn{font-weight:700;}
+.bill-row .bm{font-size:12px; color:var(--muted);}
+.bill-row .amt{font-weight:800; white-space:nowrap;}
+.bill-badge{font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-faint); color:var(--accent);}
+.bill-badge.over{background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger);}
+.bill-badge.soon{background:color-mix(in srgb, #f6c85f 20%, transparent); color:#b8860b;}
 .pos{color:var(--accent);} .neg{color:var(--danger);}
 
 /* ---------- bars ---------- */
@@ -525,6 +546,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="stat" id="tile-expenses" style="cursor:pointer"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
         <div class="stat" id="tile-net" style="cursor:pointer"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
+      <div class="card" id="dash-bills-card" style="cursor:pointer">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><b>Bills</b> <span class="muted" id="dash-bills-sub"></span></div>
+          <div id="dash-bills-vals" style="font-weight:800"></div>
+        </div>
+      </div>
       <div class="card">
         <div class="chart-pick-row">
           <select id="dash-chart-pick" aria-label="Choose a chart">
@@ -742,6 +769,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <button class="btn" id="bot-propose" type="button">Propose my budget</button>
         </div>
         <div id="bot-table" style="margin-top:12px"></div>
+        <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
           <label class="f" for="bot-goal-type" style="margin-top:0">Financial goal</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -772,6 +800,33 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
       <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
+    </section>
+
+    <!-- BILLS -->
+    <section id="screen-bills" class="screen" hidden>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <button class="btn small ghost" id="bill-cal-prev" type="button" aria-label="Previous month">‹</button>
+          <h2 id="bill-cal-title" style="margin:0"></h2>
+          <button class="btn small ghost" id="bill-cal-next" type="button" aria-label="Next month">›</button>
+        </div>
+        <div id="bill-cal-grid" class="bill-cal"></div>
+      </div>
+      <div class="card" id="bill-day-card" hidden>
+        <h2 id="bill-day-title" style="margin-top:0">Bills due</h2>
+        <div id="bill-day-list"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">Upcoming bills</h2>
+          <button class="btn small" id="bill-add" type="button">+ Add bill</button>
+        </div>
+        <div id="bill-list"></div>
+      </div>
+      <div class="card" id="bill-paid-card" hidden>
+        <h2 style="margin-top:0">Paid</h2>
+        <div id="bill-paid-list"></div>
+      </div>
     </section>
 
     <!-- TAX -->
@@ -947,6 +1002,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
     <button data-screen="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
     <button data-screen="budgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
+    <button data-screen="bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
     <button data-screen="tax"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
     <button data-screen="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
     <button data-screen="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
@@ -1284,7 +1340,7 @@ function promptName(){
 var BUILD_STAMP = '2026-09-29 02:47 PDT · dining-rule';
 var state = {
   apiUrl: null, userName: null,
-  transactions: [], budgets: [], categories: [],
+  transactions: [], budgets: [], categories: [], bills: [],
   screen: 'dashboard', dataLoaded: false
 };
 var txnDrill = null; // report-chart drill-down: {from,to,weekday,dispCats,label}
@@ -1424,7 +1480,7 @@ SheetsStore.prototype.setBudget = function(category, month, amount){
   return apiPost({action:'setBudget', category:category, month:month, amount:amount});
 };
 /* Local adapter: IndexedDB. Same row shapes as the sheet tabs. */
-var LOCAL_OS = {Transactions:'transactions', Budgets:'budgets', Categories:'categories'};
+var LOCAL_OS = {Transactions:'transactions', Budgets:'budgets', Categories:'categories', Bills:'bills'};
 function localBk(category, month){ return category + ' ' + month; }
 function localStampId(row){
   if(!row.id) row.id = 'x' + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36);
@@ -1439,12 +1495,13 @@ LocalStore.prototype._open = function(){
   if(this._dbp) return this._dbp;
   this._dbp = new Promise(function(res, rej){
     if(!('indexedDB' in window)){ rej(new Error('This browser does not support local storage.')); return; }
-    var rq = indexedDB.open('expenseTracker', 1);
+    var rq = indexedDB.open('expenseTracker', 2);
     rq.onupgradeneeded = function(){
       var db = rq.result;
       if(!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', {keyPath:'id'});
       if(!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets', {keyPath:'bk'});
       if(!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', {keyPath:'name'});
+      if(!db.objectStoreNames.contains('bills')) db.createObjectStore('bills', {keyPath:'id'});
     };
     rq.onsuccess = function(){ res(rq.result); };
     rq.onerror = function(){ rej(rq.error || new Error('Could not open the local database.')); };
@@ -1729,6 +1786,7 @@ function fbCol(r, tab){ return r.db.collection('users').doc(r.uid).collection(ta
 function fbDocId(tab, row, id){
   if(tab==='Transactions') return id ? String(id) : (row && row.id ? String(row.id) : 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
   if(tab==='Budgets') return 'b__'+encodeURIComponent(row.category||'')+'__'+encodeURIComponent(row.month||'');
+  if(tab==='Bills') return id ? String(id) : (row && row.id ? String(row.id) : 'bill'+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
   return 'c__'+encodeURIComponent(row.name||('cat'+Date.now().toString(36)));
 }
 function fbClean(row){
@@ -1846,11 +1904,13 @@ async function loadAll(){
     var r = await Promise.all([
       s.list('Transactions'),
       s.list('Budgets'),
-      s.list('Categories')
+      s.list('Categories'),
+      s.list('Bills').catch(function(){ return []; })
     ]);
     state.transactions = r[0];
     state.budgets = r[1];
     state.categories = r[2];
+    state.bills = r[3] || [];
     state.dataLoaded = true;
   }finally{
     setRefreshing(false);
@@ -1859,7 +1919,7 @@ async function loadAll(){
 function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(n)?n:0; }
 
 /* ================= navigation ================= */
-var SCREENS = ['dashboard','transactions','import','budgets','tax','reports','settings'];
+var SCREENS = ['dashboard','transactions','import','budgets','bills','tax','reports','settings'];
 var screenPersistOk = false; // boot-time renders (dash cache) must not clobber the saved tab
 function lastScreen(){
   try{
@@ -1883,6 +1943,7 @@ function showScreen(name){
     if(name==='dashboard') renderDashboard();
     else if(name==='transactions') renderTransactions();
     else if(name==='budgets') renderBudgets();
+    else if(name==='bills') renderBills();
     else if(name==='tax') renderTax();
     else if(name==='reports') renderReports();
     else if(name==='settings') syncStoreSettings();
@@ -1899,7 +1960,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('#tabbar button').forEach(function(b){
     b.addEventListener('click', function(){ showScreen(b.getAttribute('data-screen')); });
   });
-  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireTax(); wireReports();
+  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
   applyTheme();
   boot();
 });
@@ -2387,6 +2448,29 @@ function renderDashboard(){
   $('stat-income-split').textContent = 'Biz '+money(incB)+' · Per '+money(incP);
   $('stat-expense-split').textContent = 'Biz '+money(expB)+' · Per '+money(expP);
   $('stat-net-split').textContent = rangeLabel + (acct==='all' ? '' : ' · '+acct);
+
+  // Bills card: due this week + overdue. Tap to open the Bills page.
+  (function(){
+    var today = todayLocal();
+    var d1 = new Date(today+'T12:00:00');
+    var over = 0, soon = 0;
+    billsActive().forEach(function(b){
+      var st = billStatus(b);
+      if(st==='overdue') over++;
+      else if(st==='due-soon') soon++;
+    });
+    var vals = $('dash-bills-vals'), sub = $('dash-bills-sub');
+    if(vals){
+      vals.innerHTML = '';
+      if(over>0) vals.appendChild(el('span',{style:'color:var(--danger)'},over+' overdue'));
+      if(over>0 && soon>0) vals.appendChild(document.createTextNode(' · '));
+      if(soon>0) vals.appendChild(el('span',null,soon+' due this week'));
+      if(!over && !soon) vals.appendChild(el('span',{class:'muted'},'all clear'));
+    }
+    if(sub) sub.textContent = '';
+    var card = $('dash-bills-card');
+    if(card) card.onclick = function(){ showScreen('bills'); };
+  })();
 
   // Tapping a stat tile opens its transactions for this period on the
   // Transactions page. Net = income + expenses (transfers excluded).
@@ -6019,7 +6103,28 @@ function botCompute(ym){
     var ytdAvg = ytdSums[c]/ytdMonths;
     return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false, touched:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths};
+  // Floor each category at its recurring bills due this month — the budget
+  // must at least cover known bills. Dave's rule: auto-adjust + warn.
+  var billFloors = {};
+  (state.bills||[]).forEach(function(b){
+    if(billIsPaid(b)) return;
+    if(!b.recurrence || b.recurrence==='once') return;
+    if(String(b.dueDate||'').slice(0,7)!==ym) return;
+    var c = b.category||'Uncategorized';
+    billFloors[c] = (billFloors[c]||0) + num(b.amount);
+  });
+  rows.forEach(function(r){
+    var floor = Math.ceil(billFloors[r.category]||0);
+    if(floor > r.amount){ r.amount = floor; r.billFloored = true; }
+  });
+  // Categories that have bills but no YTD spending still need a row.
+  Object.keys(billFloors).forEach(function(c){
+    if(billFloors[c]>0 && !rows.some(function(r){ return r.category===c; })){
+      rows.push({category:c, avg:0, last:0, amount:Math.ceil(billFloors[c]), locked:false, touched:false, billFloored:true});
+    }
+  });
+  rows.sort(function(a,b){ return b.amount-a.amount; });
+  return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths, billFloors:billFloors};
 }
 /* Refresh a proposal's calculated values from current transactions, keeping the
    user's edits and locks: rows they typed (or accepted from a suggestion) keep
@@ -6040,7 +6145,8 @@ function botRecalc(){
     if(old){
       return {category:fr.category, avg:fr.avg, last:fr.last,
         amount: old.touched ? old.amount : fr.amount,
-        locked: !!old.locked, touched: !!old.touched};
+        locked: !!old.locked, touched: !!old.touched,
+        billFloored: !!fr.billFloored};
     }
     return fr;
   });
@@ -6052,12 +6158,13 @@ function botRecalc(){
   botProposal.ytdSums = fresh.ytdSums;
   botProposal.ytdIncSums = fresh.ytdIncSums;
   botProposal.ytdMonths = fresh.ytdMonths;
+  botProposal.billFloors = fresh.billFloors;
   botRenderTable();
 }
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = botCompute(ym);
-  botProposal = {v:2, month:ym, rows:botFilterRemoved(BOT_REMOVED_LS, ym, c.rows), avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths};
+  botProposal = {v:2, month:ym, rows:botFilterRemoved(BOT_REMOVED_LS, ym, c.rows), avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, billFloors:c.billFloors};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -6097,7 +6204,7 @@ function botRenderTable(){
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
     nm.appendChild(bName);
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
     line.appendChild(nm);
     var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
@@ -6160,7 +6267,32 @@ function botRenderTotal(){
   if(t) t.textContent = money(botProposalTotal());
   var p = $('bot-pct');
   if(p) p.textContent = botPctText();
+  renderBotBillsLine();
   updateFloatTotals();
+}
+/* Cash-flow check: bills due this month vs expected income and proposed budget. */
+function renderBotBillsLine(){
+  var host = $('bot-bills-line');
+  if(!host) return;
+  if(!botProposal || !botProposal.rows.length){ host.hidden = true; return; }
+  host.hidden = false;
+  host.innerHTML = '';
+  var ym = botProposal.month;
+  var bills = billsDueInMonth(ym);
+  var total = botProposalTotal();
+  var income = botProposal.avgIncome||0;
+  var remaining = income - bills - total;
+  var l1 = el('div',{class:'muted'},'Bills due '+fmtMonthPretty(ym)+': '+money(Math.round(bills)));
+  host.appendChild(l1);
+  var l2 = el('div',{style:'margin-top:2px'});
+  l2.appendChild(document.createTextNode('After bills + budget: '));
+  var b = el('b',{style:'color:'+(remaining>=0?'var(--accent)':'var(--danger)')},money(Math.round(remaining))+' remaining');
+  l2.appendChild(b);
+  host.appendChild(l2);
+  if(remaining<0){
+    host.appendChild(el('div',{style:'color:var(--danger);font-weight:700;margin-top:2px'},
+      '⚠ Budget exceeds income by '+money(Math.round(-remaining))+' after bills.'));
+  }
 }
 function botRenderGoalInputs(){
   var host = $('bot-goal-inputs'); host.innerHTML = '';
@@ -6488,6 +6620,369 @@ function updateFloatTotals(){
   wrap.hidden = !(expOn||incOn);
   var scr = $('screen-budgets');
   if(scr) scr.classList.toggle('has-floattotals', !!(expOn||incOn));
+}
+
+/* ================= bills =================
+   Bill: {id, name, amount, dueDate:'YYYY-MM-DD', recurrence:'once'|'monthly'|
+          'quarterly'|'yearly', category, account:'Personal'|'Business',
+          notes, createdAt, lastPaid:'YYYY-MM-DD'|null}
+   Status is computed from dueDate. Recurring bills advance their dueDate when
+   paid (same doc); one-time bills move to the Paid section via lastPaid. */
+var billCalYm = null, billSelDay = null;
+
+function billStatus(b){
+  var today = todayLocal();
+  if(b.dueDate < today) return 'overdue';
+  var d1 = new Date(today+'T12:00:00'), d2 = new Date(b.dueDate+'T12:00:00');
+  if(Math.round((d2-d1)/86400000) <= 7) return 'due-soon';
+  return 'upcoming';
+}
+function billIsPaid(b){ return b.recurrence==='once' && !!b.lastPaid; }
+function billsActive(){ return (state.bills||[]).filter(function(b){ return !billIsPaid(b); }); }
+function billsForDay(ymd){
+  return billsActive().filter(function(b){ return b.dueDate===ymd; })
+    .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+}
+/* Sum of active bills due in a calendar month, optionally filtered by category
+   and account. Used by Budget Bot flooring and the cash-flow check. */
+function billsDueInMonth(ym, category, account){
+  var total = 0;
+  billsActive().forEach(function(b){
+    if(String(b.dueDate||'').slice(0,7)!==ym) return;
+    if(category && (b.category||'')!==category) return;
+    if(account && (b.account||'')!==account) return;
+    total += num(b.amount);
+  });
+  return total;
+}
+function advanceDueDate(dateStr, recurrence){
+  var parts = String(dateStr||'').split('-');
+  if(parts.length<3) return null;
+  var y = parseInt(parts[0],10), m = parseInt(parts[1],10), d = parseInt(parts[2],10);
+  var add = recurrence==='monthly' ? 1 : recurrence==='quarterly' ? 3 : recurrence==='yearly' ? 12 : 0;
+  if(!add) return null;
+  m += add;
+  while(m>12){ m-=12; y++; }
+  // clamp to month end (Jan 31 + 1mo -> Feb 28/29)
+  var lastDay = new Date(y, m, 0).getDate();
+  if(d>lastDay) d = lastDay;
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function fmtBillDate(ymd){
+  if(!ymd) return '';
+  var p = ymd.split('-');
+  if(p.length<3) return ymd;
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(p[1],10)-1]+' '+parseInt(p[2],10);
+}
+function billBadge(st){
+  if(st==='overdue') return el('span',{class:'bill-badge over'},'overdue');
+  if(st==='due-soon') return el('span',{class:'bill-badge soon'},'due soon');
+  return null;
+}
+
+function renderBills(){
+  if(!billCalYm) billCalYm = todayLocal().slice(0,7);
+  renderBillCalendar();
+  renderBillDay();
+  renderBillList();
+}
+
+function renderBillCalendar(){
+  var ym = billCalYm;
+  $('bill-cal-title').textContent = fmtMonthPretty(ym);
+  var grid = $('bill-cal-grid'); grid.innerHTML = '';
+  ['S','M','T','W','T','F','S'].forEach(function(d){ grid.appendChild(el('div',{class:'dow'},d)); });
+  var y = parseInt(ym.slice(0,4),10), m = parseInt(ym.slice(5,7),10);
+  var first = new Date(y, m-1, 1).getDay();
+  var daysIn = new Date(y, m, 0).getDate();
+  var prevDays = new Date(y, m-1, 0).getDate();
+  var today = todayLocal();
+  // count bills per day for this month view
+  var counts = {};
+  billsActive().forEach(function(b){
+    if(String(b.dueDate||'').slice(0,7)===ym){
+      var k = b.dueDate;
+      counts[k] = counts[k]||{n:0, over:false};
+      counts[k].n++;
+      if(billStatus(b)==='overdue') counts[k].over = true;
+    }
+  });
+  var cells = [];
+  for(var i=first-1;i>=0;i--) cells.push({d:prevDays-i, other:true, ymd:null});
+  for(var d=1;d<=daysIn;d++){
+    var ymd = ym+'-'+String(d).padStart(2,'0');
+    cells.push({d:d, other:false, ymd:ymd});
+  }
+  while(cells.length%7) cells.push({d:'', other:true, ymd:null});
+  cells.forEach(function(c){
+    var cls = 'day'+(c.other?' other':'')+(c.ymd===today?' today':'')+(c.ymd&&c.ymd===billSelDay?' sel':'');
+    var cell = el('div',{class:cls});
+    cell.appendChild(el('div',null,String(c.d)));
+    if(c.ymd && counts[c.ymd]){
+      var dots = el('div',{class:'dots'});
+      var n = Math.min(counts[c.ymd].n, 3);
+      for(var k=0;k<n;k++) dots.appendChild(el('span',{class:'dot'+(counts[c.ymd].over?' over':'')}));
+      cell.appendChild(dots);
+      if(counts[c.ymd].n>3) cell.appendChild(el('div',{class:'n'},'+'+(counts[c.ymd].n-3)));
+    }
+    if(c.ymd){
+      (function(ymd){
+        cell.addEventListener('click', function(){
+          billSelDay = (billSelDay===ymd) ? null : ymd;
+          renderBillCalendar(); renderBillDay();
+        });
+      })(c.ymd);
+    }
+    grid.appendChild(cell);
+  });
+}
+
+function billRow(b, showDate){
+  var st = billStatus(b);
+  var row = el('div',{class:'bill-row'});
+  var info = el('div',{class:'bi'});
+  var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
+  nm.style.cursor = 'pointer';
+  nm.addEventListener('click', function(){ openBillForm(b); });
+  info.appendChild(nm);
+  var meta = (b.category||'Uncategorized')+' · '+(b.account||'Personal');
+  if(showDate) meta += ' · due '+fmtBillDate(b.dueDate);
+  if(b.recurrence && b.recurrence!=='once') meta += ' · '+b.recurrence;
+  info.appendChild(el('div',{class:'bm'},meta));
+  row.appendChild(info);
+  var badge = billBadge(st);
+  if(badge) row.appendChild(badge);
+  row.appendChild(el('div',{class:'amt'},money(num(b.amount))));
+  var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
+  paidBtn.addEventListener('click', function(){ openBillPaidSheet(b); });
+  row.appendChild(paidBtn);
+  return row;
+}
+
+function renderBillDay(){
+  var card = $('bill-day-card'), list = $('bill-day-list');
+  list.innerHTML = '';
+  if(!billSelDay){ card.hidden = true; return; }
+  card.hidden = false;
+  $('bill-day-title').textContent = 'Due '+fmtBillDate(billSelDay);
+  var bills = billsForDay(billSelDay);
+  if(!bills.length) list.appendChild(el('p',{class:'muted'},'No bills due this day.'));
+  bills.forEach(function(b){ list.appendChild(billRow(b, false)); });
+}
+
+function renderBillList(){
+  var list = $('bill-list'); list.innerHTML = '';
+  var active = billsActive().sort(function(a,b){
+    return String(a.dueDate||'').localeCompare(String(b.dueDate||''));
+  });
+  if(!active.length) list.appendChild(el('p',{class:'muted'},'No bills yet. Tap + Add bill to track one.'));
+  active.forEach(function(b){ list.appendChild(billRow(b, true)); });
+  // paid (one-time) in a collapsed section
+  var paid = (state.bills||[]).filter(billIsPaid).sort(function(a,b){
+    return String(b.lastPaid||'').localeCompare(String(a.lastPaid||''));
+  });
+  var pc = $('bill-paid-card');
+  if(!paid.length){ pc.hidden = true; return; }
+  pc.hidden = false;
+  var pl = $('bill-paid-list'); pl.innerHTML = '';
+  paid.forEach(function(b){
+    var row = el('div',{class:'bill-row'});
+    var info = el('div',{class:'bi'});
+    info.appendChild(el('div',{class:'bn'},b.name||'Unnamed bill'));
+    info.appendChild(el('div',{class:'bm'},(b.category||'Uncategorized')+' · paid '+fmtBillDate(b.lastPaid)));
+    row.appendChild(info);
+    row.appendChild(el('div',{class:'amt'},money(num(b.amount))));
+    var del = el('button',{class:'btn small ghost',type:'button'},'✕');
+    del.addEventListener('click', function(){ deleteBill(b); });
+    row.appendChild(del);
+    pl.appendChild(row);
+  });
+}
+
+function openBillForm(b){
+  var isEdit = !!b;
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,isEdit?'Edit bill':'Add bill'));
+    var inName = el('input',{type:'text',placeholder:'e.g. PG&E',autocomplete:'off',style:'width:100%'});
+    if(b&&b.name) inName.value = b.name;
+    sh.appendChild(el('label',{class:'f'},'Name')); sh.appendChild(inName);
+    var inAmt = el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal',style:'width:100%'});
+    if(b&&b.amount) inAmt.value = num(b.amount);
+    sh.appendChild(el('label',{class:'f'},'Amount')); sh.appendChild(inAmt);
+    var inDate = el('input',{type:'date',value:(b&&b.dueDate)||todayLocal(),style:'width:100%'});
+    sh.appendChild(el('label',{class:'f'},'Due date')); sh.appendChild(inDate);
+    var inRec = el('select',{style:'width:100%'});
+    [['once','One-time'],['monthly','Monthly'],['quarterly','Quarterly'],['yearly','Yearly']].forEach(function(o){
+      var op = el('option',{value:o[0]},o[1]);
+      if(b&&b.recurrence===o[0]) op.selected = true;
+      inRec.appendChild(op);
+    });
+    sh.appendChild(el('label',{class:'f'},'Repeats')); sh.appendChild(inRec);
+    var inCat = el('select',{style:'width:100%'});
+    allCategories().forEach(function(c){
+      var op = el('option',{value:c},c);
+      if(b&&b.category===c) op.selected = true;
+      inCat.appendChild(op);
+    });
+    sh.appendChild(el('label',{class:'f'},'Category')); sh.appendChild(inCat);
+    sh.appendChild(el('label',{class:'f'},'Account'));
+    var bpSeg = el('div',{class:'seg'});
+    var bPer = el('button',{type:'button'},'Personal'), bBiz = el('button',{type:'button'},'Business');
+    bpSeg.appendChild(bPer); bpSeg.appendChild(bBiz);
+    var curBp = (b&&b.account)||'Personal';
+    function paintBp(){ bPer.classList.toggle('on',curBp==='Personal'); bBiz.classList.toggle('on',curBp==='Business'); }
+    bPer.onclick = function(){ curBp='Personal'; paintBp(); };
+    bBiz.onclick = function(){ curBp='Business'; paintBp(); };
+    paintBp();
+    sh.appendChild(bpSeg);
+    var inNotes = el('textarea',{rows:'2',placeholder:'Optional',style:'width:100%'});
+    if(b&&b.notes) inNotes.value = b.notes;
+    sh.appendChild(el('label',{class:'f'},'Notes')); sh.appendChild(inNotes);
+    var bar = el('div',{class:'btnrow stickybar-page'});
+    var saveBtn = el('button',{class:'btn',type:'button'},isEdit?'Save':'Add bill');
+    saveBtn.addEventListener('click', async function(){
+      var name = inName.value.trim();
+      var amt = num(inAmt.value);
+      if(!name){ toast('Give the bill a name.', true); return; }
+      if(!(amt>0)){ toast('Enter an amount.', true); return; }
+      var row = {
+        name:name, amount:Math.round(amt*100)/100,
+        dueDate:inDate.value||todayLocal(), recurrence:inRec.value,
+        category:inCat.value||'', account:curBp, notes:inNotes.value.trim(),
+        createdAt:(b&&b.createdAt)||new Date().toISOString(),
+        lastPaid:(b&&b.lastPaid)||null
+      };
+      try{
+        if(isEdit){
+          row.id = b.id;
+          var cur = state.bills.find(function(x){ return x.id===b.id; });
+          if(cur) for(var k in row) cur[k]=row[k];
+          await getStore().update('Bills', b.id, row);
+          toast('Bill updated.');
+        }else{
+          var tmpId = 'tmp-'+Date.now();
+          state.bills.push(Object.assign({id:tmpId}, row));
+          var newId = await getStore().append('Bills', row);
+          var added = state.bills.find(function(x){ return x.id===tmpId; });
+          if(added && newId) added.id = String(newId);
+          toast('Bill added.');
+        }
+      }catch(e){ toast('Could not save the bill.', true); return; }
+      close(); renderBills();
+    });
+    bar.appendChild(saveBtn);
+    if(isEdit){
+      var delBtn = el('button',{class:'btn ghost',type:'button',style:'color:var(--danger)'},'Delete');
+      delBtn.addEventListener('click', function(){ deleteBill(b, close); });
+      bar.appendChild(delBtn);
+    }
+    var cancelBtn = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancelBtn.addEventListener('click', close);
+    bar.appendChild(cancelBtn);
+    sh.appendChild(bar);
+    setTimeout(function(){ inName.focus(); }, 60);
+  });
+}
+
+/* Mark-paid sheet: optional transaction creation (default OFF — Dave's
+   transactions come in via statement import). */
+function openBillPaidSheet(b){
+  openSheetStacked(function(sh, close){
+    sh.appendChild(el('h2',null,'Mark paid'));
+    sh.appendChild(el('p',{class:'muted'},
+      (b.name||'Bill')+' · '+money(num(b.amount))+' · due '+fmtBillDate(b.dueDate)));
+    var wrap = el('label',{style:'display:flex;gap:8px;align-items:center;margin:12px 0;cursor:pointer'});
+    var chk = el('input',{type:'checkbox'});
+    wrap.appendChild(chk);
+    wrap.appendChild(el('span',null,'Also create a transaction for this payment'));
+    sh.appendChild(wrap);
+    var bar = el('div',{class:'btnrow stickybar-page'});
+    var go = el('button',{class:'btn',type:'button'},'Mark paid');
+    go.addEventListener('click', async function(){
+      close();
+      await markBillPaid(b, chk.checked);
+    });
+    bar.appendChild(go);
+    var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancel.addEventListener('click', close);
+    bar.appendChild(cancel);
+    sh.appendChild(bar);
+  });
+}
+
+async function markBillPaid(b, createTxn){
+  var today = todayLocal();
+  var cur = state.bills.find(function(x){ return x.id===b.id; });
+  if(!cur) return;
+  var row = Object.assign({}, cur);
+  row.lastPaid = today;
+  if(row.recurrence && row.recurrence!=='once'){
+    var next = advanceDueDate(row.dueDate, row.recurrence);
+    if(next) row.dueDate = next;
+  }
+  for(var k in row) cur[k]=row[k];
+  try{ await getStore().update('Bills', b.id, row); }
+  catch(e){ toast('Could not update the bill.', true); return; }
+  if(createTxn){
+    var rowData = {
+      date: today,
+      merchant: row.name||'',
+      description: 'Bill payment: '+(row.name||''),
+      amount: Math.round(num(row.amount)*100)/100,
+      txn_type: 'expense',
+      category: row.category||'',
+      tax_category: '',
+      business_personal: row.account||'Personal',
+      payment_method: 'Other',
+      notes: '',
+      entered_by: state.userName||''
+    };
+    var tmpId = 'tmp-'+Date.now();
+    state.transactions.push(Object.assign({id:tmpId, created_at:new Date().toISOString()}, rowData));
+    try{
+      var newId = await getStore().append('Transactions', rowData);
+      var added = state.transactions.find(function(x){ return x.id===tmpId; });
+      if(added && newId) added.id = String(newId);
+    }catch(e){ /* transaction stays local-only; bill is still marked paid */ }
+  }
+  toast('Marked paid.');
+  renderBills();
+}
+
+function deleteBill(b, closeParent){
+  openSheetStacked(function(sh, close){
+    sh.appendChild(el('h2',null,'Delete bill?'));
+    sh.appendChild(el('p',{class:'muted'},(b.name||'Bill')+' · '+money(num(b.amount))+' will be removed.'));
+    var bar = el('div',{class:'btnrow stickybar-page'});
+    var del = el('button',{class:'btn',type:'button',style:'background:var(--danger)'},'Delete');
+    del.addEventListener('click', async function(){
+      try{ await getStore().remove('Bills', b.id); }
+      catch(e){ toast('Could not delete the bill.', true); return; }
+      state.bills = state.bills.filter(function(x){ return x.id!==b.id; });
+      close();
+      if(closeParent) closeParent();
+      toast('Bill deleted.');
+      renderBills();
+    });
+    bar.appendChild(del);
+    var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancel.addEventListener('click', close);
+    bar.appendChild(cancel);
+    sh.appendChild(bar);
+  });
+}
+
+function wireBills(){
+  $('bill-cal-prev').addEventListener('click', function(){
+    billCalYm = monthAdd(billCalYm||todayLocal().slice(0,7), -1);
+    billSelDay = null; renderBills();
+  });
+  $('bill-cal-next').addEventListener('click', function(){
+    billCalYm = monthAdd(billCalYm||todayLocal().slice(0,7), 1);
+    billSelDay = null; renderBills();
+  });
+  $('bill-add').addEventListener('click', function(){ openBillForm(null); });
 }
 
 /* ================= tax ================= */
