@@ -5177,7 +5177,7 @@ function incBotPropose(){
 }
 function incBotTotal(){
   if(!incBotProposal) return 0;
-  return incBotProposal.rows.reduce(function(s,r){ return s+num(r.amount); }, 0);
+  return incBotProposal.rows.reduce(function(s,r){ return s+(r.locked?num(r.amount):0); }, 0);
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
@@ -5238,6 +5238,7 @@ function incBotRenderTable(){
   tot.appendChild(el('span',null,'Expected total'));
   tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
   host.appendChild(tot);
+  host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},'Total of locked rows only.'));
   incBotPersist();
   updateFloatTotals();
 }
