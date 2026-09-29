@@ -589,18 +589,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <div id="dash-bills-vals" style="font-weight:800"></div>
         </div>
       </div>
-      <div class="card">
-        <div class="chart-pick-row">
-          <select id="dash-chart-pick" aria-label="Choose a chart">
-            <option value="catmix">Category Mix</option>
-            <option value="merch">Top Merchants</option>
-            <option value="week">Weekday Pattern</option>
-            <option value="trend">Monthly Trend</option>
-            <option value="budget">Budget vs Actual</option>
-          </select>
-        </div>
-        <p class="chart-sub" id="dash-chart-sub"></p>
-        <div id="dash-chart"></div>
+      <div id="dash-charts"></div>
+      <div class="card no-print" style="text-align:center">
+        <select id="dash-add-chart" aria-label="Add a chart to the home page" style="max-width:100%">
+          <option value="">&#65291; Add chart&hellip;</option>
+        </select>
       </div>
     </section>
 
@@ -2444,9 +2437,11 @@ function wireDashboard(){
   $('dash-from').addEventListener('change', renderDashboard);
   $('dash-to').addEventListener('change', renderDashboard);
   $('dash-acct').addEventListener('change', renderDashboard);
-  $('dash-chart-pick').addEventListener('change', function(){
-    try{ localStorage.setItem(DASH_CHART_KEY, this.value); }catch(e){}
-    renderDashChart();
+  $('dash-add-chart').addEventListener('change', function(){
+    if(!this.value) return;
+    var l = dashChartList();
+    if(l.indexOf(this.value)<0){ l.push(this.value); saveDashChartList(l); }
+    renderDashCharts();
   });
 }
 function renderDashboard(){
@@ -2535,33 +2530,59 @@ function renderDashboard(){
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
               byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
-  renderDashChart();
+  renderDashCharts();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
 
 /* ---- home page chart picker ----
    One chart viewport; the menu chooses which chart renders. The pick persists. */
 var dashData = null;
-var DASH_CHART_KEY = 'expenseTracker.dashChart';
+var DASH_CHART_LIST_KEY = 'expenseTracker.dashCharts';
 var DASH_CHARTS = {
-  catmix: {title:'Category Mix',       sub:'Share of total spend'},
-  merch:  {title:'Top Merchants',      sub:'Largest merchants'},
-  week:   {title:'Weekday Pattern',    sub:'Spend by day of week'},
-  trend:  {title:'Monthly Trend',      sub:'Spend by month'},
-  budget: {title:'Budget vs Actual',   sub:'Budgeted vs spent'}
+  catmix:   {title:'Category Mix',           sub:'Share of total spend'},
+  merch:    {title:'Top Merchants',          sub:'Largest merchants'},
+  week:     {title:'Weekday Pattern',        sub:'Spend by day of week'},
+  trend:    {title:'Monthly Trend',          sub:'Spend by month'},
+  budget:   {title:'Budget vs Actual',       sub:'Budgeted vs spent'},
+  bands:    {title:'Transaction Size Bands', sub:'Count of expenses by amount range'},
+  owner:    {title:'Owner Split',            sub:'Spend by who entered the transaction'},
+  card:     {title:'Card Split',             sub:'Spend by bank / payment method'},
+  catvol:   {title:'Category Volume',        sub:'Transaction count by category'},
+  avgticket:{title:'Average Ticket',         sub:'Average expense amount by category'},
+  cattrend: {title:'Category Spend Trend',   sub:'Monthly spend stacked by top categories'},
+  ownercat: {title:'Owner vs Category',      sub:'Top categories compared by owner'},
+  pareto:   {title:'Spend Pareto',           sub:'Cumulative share of spend by category (80/20)'},
+  heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'}
 };
-function dashChartPick(){
-  try{ return localStorage.getItem(DASH_CHART_KEY) || 'catmix'; }catch(e){ return 'catmix'; }
+var DASH_CHART_DEFAULTS = ['catmix','merch','week','trend','budget'];
+function dashChartList(){
+  try{
+    var l = JSON.parse(localStorage.getItem(DASH_CHART_LIST_KEY) || 'null');
+    if(Array.isArray(l) && l.length) return l.filter(function(k){ return !!DASH_CHARTS[k]; });
+  }catch(e){}
+  return DASH_CHART_DEFAULTS.slice();
 }
-function renderDashChart(){
-  var pick = dashChartPick();
-  if(!DASH_CHARTS[pick]) pick = 'catmix';
-  var sel = $('dash-chart-pick');
-  if(sel && sel.value!==pick) sel.value = pick;
-  var meta = DASH_CHARTS[pick];
-  var d = dashData, box = $('dash-chart');
-  $('dash-chart-sub').textContent = meta.sub + (d ? ' \u00B7 '+d.rangeLabel : '');
-  if(!d){ box.innerHTML=''; return; }
+function saveDashChartList(l){
+  try{ localStorage.setItem(DASH_CHART_LIST_KEY, JSON.stringify(l)); }catch(e){}
+}
+/* Home page: a customizable stack of chart cards. Each card has a remove
+   button; the "Add chart" menu underneath offers whatever isn't shown yet.
+   Choices persist. The Reports page always shows every chart type. */
+function renderDashCharts(){
+  var d = dashData, wrap = $('dash-charts');
+  var list = dashChartList();
+  var addSel = $('dash-add-chart');
+  if(addSel){
+    addSel.innerHTML = '';
+    addSel.appendChild(el('option',{value:''},'\uFF0B Add chart\u2026'));
+    Object.keys(DASH_CHARTS).forEach(function(k){
+      if(list.indexOf(k)<0) addSel.appendChild(el('option',{value:k}, DASH_CHARTS[k].title));
+    });
+    addSel.value = '';
+  }
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(!d) return;
   var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel;
   function dashDrill(extra){
     var o = {type:'expense', bp:bpVal};
@@ -2569,6 +2590,31 @@ function renderDashChart(){
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
   }
+  var ctx = {d:d, drill:dashDrill, from:from, to:to, bpVal:bpVal, rangeLabel:rangeLabel};
+  list.forEach(function(pick){
+    var meta = DASH_CHARTS[pick];
+    if(!meta) return;
+    var card = el('div',{class:'card'});
+    var head = el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:8px'});
+    head.appendChild(el('h2',{style:'margin:0'}, meta.title));
+    var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+meta.title+' from home page'},'\u00D7');
+    rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
+    (function(k){ rm.onclick = function(){
+      saveDashChartList(dashChartList().filter(function(x){ return x!==k; }));
+      renderDashCharts();
+    }; })(pick);
+    head.appendChild(rm);
+    card.appendChild(head);
+    card.appendChild(el('p',{class:'chart-sub'}, meta.sub + ' \u00B7 ' + rangeLabel));
+    var body = el('div');
+    card.appendChild(body);
+    wrap.appendChild(card);
+    renderDashChartBody(pick, body, ctx);
+  });
+}
+function renderDashChartBody(pick, box, c){
+  var d = c.d, dashDrill = c.drill, rangeLabel = c.rangeLabel,
+      from = c.from, to = c.to, bpVal = c.bpVal;
   if(pick==='catmix'){
     box.innerHTML = '<div class="donut-trio">'+
       '<div><h3 class="donut-trio-title">Income</h3><div data-dd="inc"></div></div>'+
@@ -2636,6 +2682,112 @@ function renderDashChart(){
     });
   } else if(pick==='budget'){
     renderDashBudgets(box, d);
+  } else if(pick==='bands'){
+    var BANDS = [['Under $25',25],['$25–$99',100],['$100–$249',250],['$250–$499',500],['$500–$999',1000],['$1,000+',Infinity]];
+    var bandCounts = BANDS.map(function(){ return 0; });
+    d.rows.forEach(function(t){
+      if(t.txn_type!=='expense') return;
+      var a = num(t.amount), bi2 = 0;
+      while(bi2<BANDS.length-1 && a>=BANDS[bi2][1]) bi2++;
+      bandCounts[bi2]++;
+    });
+    repVBars(box, BANDS.map(function(b,i){ return {name:b[0], value:bandCounts[i]}; }),
+      REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); });
+  } else if(pick==='owner'){
+    var byOwner = {};
+    d.rows.forEach(function(t){
+      if(t.txn_type!=='expense') return;
+      var o = String(t.entered_by||'').trim() || 'Unknown';
+      byOwner[o] = (byOwner[o]||0) + num(t.amount);
+    });
+    repDonut(box, Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; })
+      .map(function(o){ return {name:o, value:byOwner[o]}; }), null, 'No expenses in this period.');
+  } else if(pick==='card'){
+    var byBank = {};
+    d.rows.forEach(function(t){
+      if(t.txn_type!=='expense') return;
+      var b = txnBank(t);
+      byBank[b] = (byBank[b]||0) + num(t.amount);
+    });
+    repDonut(box, Object.keys(byBank).sort(function(a,b){ return byBank[b]-byBank[a]; })
+      .map(function(b){ return {name:b, value:byBank[b]}; }), null, 'No expenses in this period.');
+  } else if(pick==='catvol'){
+    var volCats = Object.keys(d.byCatNExp).sort(function(a,b){ return d.byCatNExp[b]-d.byCatNExp[a]; }).slice(0,12);
+    repHBarsCount(box, volCats.map(function(c){ return {name:c, value:d.byCatNExp[c]}; }),
+      '#f6c85f', 'No expenses in this period.', function(it){
+        dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      });
+  } else if(pick==='avgticket'){
+    var avgCats = Object.keys(d.byCatExp).sort(function(a,b){
+      return (d.byCatExp[b]/d.byCatNExp[b])-(d.byCatExp[a]/d.byCatNExp[a]); }).slice(0,12);
+    repHBars(box, avgCats.map(function(c){ return {name:c, value:d.byCatExp[c]/d.byCatNExp[c]}; }),
+      '#a78bfa', 'No expenses in this period.', function(it){
+        dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      });
+  } else if(pick==='cattrend'){
+    var trendCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,6);
+    var trendMonths = Object.keys(d.byMonth).sort();
+    var trendLabels = trendMonths.map(function(m){ return m.slice(5)==='01' ? '\u2019'+m.slice(2,4) : m.slice(5); });
+    var trendSeries = trendCats.map(function(c, ci){
+      var vals = trendMonths.map(function(m){
+        var s2=0;
+        d.rows.forEach(function(t){
+          if(t.txn_type==='expense' && repDisplayCat(t)===c && String(t.date||'').slice(0,7)===m) s2 += num(t.amount);
+        });
+        return s2;
+      });
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values:vals};
+    });
+    repStackedVBars(box, trendSeries, trendLabels, function(si, mi){
+      dashDrill({singleMonth:trendMonths[mi], dispCats:[trendCats[si]],
+        label: trendCats[si] + ' \u00B7 ' + fmtMonthPretty(trendMonths[mi])});
+    });
+  } else if(pick==='ownercat'){
+    var ocCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,5);
+    var byOwn = {};
+    d.rows.forEach(function(t){
+      if(t.txn_type!=='expense') return;
+      var o2 = String(t.entered_by||'').trim() || 'Unknown';
+      byOwn[o2] = (byOwn[o2]||0) + num(t.amount);
+    });
+    var ocOwners = Object.keys(byOwn).sort(function(a,b){ return byOwn[b]-byOwn[a]; }).slice(0,4);
+    var ocSeries = ocOwners.map(function(o, oi){
+      var vals = ocCats.map(function(c){
+        var s3=0;
+        d.rows.forEach(function(t){
+          var oo = String(t.entered_by||'').trim() || 'Unknown';
+          if(t.txn_type==='expense' && oo===o && repDisplayCat(t)===c) s3 += num(t.amount);
+        });
+        return s3;
+      });
+      return {name:o, color:REP_PALETTE[oi%REP_PALETTE.length], values:vals};
+    });
+    repGroupedVBars(box, ocSeries, ocCats, function(si, li){
+      dashDrill({dispCats:[ocCats[li]], label: ocCats[li] + ' \u00B7 ' + ocOwners[si] + ' \u00B7 ' + rangeLabel});
+    });
+  } else if(pick==='pareto'){
+    var paretoItems = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; })
+      .map(function(c){ return {name:c, value:d.byCatExp[c]}; });
+    repPareto(box, paretoItems, function(it){
+      dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+    });
+  } else if(pick==='heatmap'){
+    var hmCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,8);
+    var hmMonths = Object.keys(d.byMonth).sort();
+    var hmLabels = hmMonths.map(function(m){ return m.slice(5)==='01' ? '\u2019'+m.slice(2,4) : m.slice(5); });
+    var hmMatrix = hmCats.map(function(c){
+      return hmMonths.map(function(m){
+        var s4=0;
+        d.rows.forEach(function(t){
+          if(t.txn_type==='expense' && repDisplayCat(t)===c && String(t.date||'').slice(0,7)===m) s4 += num(t.amount);
+        });
+        return s4;
+      });
+    });
+    repHeatmap(box, hmCats, hmLabels, hmMatrix, hmMonths, function(ri, ci){
+      dashDrill({singleMonth:hmMonths[ci], dispCats:[hmCats[ri]],
+        label: hmCats[ri] + ' \u00B7 ' + fmtMonthPretty(hmMonths[ci])});
+    });
   }
 }
 function renderDashBudgets(box, d){
