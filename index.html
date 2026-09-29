@@ -5378,6 +5378,16 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
     : bankName==='Apple Card' ? 'Apple Card' : null;
   function setSection(line){
     if(!bank) return false;
+    // Checking-statement column headers name both sides at once
+    // ("Deposits/Additions ... Withdrawals/Subtractions") — that's a neutral
+    // transaction list, not an income section. "Transaction history" is the
+    // same kind of neutral title. Reset instead of flipping the section, so
+    // each row is typed by its own description (transfer from = income,
+    // purchase authorized = expense).
+    if(/transaction history/i.test(line)){ section = null; return true; }
+    var hasIn = /deposits?|additions|\bcredits?\b/i.test(line);
+    var hasOut = /withdrawals?|subtractions|\bdebits?\b/i.test(line);
+    if(hasIn && hasOut){ section = null; return true; }
     var i;
     for(i=0;i<bank.incomeSections.length;i++) if(bank.incomeSections[i].test(line)){ section='income'; return true; }
     for(i=0;i<bank.expenseSections.length;i++) if(bank.expenseSections[i].test(line)){ section='expense'; return true; }
