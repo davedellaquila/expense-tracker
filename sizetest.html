@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sizetest</title>
+<style>
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+:root{--card:#fff; --border:#ddd; --input-bg:#fff; --text:#111; --muted:#666;}
+body{margin:0; background:#eee; font-family:-apple-system,system-ui,sans-serif;}
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:flex-end; justify-content:center;}
+.sheet{
+  background:var(--card); width:100%; max-width:760px; max-height:92dvh; overflow-y:auto;
+  border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
+}
+label.f{display:block; font-size:13px; font-weight:600; color:var(--muted); margin:12px 0 5px;}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=month],input[type=url],select,textarea{
+  width:100%; font-size:16px; padding:10px 12px; border:1px solid var(--border);
+  border-radius:10px; background:var(--input-bg); color:var(--text); font-family:inherit;
+}
+.sheet.fitfields input[type=text],.sheet.fitfields input[type=number],.sheet.fitfields input[type=date],
+.sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
+</style></head>
+<body>
+<div class="overlay"><div class="sheet fitfields" id="sh">
+<label class="f">Merchant</label><input type="text" id="merch" placeholder="e.g. Costco" autocomplete="off">
+<label class="f">Description</label><input type="text" id="desc" placeholder="Optional" autocomplete="off">
+<label class="f">Notes</label><textarea id="notes" placeholder="Optional"></textarea>
+</div></div>
+<script>
+function fitFieldToContent(input, min){
+  function fit(){
+    var len = String(input.value || input.placeholder || '').length;
+    var n = Math.max(min || 10, len + 2);
+    if(input.tagName === 'TEXTAREA') input.cols = n; else input.size = n;
+  }
+  input.addEventListener('input', fit);
+  fit();
+  return input;
+}
+var m = document.getElementById('merch');
+m.value = "Tst*Pjs Roadhouse Placerville CA";
+fitFieldToContent(m);
+var d = document.getElementById('desc');
+d.value = "Dinner with the crew";
+fitFieldToContent(d);
+var n2 = document.getElementById('notes');
+n2.value = "short note";
+fitFieldToContent(n2, 20);
+document.title = 'merch-size=' + m.size + ' desc-size=' + d.size;
+</script>
+</body></html>
