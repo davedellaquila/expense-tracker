@@ -4251,6 +4251,48 @@ function importPeriodLabel(f){
   if(ym) return fmtMonthPretty(ym);
   return f.period || null; // legacy pretty string
 }
+/* Best-effort bank guess from a filename ("applecard-sept.pdf",
+   "quicksilver-stmt.pdf"). Returns a bank name or null. */
+var BANK_GUESS_PATTERNS = [
+  [/apple/i, 'Apple Card'],
+  [/quicksilver/i, 'Capital One'],
+  [/capital[\s_-]?one/i, 'Capital One'],
+  [/citi/i, 'Citibank'],
+  [/wells[\s_-]?fargo/i, 'Wells Fargo'],
+  [/(?:^|[\s_.-])wf(?:[\s_.-]|$)/i, 'Wells Fargo'],
+  [/chase/i, 'Chase'],
+  [/discover/i, 'Discover'],
+  [/amex|american[\s_-]?express/i, 'Amex']
+];
+function guessBankFromName(name){
+  var s = String(name||'');
+  for(var i=0;i<BANK_GUESS_PATTERNS.length;i++){
+    if(BANK_GUESS_PATTERNS[i][0].test(s)) return BANK_GUESS_PATTERNS[i][1];
+  }
+  return null;
+}
+var IMPORT_BANKS = ['Apple Card','Capital One','Citibank','Wells Fargo','Chase','Discover','Amex','CSV','Other'];
+function setImportBank(storedIdx, bank){
+  var arr = getImportedFiles();
+  if(!arr[storedIdx]) return;
+  arr[storedIdx].bank = (bank && bank!=='Other') ? bank : null;
+  try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
+  renderImportLog(arr[storedIdx].bank || 'Other');
+}
+function bankSelectFor(w){
+  var sel = document.createElement('select');
+  sel.setAttribute('aria-label','Bank');
+  IMPORT_BANKS.forEach(function(b){
+    var o = document.createElement('option');
+    o.value = b; o.textContent = (b==='Other' ? '— pick bank —' : b);
+    sel.appendChild(o);
+  });
+  sel.value = guessBankFromName(w.f.name) || 'Other';
+  sel.style.fontSize = '13px';
+  sel.style.maxWidth = '170px';
+  sel.addEventListener('change', function(){ setImportBank(w.i, sel.value); });
+  return sel;
+}
 /* Best-effort statement-month guess from a filename ("stmt-2026-08.pdf",
    "August 2026.pdf"). Returns 'YYYY-MM' or null. Only used to prefill the
    month picker — the user confirms. */
@@ -4279,7 +4321,12 @@ function importLogRow(w){
   var r = el('div',{class:'rowline'});
   var left = el('div');
   var pl = importPeriodLabel(f);
-  left.appendChild(el('b',null,(f.bank||'File')+(pl?' · '+pl:'')));
+  if(f.bank){
+    left.appendChild(el('b',null,f.bank+(pl?' · '+pl:'')));
+  }else{
+    left.appendChild(bankSelectFor(w));
+    if(pl) left.appendChild(el('span',{class:'muted',style:'font-size:12px;margin-left:6px'},pl));
+  }
   left.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.name||'')));
   if(!pl){
     // Imports logged before the month was recorded: one-tap to fill it in.
@@ -4312,6 +4359,33 @@ function renderImportLog(expandKey){
   box.innerHTML='';
   var stored = getImportedFiles();
   if(!stored.length){ box.appendChild(el('p',{class:'muted'},'No imports logged yet.')); return; }
+  // Older entries logged before the bank was recorded: offer filename-based
+  // guesses in one tap, with per-row dropdowns for corrections.
+  var guessable = stored.map(function(f,i){ return {f:f, i:i}; })
+    .filter(function(w){ return !w.f.bank && guessBankFromName(w.f.name); });
+  if(guessable.length){
+    var counts = {};
+    guessable.forEach(function(w){ var b=guessBankFromName(w.f.name); counts[b]=(counts[b]||0)+1; });
+    var bn = el('div',{class:'notice blue'});
+    bn.appendChild(document.createTextNode(
+      guessable.length+' older statements are missing a bank — from the filenames we guess: '+
+      Object.keys(counts).map(function(b){ return b+' × '+counts[b]; }).join(', ')+'. '));
+    var apply = el('button',{class:'btn small',type:'button',style:'margin-left:8px'},'Apply');
+    apply.addEventListener('click', function(){
+      var arr = getImportedFiles();
+      guessable.forEach(function(w){
+        if(arr[w.i] && !arr[w.i].bank) arr[w.i].bank = guessBankFromName(arr[w.i].name);
+      });
+      try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
+      renderImportLog();
+      toast('Banks assigned — fix any mistakes with the dropdown on each row.');
+    });
+    bn.appendChild(apply);
+    var dis = el('button',{class:'btn small ghost',type:'button',style:'margin-left:6px'},'Not now');
+    dis.addEventListener('click', function(){ bn.remove(); });
+    bn.appendChild(dis);
+    box.appendChild(bn);
+  }
   var groups = {};
   stored.forEach(function(f, i){
     var k = f.bank || 'Other';
