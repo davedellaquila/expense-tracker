@@ -4660,7 +4660,7 @@ function botAllocateCuts(rows, gap){
   return {list:list, remaining:remaining};
 }
 function botProposalTotal(){
-  return botProposal.rows.reduce(function(s,r){ return s + num(r.amount); }, 0);
+  return botProposal.rows.reduce(function(s,r){ return s + (r.locked ? num(r.amount) : 0); }, 0);
 }
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
