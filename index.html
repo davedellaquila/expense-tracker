@@ -4797,7 +4797,7 @@ function renderIncomeTargets(ym){
     var wrap = el('div',{class:'barrow'});
     var top = el('div',{class:'top'});
     var iListName = el('b',{class:'rep-click',title:'Show transactions'},c);
-    iListName.addEventListener('click', function(){ botDrillCategory(c, ym, 'income'); });
+    iListName.addEventListener('click', function(){ botDrillCategory(c, 'income'); });
     top.appendChild(iListName);
     var lbl = el('span',null,money(got)+(tgt>0?' of '+money(tgt):''));
     if(tgt>0 && got>=tgt) lbl.className='pos';
@@ -4859,7 +4859,7 @@ function renderBudgets(){
     var wrap = el('div',{class:'barrow'});
     var top = el('div',{class:'top'});
     var bListName = el('b',{class:'rep-click',title:'Show transactions'},c);
-    bListName.addEventListener('click', function(){ botDrillCategory(c, ym, 'expense'); });
+    bListName.addEventListener('click', function(){ botDrillCategory(c, 'expense'); });
     top.appendChild(bListName);
     var lbl = el('span',null,money(spent)+(amt>0?' of '+money(amt):''));
     if(amt>0 && spent>amt) lbl.className='neg';
@@ -5103,10 +5103,10 @@ function botPropose(){
   toast(c.rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
 }
 /* Budget page: tapping a category name opens the Transactions page filtered to
-   that category and the budget month. */
-function botDrillCategory(cat, ym, type){
-  drillToTransactions({singleMonth:ym, type:type, dispCats:[cat],
-    label:cat+' · '+fmtMonthPretty(ym)});
+   that category. The period is left alone — whatever the Transactions page's
+   Period menu is currently set to stays in effect. */
+function botDrillCategory(cat, type){
+  drillToTransactions({type:type, dispCats:[cat], label:cat});
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
@@ -5128,7 +5128,7 @@ function botRenderTable(){
     var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-soft);border-radius:8px':'')});
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
-    bName.addEventListener('click', function(){ botDrillCategory(r.category, botProposal.month, isInc?'income':'expense'); });
+    bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
     nm.appendChild(bName);
     nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
     line.appendChild(nm);
@@ -5418,7 +5418,7 @@ function incBotRenderTable(){
     var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-soft);border-radius:8px':'')});
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
-    ibName.addEventListener('click', function(){ botDrillCategory(r.category, incBotProposal.month, 'income'); });
+    ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
     nm.appendChild(ibName);
     nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'YTD '+money(Math.round(r.ytd||0))+' total'));
     line.appendChild(nm);
