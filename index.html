@@ -16,7 +16,7 @@
 <style>
 :root{
   --bg:#f3f5f7; --card:#ffffff; --text:#17202a; --muted:#68727f;
-  --border:#e2e7ec; --accent:#177a52; --accent-soft:#e6f4ec;
+  --border:#e2e7ec; --accent:#177a52; --accent-soft:#e6f4ec; --accent-faint:#f4faf6;
   --blue:#2563eb; --blue-soft:#e8effd;
   --danger:#cf3f3f; --danger-soft:#fbecec;
   --warn:#9a6b1a; --warn-soft:#fdf3e0;
@@ -26,7 +26,7 @@
 }
 [data-theme="dark"]{
   --bg:#0f141a; --card:#182028; --text:#edf1f5; --muted:#9aa7b4;
-  --border:#2b3540; --accent:#35a06c; --accent-soft:#123528;
+  --border:#2b3540; --accent:#35a06c; --accent-soft:#123528; --accent-faint:#1a2620;
   --blue:#6b9bf3; --blue-soft:#1b2a4a;
   --danger:#e87a7a; --danger-soft:#3d1f1f;
   --warn:#d9a441; --warn-soft:#3a2c12;
@@ -5365,7 +5365,7 @@ function botRenderTable(){
   host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
@@ -5654,7 +5654,7 @@ function incBotRenderTable(){
   head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
     ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
