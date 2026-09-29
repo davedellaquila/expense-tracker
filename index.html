@@ -2994,9 +2994,10 @@ var DASH_CHARTS = {
   cattrend: {title:'Category Spend Trend',   sub:'Monthly spend stacked by top categories'},
   ownercat: {title:'Owner vs Category',      sub:'Top categories compared by owner'},
   pareto:   {title:'Spend Pareto',           sub:'Cumulative share of spend by category (80/20)'},
-  heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'}
+  heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'},
+  largest:  {title:'Largest expenses', sub:'Top 10 expenses in the period'}
 };
-var DASH_CHART_DEFAULTS = ['catmix','catmixtable','merch','week','trend','budget'];
+var DASH_CHART_DEFAULTS = ['catmix','catmixtable','merch','week','trend','budget','largest'];
 /* Ordered list of visible Home chart cards. Re-adding a chart appends it at
    the bottom; dragging rewrites the order. Migrates once from the legacy key. */
 function dashChartList(){
@@ -3013,11 +3014,27 @@ function dashChartList(){
 function saveDashChartList(l){
   try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(l)); }catch(e){}
 }
+/* One-time migration: 'largest' never existed on the Home page before, so any
+   saved list missing it gets it appended at the bottom (nobody could have
+   deliberately removed it). Versioned so it runs exactly once. */
+var HOME_CHARTS_V_KEY = 'expenseTracker.homeChartsV';
+var HOME_CHARTS_V = 1;
+function migrateDashCharts(){
+  try{
+    var v = parseInt(localStorage.getItem(HOME_CHARTS_V_KEY)||'0', 10);
+    if(v < HOME_CHARTS_V){
+      var l = dashChartList();
+      if(l.indexOf('largest')<0){ l.push('largest'); saveDashChartList(l); }
+      localStorage.setItem(HOME_CHARTS_V_KEY, String(HOME_CHARTS_V));
+    }
+  }catch(e){}
+}
 /* Home page: a customizable stack of chart cards. Each card has a remove
    button; the "Add chart" menu underneath offers whatever isn't shown yet.
    Choices persist. The Reports page has the same add/remove UX with its own
    saved list (every chart shows by default). */
 function renderDashCharts(){
+  migrateDashCharts();
   var d = dashData, wrap = $('dash-charts');
   var list = dashChartList();
   var addSel = $('dash-add-chart');
@@ -3161,7 +3178,10 @@ function renderDashChartBody(pick, box, c){
       byBank[b] = (byBank[b]||0) + num(t.amount);
     });
     repDonut(box, Object.keys(byBank).sort(function(a,b){ return byBank[b]-byBank[a]; })
-      .map(function(b){ return {name:b, value:byBank[b]}; }), null, 'No expenses in this period.');
+      .map(function(b){ return {name:b, value:byBank[b]}; }),
+      function(it){
+        dashDrill({banks:(it.names && it.names.length ? it.names : [it.name])});
+      }, 'No expenses in this period.');
   } else if(pick==='catvol'){
     var volCats = Object.keys(d.byCatNExp).sort(function(a,b){ return d.byCatNExp[b]-d.byCatNExp[a]; }).slice(0,12);
     repHBarsCount(box, volCats.map(function(c){ return {name:c, value:d.byCatNExp[c]}; }),
@@ -3239,6 +3259,28 @@ function renderDashChartBody(pick, box, c){
       dashDrill({singleMonth:hmMonths[ci], dispCats:[hmCats[ri]],
 });
     });
+  } else if(pick==='largest'){
+    var leTop = d.rows.filter(function(t){ return t.txn_type==='expense'; })
+      .sort(function(a,b){ return num(b.amount)-num(a.amount); }).slice(0,10);
+    if(!leTop.length){ box.innerHTML = '<p class="muted">No expenses in this period.</p>'; }
+    else{
+      var leH = '<div class="ptablewrap"><table class="ptable top-table"><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr>';
+      leTop.forEach(function(t){
+        var merch = String(t.merchant||'').trim(), desc = String(t.description||'').trim();
+        var merchCell = merch
+          ? '<div class="top-merch">'+esc(merch)+'</div>' + ((desc && desc!==merch) ? '<div class="top-desc">'+esc(desc)+'</div>' : '')
+          : '<div class="top-merch">'+esc(desc)+'</div>';
+        leH += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money(num(t.amount))+'</td></tr>';
+      });
+      box.innerHTML = leH + '</table></div>';
+      var leRows = box.querySelectorAll('[data-tid]');
+      for(var leI=0; leI<leRows.length; leI++)(function(n){
+        n.addEventListener('click', function(){
+          var t = txnById(n.getAttribute('data-tid'));
+          if(t) openTxnForm(t);
+        });
+      })(leRows[leI]);
+    }
   }
 }
 function renderDashBudgets(box, d){
