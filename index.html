@@ -3506,7 +3506,6 @@ function openTxnForm(t){
         withSaveLock(async function(){
           try{
             await getStore().remove('Transactions', t.id);
-            await loadAll();
             if(state.screen==='transactions') renderTransactions();
             toast('Deleted.');
           }catch(err){
@@ -3547,6 +3546,7 @@ function openTxnForm(t){
       };
       // changing a category: offer to update similar transactions too (review first)
       var bulkIds = [];
+      var tmpId = null; // optimistic id for a new row; replaced by the real id after append
       if(isEdit && newCatName !== (t.category||'')){
         var similar = findSimilarTxns(t, rowData);
         if(similar.length){
@@ -3581,7 +3581,8 @@ function openTxnForm(t){
           if(tx) tx.txn_type = curType;
         });
       }else{
-        state.transactions.push(Object.assign({id:'tmp-'+Date.now(), created_at:new Date().toISOString()}, rowData));
+        tmpId = 'tmp-'+Date.now();
+        state.transactions.push(Object.assign({id:tmpId, created_at:new Date().toISOString()}, rowData));
       }
       var nUpdated = bulkIds.length + bulkTypeIds.length;
       close();
@@ -3598,7 +3599,11 @@ function openTxnForm(t){
           rowData.created_at = t.created_at||'';
           await getStore().update('Transactions', t.id, rowData);
         }else{
-          await getStore().append('Transactions', rowData);
+          // Adopt the real id from the write result instead of re-reading
+          // everything: the append promise confirms the add on all backends.
+          var newId = await getStore().append('Transactions', rowData);
+          var added = state.transactions.find(function(x){ return x.id===tmpId; });
+          if(added && newId) added.id = String(newId);
         }
         // Similar-transaction writes go out as one batch, not N slow singles:
         // a single round trip can't die halfway and leave the batch half-applied.
@@ -3611,15 +3616,19 @@ function openTxnForm(t){
           var tx = state.transactions.find(function(x){ return x.id===id; });
           if(tx) bulkWrites.push({id:tx.id, row:txnRowForUpdate(tx, tx.category||'', {txn_type:curType}), expect:{txn_type:curType}});
         });
-        if(bulkWrites.length) await bulkWriteTxns(bulkWrites);
-        await loadAll();
-        // Verify the similar-row writes actually stuck (a "success" that didn't
-        // stick is a failure): retry once, then report honestly.
-        var bulkFailed = bulkWritesFailed(bulkWrites);
-        if(bulkFailed.length){
-          await bulkWriteTxns(bulkWrites.filter(function(w){ return bulkFailed.indexOf(w.id)>=0; }));
+        // Plain writes are confirmed by the store itself — no re-read needed.
+        // Only re-read to verify similar-transaction writes actually stuck
+        // (a "success" that didn't stick is a failure): retry once, then report honestly.
+        var bulkFailed = [];
+        if(bulkWrites.length){
+          await bulkWriteTxns(bulkWrites);
           await loadAll();
           bulkFailed = bulkWritesFailed(bulkWrites);
+          if(bulkFailed.length){
+            await bulkWriteTxns(bulkWrites.filter(function(w){ return bulkFailed.indexOf(w.id)>=0; }));
+            await loadAll();
+            bulkFailed = bulkWritesFailed(bulkWrites);
+          }
         }
         if(state.screen==='transactions') renderTransactions();
         if(bulkFailed.length){
