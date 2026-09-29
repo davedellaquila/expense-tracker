@@ -215,6 +215,8 @@ input[type=month]{min-width:0;}
 .sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
 /* ...except fields marked fullw, which always span the form width */
 .sheet.fitfields input.fullw,.sheet.fitfields select.fullw,.sheet.fitfields textarea.fullw{width:100%;}
+/* auto-growing textareas start at their row count and expand with content */
+textarea.autogrow{min-height:0; resize:none; overflow:hidden;}
 /* clear (×) button inside search boxes */
 .clearbtn{position:absolute; right:8px; top:50%; transform:translateY(-50%);
   width:22px; height:22px; border:none; border-radius:50%; padding:0;
@@ -3625,19 +3627,11 @@ function openScrubber(){
     function editRow(tag, to){
       var erow = el('div',{style:'display:flex;gap:6px;align-items:flex-start;margin:4px 0 4px 28px'});
       erow.appendChild(el('span',{class:'muted',style:'font-size:12px;flex:none;margin-top:12px'},'→ '+tag));
-      var inp = el('textarea',{rows:'1',autocapitalize:'off',autocomplete:'off',spellcheck:'false',
-        style:'flex:1;min-width:0;font-size:16px;min-height:0;resize:none;overflow:hidden'});
+      var inp = autoGrowTextarea(el('textarea',{rows:'1',autocapitalize:'off',autocomplete:'off',spellcheck:'false',
+        style:'flex:1;min-width:0;font-size:16px'}), 160);
       inp.value = to;
-      // Grow to fit the text (capped, then scrolls).
-      function fit(){
-        inp.style.height = 'auto';
-        var h = inp.scrollHeight;
-        if(h>0){ inp.style.height = Math.min(h,160)+'px'; inp.style.overflowY = h>160 ? 'auto' : 'hidden'; }
-      }
-      inp.addEventListener('input', fit);
       erow.appendChild(inp);
       wrap.appendChild(erow);
-      requestAnimationFrame(fit);
       return inp;
     }
     var inM = f.toM!=null ? editRow('Merchant:', f.toM) : null;
@@ -4119,6 +4113,25 @@ function fitFieldToContent(input, min){
   return input;
 }
 
+/* Auto-growing textarea: starts at one row and expands to show all contents
+   (capped at maxH, then scrolls). Used for the full-width edit-form fields. */
+function autoGrowTextarea(ta, maxH){
+  maxH = maxH || 160;
+  ta.classList.add('autogrow');
+  function fit(){
+    ta.style.height = 'auto';
+    var h = ta.scrollHeight;
+    if(h > 0){
+      ta.style.height = Math.min(h, maxH) + 'px';
+      ta.style.overflowY = h > maxH ? 'auto' : 'hidden';
+    }
+  }
+  ta.addEventListener('input', fit);
+  requestAnimationFrame(fit);
+  setTimeout(fit, 50); // after fonts/layout settle
+  return ta;
+}
+
 function openTxnForm(t){
   var isEdit = !!t;
   openSheet(function(sh, close){
@@ -4150,10 +4163,10 @@ function openTxnForm(t){
       return input;
     }
     var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal()}));
-    var inMerch = field('Merchant', el('input',{type:'text',placeholder:'e.g. Costco',autocomplete:'off',class:'fullw'}));
-    if(t&&t.merchant) inMerch.value=t.merchant;
-    var inDesc = field('Description', el('input',{type:'text',placeholder:'Optional detail',autocomplete:'off',class:'fullw'}));
-    if(t&&t.description) inDesc.value=t.description;
+    var inMerch = field('Merchant', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'e.g. Costco',autocomplete:'off',spellcheck:'false',class:'fullw'})));
+    if(t&&t.merchant){ inMerch.value=t.merchant; }
+    var inDesc = field('Description', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'Optional detail',autocomplete:'off',spellcheck:'false',class:'fullw'})));
+    if(t&&t.description){ inDesc.value=t.description; }
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
     var inCat = field('Category', el('select'));
@@ -4199,8 +4212,8 @@ function openTxnForm(t){
       if(!found) inBank.appendChild(el('option',{value:cur},cur));
       inBank.value = cur;
     });
-    var inNotes = field('Notes', el('textarea',{placeholder:'Optional',class:'fullw'}));
-    if(t&&t.notes) inNotes.value=t.notes;
+    var inNotes = field('Notes', autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',class:'fullw'})));
+    if(t&&t.notes){ inNotes.value=t.notes; }
 
     function refreshCats(){
       var prev = inCat.value;
