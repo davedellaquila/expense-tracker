@@ -1102,6 +1102,8 @@ function el(tag, attrs, text){
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 var moneyFmt = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
 function money(n){ n = Number(n)||0; return moneyFmt.format(n); }
+var money0Fmt = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+function money0(n){ n = Number(n)||0; return money0Fmt.format(n); }
 function todayLocal(){
   var d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -2478,13 +2480,13 @@ function renderDashboard(){
     }
   });
   var net = inc-exp;
-  $('stat-income').textContent = money(inc);
-  $('stat-expense').textContent = money(exp);
+  $('stat-income').textContent = money0(inc);
+  $('stat-expense').textContent = money0(exp);
   var netEl = $('stat-net');
-  netEl.textContent = money(net);
+  netEl.textContent = money0(net);
   netEl.className = 'value '+(net>=0?'pos':'neg');
-  $('stat-income-split').textContent = 'Biz '+money(incB)+' · Per '+money(incP);
-  $('stat-expense-split').textContent = 'Biz '+money(expB)+' · Per '+money(expP);
+  $('stat-income-split').textContent = 'Biz '+money0(incB)+' · Per '+money0(incP);
+  $('stat-expense-split').textContent = 'Biz '+money0(expB)+' · Per '+money0(expP);
   $('stat-net-split').textContent = rangeLabel + (acct==='all' ? '' : ' · '+acct);
 
   // Bills card: due this week + overdue. Tap to open the Bills page.
