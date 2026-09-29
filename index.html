@@ -7887,9 +7887,15 @@ function renderBillCalendar(){
   });
 }
 
-function billRow(b, showDate){
+function billRow(b, showDate, maxAmt){
   var st = billStatus(b);
   var row = el('div',{class:'bill-row'});
+  // Relative-amount fill: the priciest bill fills the whole tile, others
+  // fill left-to-right in proportion to it.
+  if(maxAmt > 0){
+    var pct = Math.max(0, Math.min(100, Math.round(num(b.amount)/maxAmt*100)));
+    if(pct > 0) row.style.background = 'linear-gradient(to right, var(--accent-soft) '+pct+'%, transparent '+pct+'%)';
+  }
   var info = el('div',{class:'bi'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
   nm.style.cursor = 'pointer';
@@ -7915,6 +7921,12 @@ function billRow(b, showDate){
   return row;
 }
 
+function billMaxAmount(){
+  var m = 0;
+  (billsActive()||[]).forEach(function(b){ var a = num(b.amount); if(a > m) m = a; });
+  return m;
+}
+
 function renderBillDay(){
   var card = $('bill-day-card'), list = $('bill-day-list');
   list.innerHTML = '';
@@ -7923,7 +7935,8 @@ function renderBillDay(){
   $('bill-day-title').textContent = 'Due '+fmtBillDate(billSelDay);
   var bills = billsForDay(billSelDay);
   if(!bills.length) list.appendChild(el('p',{class:'muted'},'No bills due this day.'));
-  bills.forEach(function(b){ list.appendChild(billRow(b, false)); });
+  var maxAmt = billMaxAmount();
+  bills.forEach(function(b){ list.appendChild(billRow(b, false, maxAmt)); });
 }
 
 function renderBillList(){
@@ -7932,7 +7945,8 @@ function renderBillList(){
     return String(a.dueDate||'').localeCompare(String(b.dueDate||''));
   });
   if(!active.length) list.appendChild(el('p',{class:'muted'},'No bills yet. Tap + Add bill to track one.'));
-  active.forEach(function(b){ list.appendChild(billRow(b, true)); });
+  var maxAmt = billMaxAmount();
+  active.forEach(function(b){ list.appendChild(billRow(b, true, maxAmt)); });
   // paid (one-time) in a collapsed section
   var paid = (state.bills||[]).filter(billIsPaid).sort(function(a,b){
     return String(b.lastPaid||'').localeCompare(String(a.lastPaid||''));
