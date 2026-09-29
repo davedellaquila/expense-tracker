@@ -380,6 +380,31 @@ textarea{resize:vertical; min-height:64px;}
   .tabbar .tab-short{display:inline;}
 }
 
+/* ---------- iPhone layout refinements (≤560px) ---------- */
+@media (max-width:560px){
+  /* tab bar: 8 tabs fit without crowding */
+  .tabbar button{font-size:9.5px; gap:2px; padding:4px 0 6px;}
+  .tabbar button svg{width:20px; height:20px;}
+  /* home stat tiles: stay 3-across, compact */
+  .stat{padding:8px 6px;}
+  .stat .label{font-size:10.5px;}
+  .stat .value{font-size:16px;}
+  .stat .split{font-size:10.5px; line-height:1.4;}
+  /* tables: hide Txns / Avg-mo / %-of-budget columns on phones
+     (th carry data-scol; td cells get matching data-scol in JS) */
+  .ptable [data-scol="txns"], .ptable [data-scol="avg"], .ptable [data-scol="pct"]{display:none;}
+  /* transactions filters: stack instead of 2 columns */
+  .filters{grid-template-columns:1fr;}
+  /* transaction cards: slightly tighter */
+  .txn{padding:8px 10px; gap:8px;}
+  /* budget proposal rows: roomier grid, 44px lock/delete tap targets
+     (grid is inline in JS, so !important overrides it here) */
+  .bot-row, .bot-head{grid-template-columns:44px 1fr 62px 80px 40px !important; gap:6px !important;}
+  .bot-row .lockbtn{min-height:44px; min-width:40px;}
+  /* bills calendar: taller day cells so dots don't crowd the date */
+  .bill-cal .day{min-height:52px;}
+}
+
 /* ---------- modal ---------- */
 .overlay{
   position:fixed; inset:0; z-index:60; background:rgba(15,20,25,.5);
@@ -1140,17 +1165,17 @@ function catMixTable(byCat, byCatN, total, opts){
       var avgCell = '', avgAttr = '';
       if(avgCol){
         var avg = byC[c]/months;
-        avgCell = '<td style="text-align:right">'+money(avg)+'</td>';
+        avgCell = '<td data-scol="avg" style="text-align:right">'+money(avg)+'</td>';
         avgAttr = ' data-sv-avg="'+avg.toFixed(2)+'"';
       }
       var rowAttr = opts.clickable ? ' class="rep-click" data-catrow="'+esc(c)+'" data-cattype="'+dtype+'"' : '';
       h += '<tr'+rowAttr+' data-srow data-sv-name="'+esc(String(c).toLowerCase())+'"'+
         ' data-sv-txns="'+(byN[c]||0)+'" data-sv-share="'+share.toFixed(2)+'"'+
         ' data-sv-amount="'+byC[c].toFixed(2)+'"'+avgAttr+'>'+
-        '<td style="color:'+color+'">'+esc(c)+'</td>'+
-        '<td style="text-align:right">'+(byN[c]||0)+'</td>'+
-        '<td style="text-align:right">'+Math.round(share)+'%</td>'+
-        '<td style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
+        '<td data-scol="name" style="color:'+color+'">'+esc(c)+'</td>'+
+        '<td data-scol="txns" style="text-align:right">'+(byN[c]||0)+'</td>'+
+        '<td data-scol="share" style="text-align:right">'+Math.round(share)+'%</td>'+
+        '<td data-scol="amount" style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
     });
   }
   section(incCats, inc?inc.byCat:{}, inc?inc.byCatN:{}, inc?inc.total:0, 'var(--accent)', 'income', 'Income');
@@ -6187,7 +6212,7 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No spending this year — nothing to base a budget on.'));
     return;
   }
-  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
   head.appendChild(el('span'));
   head.appendChild(el('span',null,'Category'));
   head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -6196,8 +6221,8 @@ function botRenderTable(){
   host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
-    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
     line.appendChild(check);
     var nm = el('div');
@@ -6212,7 +6237,7 @@ function botRenderTable(){
     inp.value = r.amount;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
-    var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
       botProposal.rows = botProposal.rows.filter(function(x){ return x!==r; });
@@ -6502,7 +6527,7 @@ function incBotRenderTable(){
     return;
   }
   var months = incBotProposal.months||1;
-  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
   head.appendChild(el('span'));
   head.appendChild(el('span',null,'Category'));
   head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -6510,8 +6535,8 @@ function incBotRenderTable(){
   head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
     line.appendChild(check);
     var nm = el('div');
@@ -6525,7 +6550,7 @@ function incBotRenderTable(){
     inp.value = r.amount;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; incBotRenderTotal(); incBotPersist(); });
     line.appendChild(inp);
-    var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, r.category);
       incBotProposal.rows = incBotProposal.rows.filter(function(x){ return x!==r; });
@@ -7438,20 +7463,20 @@ function renderReports(){
   var btbl = $('rep-budgettable');
   if(!bCats.length){ btbl.innerHTML = ''; }
   else{
-    var totB = 0, totA = 0, bh = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Actual</th><th style="text-align:right">Variance</th><th style="text-align:right">% of budget</th></tr>';
+    var totB = 0, totA = 0, bh = '<div class="ptablewrap"><table class="ptable"><tr><th data-scol="name">Category</th><th data-scol="budget" style="text-align:right">Budget</th><th data-scol="actual" style="text-align:right">Actual</th><th data-scol="var" style="text-align:right">Variance</th><th data-scol="pct" style="text-align:right">% of budget</th></tr>';
     bItems.forEach(function(it){
       totB += it.budget; totA += it.actual;
       var v = it.actual - it.budget;
-      bh += '<tr class="rep-click" data-bcat="'+esc(it.name)+'"><td>'+esc(it.name)+'</td><td style="text-align:right">'+money(it.budget)+'</td>'+
-        '<td style="text-align:right">'+money(it.actual)+'</td>'+
-        '<td style="text-align:right" class="'+(v>0?'neg':'')+'">'+(v>0?'+':'')+money(v)+'</td>'+
-        '<td style="text-align:right">'+(it.budget>0 ? Math.round(it.actual/it.budget*100)+'%' : '—')+'</td></tr>';
+      bh += '<tr class="rep-click" data-bcat="'+esc(it.name)+'"><td data-scol="name">'+esc(it.name)+'</td><td data-scol="budget" style="text-align:right">'+money(it.budget)+'</td>'+
+        '<td data-scol="actual" style="text-align:right">'+money(it.actual)+'</td>'+
+        '<td data-scol="var" style="text-align:right" class="'+(v>0?'neg':'')+'">'+(v>0?'+':'')+money(v)+'</td>'+
+        '<td data-scol="pct" style="text-align:right">'+(it.budget>0 ? Math.round(it.actual/it.budget*100)+'%' : '—')+'</td></tr>';
     });
     var tv = totA - totB;
-    bh += '<tr><td><b>Total</b></td><td style="text-align:right"><b>'+money(totB)+'</b></td>'+
-      '<td style="text-align:right"><b>'+money(totA)+'</b></td>'+
-      '<td style="text-align:right" class="'+(tv>0?'neg':'')+'"><b>'+(tv>0?'+':'')+money(tv)+'</b></td>'+
-      '<td style="text-align:right"><b>'+(totB>0 ? Math.round(totA/totB*100)+'%' : '—')+'</b></td></tr>';
+    bh += '<tr><td data-scol="name"><b>Total</b></td><td data-scol="budget" style="text-align:right"><b>'+money(totB)+'</b></td>'+
+      '<td data-scol="actual" style="text-align:right"><b>'+money(totA)+'</b></td>'+
+      '<td data-scol="var" style="text-align:right" class="'+(tv>0?'neg':'')+'"><b>'+(tv>0?'+':'')+money(tv)+'</b></td>'+
+      '<td data-scol="pct" style="text-align:right"><b>'+(totB>0 ? Math.round(totA/totB*100)+'%' : '—')+'</b></td></tr>';
     bh += '</table></div>';
     if(acct!=='all') bh += '<p class="muted" style="font-size:12px;margin:6px 0 0">Budgets aren\'t split by account — actuals above reflect the '+esc(acct)+' filter.</p>';
     btbl.innerHTML = bh;
