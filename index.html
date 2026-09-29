@@ -5321,9 +5321,9 @@ function txnYearForMonth(txnMonth, stmtMonth, year){
    alone can't tell them apart — description keywords are the next best signal. */
 function guessTypeFromDesc(desc){
   var d = String(desc||'').toLowerCase();
+  if(/transfer/.test(d)) return 'transfer'; // Dave's rule: "Transfer" in the name means it's a transfer
   if(/purchase return|refund/.test(d)) return 'income';
   if(/payroll|deposit|interest payment|zelle from|instant pmt from/.test(d)) return 'income';
-  if(/transfer/.test(d)) return /\bfrom\b/.test(d) ? 'income' : 'expense';
   if(/purchase authorized|purchase with cash back|\bchecks?\b|withdrawal|bill pay|online pmt|\bfee\b|moneylink|\bmtg\b|mortgage|\bloan\b|\bpymts?\b|\bpayment\b|premium/.test(d)) return 'expense';
   return null;
 }
@@ -5464,6 +5464,7 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       else if(section==='expense') type='expense';
       else if(bankName==='Capital One' || bankName==='Wells Fargo' || bankName==='Apple Card') type = stmtDefaultType(bankName, desc);
       else type = guessTypeFromDesc(desc) || (amt<0 ? 'expense' : 'income');
+      if(/transfer/i.test(desc)) type='transfer'; // Dave's rule: "Transfer" in the name means it's a transfer
       lastTxn = {
         date: yy+'-'+mm+'-'+dd,
         description: desc, amount: Math.abs(Math.round(amt*100)/100),
