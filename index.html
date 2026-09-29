@@ -481,6 +481,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 .badge{display:inline-block; font-size:11px; font-weight:700; border-radius:99px; padding:2px 9px; margin-left:6px; vertical-align:1px;}
 .badge.in{background:var(--accent-soft); color:var(--accent);}
 .badge.ex{background:var(--danger-soft); color:var(--danger);}
+/* ---------- document scanner (bill + receipt OCR) ---------- */
+.filepick{display:none;}
+.scannote{font-size:12px; color:var(--accent); font-weight:600; margin:3px 0 0;}
+.scannote.dim{color:var(--muted); font-weight:400;}
+.scanprog{display:flex; align-items:center; gap:10px; padding:18px 4px; font-size:14.5px; font-weight:600;}
+.scanthumb-img{width:100%; border-radius:12px; border:1px solid var(--border); margin:6px 0 4px; cursor:pointer;}
+.scanattach{display:flex; align-items:center; gap:10px; margin:2px 0 8px;}
+.scanattach img{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex:none;}
+.scanbadge{font-size:13px; flex:none;}
 </style>
 </head>
 <body>
@@ -3234,6 +3243,8 @@ function renderTransactions(){
     var amt = el('span',{class:'amt '+tmRow.amtCls},
       tmRow.sign + money(num(t.amount)));
     b.appendChild(amt);
+    if(t.scanPath || t.scanDataUrl)
+      b.appendChild(el('span',{class:'scanbadge', title:'Receipt scan attached'},'\uD83D\uDCF7'));
     if(txnSelectMode){
       b.addEventListener('click', function(){
         if(txnSelected[t.id]) delete txnSelected[t.id]; else txnSelected[t.id]=true;
@@ -4264,6 +4275,49 @@ function openTxnForm(t){
     sh.classList.add('fitfields'); // fields size to their contents
     sh.appendChild(el('h2',null, isEdit?'Edit transaction':'Add transaction'));
 
+    /* Receipt scanner: photo -> on-device OCR -> pre-fill merchant/amount/date. */
+    var scanPhoto = null; // {blob, dataUrl} from the most recent scan
+    var scanBox = el('div');
+    function renderScanBox(){
+      scanBox.innerHTML = '';
+      if(scanPhoto){
+        var row = el('div',{class:'scanattach'});
+        var im = el('img',{src:scanPhoto.dataUrl, alt:'Scanned receipt'});
+        im.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        row.appendChild(im);
+        var vw = el('button',{class:'linkbtn', type:'button'},'View');
+        vw.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        row.appendChild(vw);
+        var rt = el('button',{class:'linkbtn', type:'button'},'Retake');
+        rt.addEventListener('click', startReceiptScan);
+        row.appendChild(rt);
+        scanBox.appendChild(row);
+      }else if(isEdit && (t.scanPath || t.scanDataUrl)){
+        var ex = el('button',{class:'linkbtn', type:'button'},'\uD83D\uDCF7 View receipt scan');
+        ex.addEventListener('click', function(){ openScanPhoto(t); });
+        scanBox.appendChild(ex);
+      }
+    }
+    function startReceiptScan(){
+      openScanSheet('receipt', function(res){
+        scanPhoto = {blob:res.blob, dataUrl:res.dataUrl};
+        if(res.values.merchant){
+          inMerch.value = res.values.merchant;
+          inMerch.dispatchEvent(new Event('input', {bubbles:true}));
+          markScanned(inMerch);
+        }
+        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); }
+        if(res.values.date){ inDate.value = res.values.date; markScanned(inDate); }
+        renderScanBox();
+        toast('Filled from scan \u2014 check the fields, then pick a category.');
+      });
+    }
+    var scanBtn = el('button',{class:'btn ghost', type:'button', style:'margin-bottom:6px'},'\uD83D\uDCF7 Scan receipt');
+    scanBtn.addEventListener('click', startReceiptScan);
+    sh.appendChild(scanBtn);
+    sh.appendChild(scanBox);
+    renderScanBox();
+
     var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income'), bTrf=el('button',{type:'button'},'Transfer');
     typeSeg.appendChild(bExp); typeSeg.appendChild(bInc); typeSeg.appendChild(bTrf);
     var bpSeg = el('div',{class:'seg'}), bPer=el('button',{type:'button'},'Personal'), bBiz=el('button',{type:'button'},'Business');
@@ -4419,6 +4473,21 @@ function openTxnForm(t){
         notes: inNotes.value.trim(),
         entered_by: state.userName||''
       };
+      /* Receipt scan photo: Firebase -> Storage (path on the row); local ->
+         data URL on the row; Sheets backend -> skipped. Edit without a new
+         scan keeps the existing photo (updates replace the whole row). */
+      if(scanPhoto){
+        if(storeKind()==='firebase' && firebaseConfigured()){
+          var rsp = await uploadScanPhoto('receipt', scanPhoto.blob);
+          if(rsp) rowData.scanPath = rsp;
+          else toast('Receipt photo could not be saved; the transaction was saved without it.');
+        }else if(storeKind()==='local'){
+          rowData.scanDataUrl = scanPhoto.dataUrl;
+        }
+      }else if(isEdit){
+        if(t.scanPath) rowData.scanPath = t.scanPath;
+        if(t.scanDataUrl) rowData.scanDataUrl = t.scanDataUrl;
+      }
       // changing a category: offer to update similar transactions too (review first)
       var bulkIds = [];
       var tmpId = null; // optimistic id for a new row; replaced by the real id after append
@@ -6775,6 +6844,12 @@ function billRow(b, showDate){
   if(showDate) meta += ' · due '+fmtBillDate(b.dueDate);
   if(b.recurrence && b.recurrence!=='once') meta += ' · '+b.recurrence;
   info.appendChild(el('div',{class:'bm'},meta));
+  if(b.scanPath || b.scanDataUrl){
+    var sc = el('span',{class:'scanbadge', title:'Scanned photo attached'},'\uD83D\uDCF7');
+    sc.style.cursor = 'pointer';
+    sc.addEventListener('click', function(e){ e.stopPropagation(); openScanPhoto(b); });
+    info.appendChild(sc);
+  }
   row.appendChild(info);
   var badge = billBadge(st);
   if(badge) row.appendChild(badge);
@@ -6825,10 +6900,343 @@ function renderBillList(){
   });
 }
 
+/* ================= document scanner: on-device OCR for bills + receipts =================
+   One shared scanner, two entry points (bill form, transaction form). Tesseract.js
+   is lazy-loaded on first scan so normal app load is unaffected. Everything runs
+   on-device: the photo never leaves the phone for recognition. */
+var TESS_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+var _tessP = null;
+function loadTesseract(){
+  if(_tessP) return _tessP;
+  _tessP = new Promise(function(res, rej){
+    if(typeof Tesseract !== 'undefined' && Tesseract.recognize){ res(); return; }
+    var s = document.createElement('script');
+    s.src = TESS_CDN; s.async = true;
+    var done = false;
+    function ok(){ if(!done){ done = true; res(); } }
+    function bad(){ if(!done){ done = true; _tessP = null; rej(new Error('scanner-load')); } }
+    s.onload = ok; s.onerror = bad;
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!done) bad(); }, 60000);
+  });
+  return _tessP;
+}
+/* Downscale to bound OCR time + storage size. Returns a JPEG Blob. */
+function downscalePhoto(file, maxDim){
+  maxDim = maxDim || 1600;
+  return new Promise(function(res, rej){
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var sc = Math.min(1, maxDim / Math.max(w || 1, h || 1));
+        var cw = Math.max(1, Math.round(w*sc)), ch = Math.max(1, Math.round(h*sc));
+        var cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        URL.revokeObjectURL(url);
+        if(cv.toBlob) cv.toBlob(function(b){ b ? res(b) : rej(new Error('encode')); }, 'image/jpeg', 0.85);
+        else rej(new Error('encode'));
+      }catch(e){ URL.revokeObjectURL(url); rej(e); }
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('decode')); };
+    img.src = url;
+  });
+}
+function blobToDataURL(blob){
+  return new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){ res(fr.result); };
+    fr.onerror = function(){ rej(new Error('read')); };
+    fr.readAsDataURL(blob);
+  });
+}
+function ocrPhoto(blob, onProgress){
+  return loadTesseract().then(function(){
+    return Tesseract.recognize(blob, 'eng', { logger: function(m){
+      if(onProgress && m && m.status === 'recognizing text' && typeof m.progress === 'number') onProgress(m.progress);
+    }});
+  }).then(function(r){ return (r && r.data && r.data.text) || ''; });
+}
+/* ---- heuristic field extraction (pure functions; unit-tested in Node) ---- */
+function scanLines(text){
+  return String(text||'').split(/\n+/).map(function(s){ return s.trim(); }).filter(function(s){ return !!s; });
+}
+/* Money values on a line: require cents so stray integers don't match. */
+function scanMoneyVals(line){
+  var out = [], m, re = /\$?\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})/g;
+  while((m = re.exec(line))){ out.push(parseFloat(m[1].replace(/,/g,''))); }
+  return out.filter(function(v){ return isFinite(v); });
+}
+var SCAN_MONTHS = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,
+  jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
+/* Parse a US date from free text -> 'YYYY-MM-DD' or null. */
+function scanParseUsDate(s){
+  s = String(s||'');
+  var m, mm, dd, yy;
+  m = s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+  if(m){
+    mm = +m[1]; dd = +m[2]; yy = +m[3];
+    if(yy < 100) yy = yy < 50 ? 2000+yy : 1900+yy;
+    if(mm>=1&&mm<=12&&dd>=1&&dd<=31&&yy>=2000&&yy<=2045)
+      return yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    return null;
+  }
+  m = s.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i);
+  if(m){
+    mm = SCAN_MONTHS[m[1].toLowerCase()]; dd = +m[2]; yy = +m[3];
+    if(mm&&dd>=1&&dd<=31&&yy>=2000&&yy<=2045)
+      return yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  }
+  return null;
+}
+function scanCleanName(s){
+  return String(s||'').replace(/[^\w\s&\-.']/g,'').replace(/\s+/g,' ').trim().slice(0,60);
+}
+/* Bill: biller name, amount due, due date. */
+function parseBillScan(text){
+  var lines = scanLines(text);
+  var res = {name:null, amount:null, dueDate:null, found:{}};
+  var i, ln;
+  var amtKw = /amount due|total due|payment due|balance due|amount owed|please pay|total amount/i;
+  var cands = [];
+  lines.forEach(function(l){ if(amtKw.test(l)) scanMoneyVals(l).forEach(function(v){ cands.push(v); }); });
+  if(!cands.length)
+    lines.forEach(function(l){ if(/\btotal\b/i.test(l)) scanMoneyVals(l).forEach(function(v){ cands.push(v); }); });
+  if(cands.length){ res.amount = Math.max.apply(null, cands); res.found.amount = true; }
+  var dateKw = /due date|payment due|pay by|due on/i, d = null;
+  for(i=0;i<lines.length&&!d;i++) if(dateKw.test(lines[i])) d = scanParseUsDate(lines[i]);
+  for(i=0;i<lines.length&&!d;i++) if(/\bdue\b/i.test(lines[i])) d = scanParseUsDate(lines[i]);
+  if(d){ res.dueDate = d; res.found.dueDate = true; }
+  for(i=0;i<lines.length&&i<12;i++){
+    ln = lines[i];
+    var alpha = ln.replace(/[^a-zA-Z]/g,'');
+    if(alpha.length>=3 && ln.indexOf(':')<0 &&
+       !/account|statement|invoice|page|due|total|amount|balance/i.test(ln) &&
+       !scanParseUsDate(ln)){
+      var nm = scanCleanName(ln);
+      if(nm){ res.name = nm; res.found.name = true; break; }
+    }
+  }
+  return res;
+}
+/* Receipt: merchant, total, date. */
+function parseReceiptScan(text){
+  var lines = scanLines(text);
+  var res = {merchant:null, amount:null, date:null, found:{}};
+  var i, ln;
+  for(i=0;i<lines.length&&i<10;i++){
+    ln = lines[i];
+    var alpha = ln.replace(/[^a-zA-Z]/g,'');
+    if(alpha.length>=3 && ln.indexOf(':')<0 && !/receipt|store\s*#|order\s*#/i.test(ln)){
+      var mc = scanCleanName(ln);
+      if(mc){ res.merchant = mc; res.found.merchant = true; break; }
+    }
+  }
+  var cands = [];
+  lines.forEach(function(l){
+    if(/\btotal\b/i.test(l) && !/subtotal/i.test(l)) scanMoneyVals(l).forEach(function(v){ cands.push(v); });
+  });
+  if(!cands.length)
+    lines.forEach(function(l){
+      if(/balance due|amount due/i.test(l)) scanMoneyVals(l).forEach(function(v){ cands.push(v); });
+    });
+  if(!cands.length)
+    lines.forEach(function(l){ scanMoneyVals(l).forEach(function(v){ cands.push(v); }); });
+  if(cands.length){ res.amount = Math.max.apply(null, cands); res.found.amount = true; }
+  for(i=0;i<lines.length&&i<15;i++){
+    var d = scanParseUsDate(lines[i]);
+    if(d){ res.date = d; res.found.date = true; break; }
+  }
+  return res;
+}
+/* Scan sheet: pick/take photo -> progress -> editable review -> Use these details.
+   kind: 'bill' | 'receipt'. onDone receives {blob, dataUrl, values}. */
+function openScanSheet(kind, onDone){
+  var isBill = kind === 'bill';
+  openSheetStacked(function(sh, close){
+    sh.appendChild(el('h2', null, isBill ? 'Scan bill' : 'Scan receipt'));
+    sh.appendChild(el('p', {class:'muted'},
+      'Take a photo of the ' + (isBill ? 'bill' : 'receipt') +
+      ' \u2014 this phone reads it and fills in what it finds. ' +
+      'Check the fields before saving; the photo itself is never uploaded for recognition.'));
+    var pickBox = el('div');
+    var fileCam = el('input', {type:'file', accept:'image/*', capture:'environment', class:'filepick'});
+    fileCam.setAttribute('aria-label', 'Take photo');
+    var fileLib = el('input', {type:'file', accept:'image/*', class:'filepick'});
+    fileLib.setAttribute('aria-label', 'Choose photo');
+    pickBox.appendChild(fileCam); pickBox.appendChild(fileLib);
+    var btnRow = el('div', {class:'btnrow'});
+    var takeBtn = el('button', {class:'btn', type:'button'}, '\uD83D\uDCF7 Take photo');
+    var libBtn = el('button', {class:'btn ghost', type:'button'}, 'Choose photo');
+    takeBtn.addEventListener('click', function(){ fileCam.click(); });
+    libBtn.addEventListener('click', function(){ fileLib.click(); });
+    btnRow.appendChild(takeBtn); btnRow.appendChild(libBtn);
+    pickBox.appendChild(btnRow);
+    var cancelBtn = el('button', {class:'btn ghost', type:'button', style:'margin-top:10px'}, 'Cancel');
+    cancelBtn.addEventListener('click', close);
+    pickBox.appendChild(cancelBtn);
+    sh.appendChild(pickBox);
+
+    var progBox = el('div', {class:'scanprog', style:'display:none'});
+    progBox.appendChild(el('span', {class:'spin'}));
+    var progTxt = el('span', null, 'Reading\u2026');
+    progBox.appendChild(progTxt);
+    sh.appendChild(progBox);
+
+    var reviewBox = el('div', {style:'display:none'});
+    sh.appendChild(reviewBox);
+
+    function showPick(){ pickBox.style.display=''; progBox.style.display='none'; reviewBox.style.display='none'; }
+    function showProg(t){ pickBox.style.display='none'; reviewBox.style.display='none'; progBox.style.display=''; progTxt.textContent = t; }
+
+    function onFile(file){
+      if(!file) return;
+      showProg('Preparing photo\u2026');
+      downscalePhoto(file).then(function(blob){
+        return blobToDataURL(blob).then(function(du){ return {blob:blob, du:du}; });
+      }).then(function(img){
+        showProg('Loading scanner\u2026 (first time only)');
+        return ocrPhoto(img.blob, function(p){ progTxt.textContent = 'Reading\u2026 ' + Math.round(p*100) + '%'; })
+          .then(function(text){ return {img:img, text:text}; });
+      }).then(function(r){ showReview(r.img, r.text); })
+      .catch(function(e){
+        console.warn('scan failed:', e);
+        showPick();
+        toast(e && e.message === 'scanner-load'
+          ? 'Could not load the scanner \u2014 it needs internet the first time.'
+          : 'Could not read that photo. Try again or enter it manually.', true);
+      });
+      fileCam.value = ''; fileLib.value = '';
+    }
+    fileCam.addEventListener('change', function(){ onFile(fileCam.files[0]); });
+    fileLib.addEventListener('change', function(){ onFile(fileLib.files[0]); });
+
+    function fieldRow(labelText, input, foundFlag){
+      var wrap = el('div');
+      wrap.appendChild(el('label', {class:'f'}, labelText));
+      wrap.appendChild(input);
+      wrap.appendChild(el('div', {class: foundFlag ? 'scannote' : 'scannote dim'},
+        foundFlag ? '\u2728 Found on scan \u2014 check it' : 'Not found on scan \u2014 fill in'));
+      return wrap;
+    }
+
+    function showReview(img, text){
+      var parsed = isBill ? parseBillScan(text) : parseReceiptScan(text);
+      reviewBox.innerHTML = '';
+      pickBox.style.display='none'; progBox.style.display='none'; reviewBox.style.display='';
+      var thumb = el('img', {class:'scanthumb-img', src: img.du, alt:'Scanned photo'});
+      thumb.addEventListener('click', function(){ window.open(img.du, '_blank'); });
+      reviewBox.appendChild(thumb);
+      var vals = {}, anyFound = false;
+      function addField(labelText, key, val, foundFlag, attrs){
+        var a = Object.assign({type:'text', style:'width:100%'}, attrs || {});
+        var inp = el('input', a);
+        if(val != null && val !== '') inp.value = val;
+        vals[key] = inp;
+        if(foundFlag) anyFound = true;
+        reviewBox.appendChild(fieldRow(labelText, inp, foundFlag));
+      }
+      var numAttrs = {type:'number', min:'0.01', step:'0.01', inputmode:'decimal'};
+      if(isBill){
+        addField('Name', 'name', parsed.name, parsed.found.name);
+        addField('Amount', 'amount', parsed.amount != null ? parsed.amount.toFixed(2) : '', parsed.found.amount, numAttrs);
+        addField('Due date', 'dueDate', parsed.dueDate || '', parsed.found.dueDate, {type:'date'});
+      }else{
+        addField('Merchant', 'merchant', parsed.merchant, parsed.found.merchant);
+        addField('Amount', 'amount', parsed.amount != null ? parsed.amount.toFixed(2) : '', parsed.found.amount, numAttrs);
+        addField('Date', 'date', parsed.date || '', parsed.found.date, {type:'date'});
+      }
+      if(!anyFound)
+        reviewBox.appendChild(el('p', {class:'muted'},
+          "Couldn't pull the details from that photo \u2014 fill them in here, or use the photo for reference and enter everything manually."));
+      var bar = el('div', {class:'btnrow stickybar-page'});
+      var useBtn = el('button', {class:'btn', type:'button'}, 'Use these details');
+      useBtn.addEventListener('click', function(){
+        var out = {};
+        for(var k in vals) out[k] = vals[k].value.trim();
+        close();
+        onDone({blob: img.blob, dataUrl: img.du, values: out});
+      });
+      var retakeBtn = el('button', {class:'btn ghost', type:'button'}, 'Retake');
+      retakeBtn.addEventListener('click', showPick);
+      bar.appendChild(useBtn); bar.appendChild(retakeBtn);
+      reviewBox.appendChild(bar);
+    }
+  });
+}
+/* "Filled from scan" note under a pre-filled form field. */
+function markScanned(input){
+  if(!input || input.getAttribute('data-scanned')) return;
+  input.setAttribute('data-scanned', '1');
+  var note = el('div', {class:'scannote'}, '\u2728 Filled from scan');
+  input.parentNode.insertBefore(note, input.nextSibling);
+}
+/* Store a scan photo with its record. Firebase -> Storage path on the row;
+   local backend -> data URL on the row; Sheets backend -> skipped. */
+function uploadScanPhoto(kind, blob){
+  if(!blob || storeKind() !== 'firebase' || !firebaseConfigured()) return Promise.resolve(null);
+  return firebaseReady().then(function(r){
+    return firebaseStorage().then(function(storage){
+      var dir = kind === 'bill' ? 'bill-scans' : 'receipt-scans';
+      var path = 'users/' + r.uid + '/' + dir + '/' + Date.now() + '-' +
+        Math.random().toString(36).slice(2, 8) + '.jpg';
+      return storage.ref(path).put(blob).then(function(){ return path; });
+    });
+  }).catch(function(e){ console.warn('scan upload failed:', e); return null; });
+}
+function openScanPhoto(rec){
+  if(!rec) return;
+  if(rec.scanDataUrl){ window.open(rec.scanDataUrl, '_blank'); return; }
+  if(rec.scanPath){
+    firebaseStorage().then(function(storage){ return storage.ref(rec.scanPath).getDownloadURL(); })
+      .then(function(url){ window.open(url, '_blank'); })
+      .catch(function(){ toast('Could not open the scanned photo.', true); });
+  }
+}
 function openBillForm(b){
   var isEdit = !!b;
   openSheet(function(sh, close){
     sh.appendChild(el('h2',null,isEdit?'Edit bill':'Add bill'));
+    /* Bill scanner: photo -> on-device OCR -> pre-fill name/amount/due date. */
+    var scanPhoto = null; // {blob, dataUrl} from the most recent scan
+    var scanBox = el('div');
+    function renderScanBox(){
+      scanBox.innerHTML = '';
+      if(scanPhoto){
+        var row = el('div',{class:'scanattach'});
+        var im = el('img',{src:scanPhoto.dataUrl, alt:'Scanned bill'});
+        im.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        row.appendChild(im);
+        var vw = el('button',{class:'linkbtn', type:'button'},'View');
+        vw.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        row.appendChild(vw);
+        var rt = el('button',{class:'linkbtn', type:'button'},'Retake');
+        rt.addEventListener('click', startBillScan);
+        row.appendChild(rt);
+        scanBox.appendChild(row);
+      }else if(isEdit && (b.scanPath || b.scanDataUrl)){
+        var ex = el('button',{class:'linkbtn', type:'button'},'\uD83D\uDCF7 View scanned bill');
+        ex.addEventListener('click', function(){ openScanPhoto(b); });
+        scanBox.appendChild(ex);
+      }
+    }
+    function startBillScan(){
+      openScanSheet('bill', function(res){
+        scanPhoto = {blob:res.blob, dataUrl:res.dataUrl};
+        if(res.values.name){ inName.value = res.values.name; markScanned(inName); }
+        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); }
+        if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); }
+        renderScanBox();
+        toast('Filled from scan \u2014 check the fields.');
+      });
+    }
+    var scanBtn = el('button',{class:'btn ghost', type:'button', style:'margin-bottom:6px'},'\uD83D\uDCF7 Scan bill');
+    scanBtn.addEventListener('click', startBillScan);
+    sh.appendChild(scanBtn);
+    sh.appendChild(scanBox);
+    renderScanBox();
     var inName = el('input',{type:'text',placeholder:'e.g. PG&E',autocomplete:'off',style:'width:100%'});
     if(b&&b.name) inName.value = b.name;
     sh.appendChild(el('label',{class:'f'},'Name')); sh.appendChild(inName);
@@ -6878,6 +7286,23 @@ function openBillForm(b){
         createdAt:(b&&b.createdAt)||new Date().toISOString(),
         lastPaid:(b&&b.lastPaid)||null
       };
+      /* Scan photo: Firebase -> Storage (path on the row); local -> data URL
+         on the row; Sheets backend -> skipped. Edit without a new scan keeps
+         the existing photo (updates replace the whole row). */
+      if(scanPhoto){
+        if(storeKind()==='firebase' && firebaseConfigured()){
+          saveBtn.disabled = true;
+          var sp = await uploadScanPhoto('bill', scanPhoto.blob);
+          saveBtn.disabled = false;
+          if(sp) row.scanPath = sp;
+          else toast('Scan photo could not be saved; the bill was saved without it.');
+        }else if(storeKind()==='local'){
+          row.scanDataUrl = scanPhoto.dataUrl;
+        }
+      }else if(isEdit){
+        if(b.scanPath) row.scanPath = b.scanPath;
+        if(b.scanDataUrl) row.scanDataUrl = b.scanDataUrl;
+      }
       try{
         if(isEdit){
           row.id = b.id;
