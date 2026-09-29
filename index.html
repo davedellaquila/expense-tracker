@@ -857,6 +857,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="btnrow"><button class="btn" id="set-user-save">Save name</button></div>
       </div>
       <div class="card">
+        <h2>Data cleanup</h2>
+        <p class="muted" style="font-size:13px;margin:0 0 10px">Older PDF imports sometimes glued statement section headers (like "JANE DOE #1234: Transactions") onto merchant names. Scan finds those rows so you can review and fix them — with undo.</p>
+        <div class="btnrow"><button class="btn" id="set-scrub">Scan for header text</button></div>
+        <div id="set-scrub-results" style="margin-top:6px"></div>
+      </div>
+      <div class="card">
         <h2>Appearance</h2>
         <div class="seg" id="theme-seg">
           <button data-theme-opt="light">☀️ Light</button>
@@ -2083,6 +2089,7 @@ function wireSettings(){
     b.addEventListener('click', function(){ switchStoreKind(b.getAttribute('data-spick')); });
   });
   $('set-backup').addEventListener('click', backupJson);
+  $('set-scrub').addEventListener('click', openScrubber);
   /* Firebase account linking for cross-device sync. */
   $('set-auth-signin').addEventListener('click', function(){ authEmailFlow('signin', $('set-auth-signin')); });
   $('set-auth-signup').addEventListener('click', function(){ authEmailFlow('signup', $('set-auth-signup')); });
@@ -3294,6 +3301,100 @@ function openTidyMerchants(){
     row.appendChild(cancel); row.appendChild(apply);
     sh.appendChild(row);
   });
+}
+
+/* Statement-header scrubber (Settings → Data cleanup). Older PDF imports glued
+   cardholder section headers ("QUENTIN E DELL'AQUILA #7748: Transactions ...")
+   onto the previous row's description (= merchant). This finds those rows,
+   previews the trim, and applies it through the undoable bulk-job system. */
+var STMT_HEADER_RE = /\s+[A-Z][A-Z.'\- ]{0,40}#\d{3,}\s*:.*$/;
+function scanStatementCruft(){
+  var out = [];
+  (state.transactions||[]).forEach(function(t){
+    if(String(t.id||'').indexOf('tmp-')===0) return; // still saving: leave it alone
+    var m = String(t.merchant||''), d = String(t.description||'');
+    var cm = m.replace(STMT_HEADER_RE,'').trim();
+    var cd = d.replace(STMT_HEADER_RE,'').trim();
+    var toM = (cm && cm!==m.trim()) ? cm : null;
+    var toD = (cd && cd!==d.trim()) ? cd : null;
+    if(toM || toD) out.push({id:t.id, date:t.date, amount:t.amount, fromM:m, toM:toM, fromD:d, toD:toD});
+  });
+  out.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  return out;
+}
+function buildScrubJob(items){
+  var rows = [];
+  items.forEach(function(it){
+    var x = txnById(it.id);
+    var ov = {};
+    if(it.toM!=null) ov.merchant = it.toM;
+    if(it.toD!=null) ov.description = it.toD;
+    rows.push({
+      id: it.id,
+      before: x ? txnRowForUpdate(x, x.category||'', {}) : {},
+      expected: ov,
+      target: x ? txnRowForUpdate(x, x.category||'', ov) : null
+    });
+  });
+  var job = {
+    id:'bj_'+Date.now(), kind:'update',
+    startedAt:new Date().toISOString(), completedAt:null,
+    label: items.length+' transaction'+(items.length===1?'':'s')+' (scrub headers)',
+    rows: rows, status:{}
+  };
+  rows.forEach(function(r){ job.status[r.id]='pending'; });
+  return job;
+}
+function openScrubber(){
+  var box = $('set-scrub-results');
+  box.innerHTML = '';
+  var found = scanStatementCruft();
+  if(!found.length){
+    box.appendChild(el('p',{class:'muted',style:'font-size:13px;margin:0'},'No statement header text found — merchant names look clean.'));
+    return;
+  }
+  box.appendChild(el('p',{class:'muted',style:'font-size:13px'},
+    found.length+' transaction'+(found.length===1?'':'s')+' with header text stuck to the name. Uncheck any to skip.'));
+  var checks = [];
+  found.forEach(function(f){
+    var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer'});
+    var cb = el('input',{type:'checkbox',style:'margin-top:3px;flex:none'}); cb.checked = true;
+    lab.appendChild(cb);
+    var tx = el('div',{style:'min-width:0;font-size:13px;flex:1'});
+    tx.appendChild(el('div',{class:'muted',style:'font-size:12px'}, (f.date||'????-??-??')+' · '+money(num(f.amount))));
+    function changeRow(tag, from, to){
+      tx.appendChild(el('div',{style:'word-break:break-word;color:var(--muted);text-decoration:line-through;font-size:12px'}, tag+from));
+      var toEl = el('div',{style:'word-break:break-word;font-size:12px'});
+      toEl.appendChild(el('b',null,tag+to));
+      tx.appendChild(toEl);
+    }
+    if(f.toM!=null) changeRow('Merchant: ', f.fromM, f.toM);
+    if(f.toD!=null && (f.toD!==f.toM || f.fromD!==f.fromM)) changeRow('Description: ', f.fromD, f.toD);
+    lab.appendChild(tx);
+    box.appendChild(lab);
+    checks.push({f:f, cb:cb});
+  });
+  var row = el('div',{class:'btnrow',style:'margin-top:10px'});
+  var apply = el('button',{class:'btn',type:'button'},'Apply');
+  var updateLabel = function(){
+    var n = checks.filter(function(c){ return c.cb.checked; }).length;
+    apply.textContent = 'Scrub '+n+' transaction'+(n===1?'':'s');
+    apply.disabled = n===0;
+  };
+  checks.forEach(function(c){ c.cb.addEventListener('change', updateLabel); });
+  updateLabel();
+  apply.onclick = async function(){
+    var sel = checks.filter(function(c){ return c.cb.checked; }).map(function(c){ return c.f; });
+    if(!sel.length) return;
+    if(sel.length>50){
+      var okc = await confirmDialog('Update '+sel.length+' transactions? This may take a minute or two.', 'Proceed');
+      if(!okc) return;
+    }
+    box.innerHTML = '';
+    runBulkJob(buildScrubJob(sel), {verb:'Scrubbed'});
+  };
+  row.appendChild(apply);
+  box.appendChild(row);
 }
 
 /* Bulk update: change chosen fields on a set of selected transactions.
@@ -4743,6 +4844,10 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       }
       return;
     }
+    // Cardholder section headers ("QUENTIN E DELL'AQUILA #7748: Transactions")
+    // are neither transactions nor real section flips — drop them before they
+    // glue onto the previous row's description or flip the income/expense section.
+    if(/^[A-Z][A-Z.'\- ]{0,40}#\d{3,}\s*:/.test(line)) return;
     if(setSection(line)) return;
     if(SKIP_LINE.test(line)) return;
     if(lastTxn && line.length>3 && !/^\d/.test(line) && !SKIP_LINE.test(line) && line.length<90){
