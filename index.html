@@ -4679,7 +4679,18 @@ function botPropose(){
     var avg = sums[c]/3;
     return {category:c, avg:avg, last:lasts[c]||0, amount:botNiceRound(avg), locked:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  botProposal = {month:ym, rows:rows, avgIncome:income/3};
+  // YTD average per category: Jan 1 of the budget year through the selected month,
+  // divided by the calendar months elapsed (transfers excluded, like the 3-mo avg).
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
+  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {};
+  state.transactions.forEach(function(t){
+    if(!t.date || t.date<y0 || t.date>=yEnd) return;
+    if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
+    if(t.txn_type!=='expense') return;
+    var c = t.category || 'Uncategorized';
+    ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
+  });
+  botProposal = {month:ym, rows:rows, avgIncome:income/3, ytdSums:ytdSums, ytdMonths:ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -4696,12 +4707,21 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No spending in the last 3 months — nothing to base a budget on.'));
     return;
   }
+  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  head.appendChild(el('span',null,'Category'));
+  head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+  head.appendChild(el('span',null,'Budget'));
+  head.appendChild(el('span'));
+  head.appendChild(el('span'));
+  host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
     var nm = el('div');
     nm.appendChild(el('b',null,r.category));
     nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
     line.appendChild(nm);
+    var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
+    line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
     inp.disabled = r.locked;
