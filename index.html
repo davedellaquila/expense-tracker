@@ -340,6 +340,18 @@ textarea{resize:vertical; min-height:64px;}
 }
 .searchstick[hidden]{display:none;}
 .searchstick input{margin:0;}
+/* Reports sticky filter summary: same floating placement as the Transactions
+   search clone; appears once the filter card scrolls off-screen. Tapping it
+   scrolls back to the filters. */
+.repfilterstick{cursor:pointer; padding:8px 14px; text-align:left;}
+.repfilterstick .rf-cap{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
+.repfilterstick .rf-sum{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#rep-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
+/* Largest expenses: two-line merchant/description cell with ellipsis truncation */
+table.ptable.top-table{min-width:0;}
+.top-cell{min-width:0;}
+.top-merch{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.top-desc{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
   background:var(--card); color:var(--danger); cursor:pointer; margin:0;
@@ -920,7 +932,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 
     <!-- REPORTS -->
     <section id="screen-reports" class="screen" hidden>
-      <div class="card no-print">
+      <div class="card no-print" id="rep-filtercard">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
           <div style="flex:1; min-width:150px">
             <label class="f" style="margin-top:0" for="rep-preset">Period</label>
@@ -954,6 +966,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
           <div id="rep-catchips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
+      </div>
+      <div class="searchstick repfilterstick" id="repfilterstick" hidden role="button" tabindex="0" aria-label="Report filters — activate to scroll back to the filters">
+        <div class="rf-cap">Report filters</div>
+        <div class="rf-sum" id="repfilterstick-text"></div>
       </div>
       <div class="card">
         <h2 id="rep-title" style="margin-bottom:2px">Expense report</h2>
@@ -3622,13 +3638,21 @@ function resetTxnFilters(){
   txnDrill = null; // also clear any chart drill selection
   renderTransactions();
 }
-/* Chart drill-through: set ONLY the temporary pill context and jump to the
-   Transactions screen. Native filter controls are never rewritten by a drill;
-   they stay independent and combine with the pill as additional filters.
-   o.carryCats (the source page's active chip selection) is intersected with
-   the tapped element's own categories so an active filter is never dropped.
-   Transfers are exempt from chip filtering, so xferOnly drills never carry
-   categories. */
+/* Chart drill-through: single-category drills set the native Transactions
+   category dropdown (the pre-pill behavior); multi-category drills set the
+   temporary pill context instead. Native filter controls are otherwise never
+   rewritten by a drill; they stay independent and combine with the pill as
+   additional filters. o.carryCats (the source page's active chip selection)
+   is intersected with the tapped element's own categories so an active
+   filter is never dropped. Transfers are exempt from chip filtering, so
+   xferOnly drills never carry categories. */
+/* Does a drill context carry any filter dimension besides categories? Used to
+   decide whether a single-category drill still needs its pill. */
+function drillHasDims(d){
+  return !!(d.from || d.to || d.type || d.bp || d.taxCat || d.rawCats ||
+    d.weekday!=null || (d.owners&&d.owners.length) || (d.banks&&d.banks.length) ||
+    d.band || d.minAmt!=null || d.maxAmt!=null || d.q || d.xferOnly || d.noXfer);
+}
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var carry = (!o.xferOnly && o.carryCats && o.carryCats.length) ? o.carryCats : null;
@@ -3637,10 +3661,31 @@ function drillToTransactions(o){
   if(carry && dc) effCats = dc.filter(function(c){ return carry.indexOf(c)>=0; });
   else if(carry) effCats = carry.slice();
   else if(dc) effCats = dc;
+  // Single-category drills set the native Transactions category dropdown
+  // instead of listing the category in the pill — but only when the category
+  // exists as a real dropdown option; display-only names like "Transfers" or
+  // "Uncategorized" keep the pill path so filtering stays correct.
+  var union = [];
+  [o.carryCats, o.dispCats].forEach(function(arr){
+    (arr||[]).forEach(function(c){ if(union.indexOf(c)<0) union.push(c); });
+  });
+  var drillCat = (union.length===1 && allCategories().indexOf(union[0])>=0) ? union[0] : null;
+  if(drillCat){
+    // ensure the option exists before selecting it (the dropdown may never
+    // have been rendered); renderTransactions rebuilds the options from
+    // allCategories() and preserves this value via its keep logic.
+    var fcat = $('f-cat');
+    if(fcat){
+      var hasOpt = false;
+      for(var oi=0; oi<fcat.options.length; oi++) if(fcat.options[oi].value===drillCat){ hasOpt = true; break; }
+      if(!hasOpt) fcat.appendChild(el('option',{value:drillCat},drillCat));
+      fcat.value = drillCat;
+    }
+  }
   txnDrill = {
     from: from, to: to,
     type: o.type || '', bp: o.bp || '', taxCat: o.taxCat || null,
-    dispCats: effCats, rawCats: o.rawCats || null,
+    dispCats: drillCat ? null : effCats, rawCats: o.rawCats || null,
     weekday: (o.weekday==null ? null : o.weekday),
     owners: o.owners || null, banks: o.banks || null,
     band: o.band || null,
@@ -3649,6 +3694,9 @@ function drillToTransactions(o){
     q: o.q ? String(o.q).trim().toLowerCase() : null,
     xferOnly: !!o.xferOnly, noXfer: !!o.noXfer
   };
+  // A single-category drill with no other dimensions needs no pill at all:
+  // the native dropdown alone shows exactly the drilled selection.
+  if(drillCat && !drillHasDims(txnDrill)) txnDrill = null;
   showScreen('transactions');
 }
 /* show/hide the × clear buttons in the two search boxes */
@@ -8357,6 +8405,24 @@ function wireReports(){
     });
     setRepCatCollapsed(repCatCollapsed());
   }
+  // sticky filter summary: appears once the filter card scrolls off-screen
+  // (same IntersectionObserver pattern as the Transactions searchstick);
+  // tapping it smooth-scrolls back to the filters.
+  var rfs = $('repfilterstick'), rfc = $('rep-filtercard');
+  if(rfs && rfc){
+    var scrollToRepFilters = function(){ rfc.scrollIntoView({behavior:'smooth', block:'start'}); };
+    rfs.addEventListener('click', scrollToRepFilters);
+    rfs.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); scrollToRepFilters(); }
+    });
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries){
+        var r = entries[0].boundingClientRect;
+        var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='reports';
+        rfs.hidden = !offTop;
+      }, {threshold:0}).observe(rfc);
+    }
+  }
 }
 function renderReports(){
   var acct = $('rep-acct').value;
@@ -8422,6 +8488,14 @@ function renderReports(){
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   $('rep-title').textContent = 'Expense report';
   $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
+  // sticky filter summary panel (shown once the filter card scrolls off-screen)
+  var rfsT = $('repfilterstick-text');
+  if(rfsT){
+    var rfsCats = !repCatSel.length ? 'All categories'
+      : repCatSel.length===1 ? repCatSel[0]
+      : repCatSel[0]+' + '+(repCatSel.length-1)+' more';
+    rfsT.textContent = rangeLabel + ' · ' + rfsCats + (acct==='all' ? '' : ' · '+acct) + ' · ' + rows.length + ' transactions';
+  }
   $('rep-stats').innerHTML =
     statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions') +
     statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions') +
@@ -8438,8 +8512,16 @@ function renderReports(){
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
   $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {periodMonths:monthsInRange(from, to),
+    clickable:true,
     inc:{byCat:byInc, byCatN:byIncN, total:inc},
     footnote:'Avg / mo is the category total divided by the number of months in the selected period.'});
+  var repCatRows = $('rep-cattable').querySelectorAll('[data-catrow]');
+  for(var rri=0; rri<repCatRows.length; rri++)(function(n){
+    n.addEventListener('click', function(){
+      var c = n.getAttribute('data-catrow'), ct = n.getAttribute('data-cattype')||'expense';
+      drillToTransactions({from:from, to:to, type:ct, bp:bpVal, carryCats:repCatSel, dispCats:[c]});
+    });
+  })(repCatRows[rri]);
   wireCatMixSorting($('rep-cattable'));
 
   // --- budget vs actual: paired bars + variance table, follows the report period ---
@@ -8549,13 +8631,17 @@ function renderReports(){
     });
   }
 
-  // --- largest expenses ---
+  // --- largest expenses: merchant on line 1, description on line 2 ---
   var tp = $('rep-top');
   if(!top.length){ tp.innerHTML = '<p class="muted">No expenses in this period.</p>'; }
   else{
-    var th = '<div class="ptablewrap"><table class="ptable"><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>';
+    var th = '<div class="ptablewrap"><table class="ptable top-table"><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr>';
     top.slice(0,10).forEach(function(t){
-      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td>'+esc(t.date||'')+'</td><td>'+esc(t.description||'')+'</td><td>'+esc(repDisplayCat(t))+'</td><td style="text-align:right">'+money(num(t.amount))+'</td></tr>';
+      var merch = String(t.merchant||'').trim(), desc = String(t.description||'').trim();
+      var merchCell = merch
+        ? '<div class="top-merch">'+esc(merch)+'</div>' + ((desc && desc!==merch) ? '<div class="top-desc">'+esc(desc)+'</div>' : '')
+        : '<div class="top-merch">'+esc(desc)+'</div>';
+      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(t.date||'')+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money(num(t.amount))+'</td></tr>';
     });
     tp.innerHTML = th + '</table></div>';
     var tpRows = tp.querySelectorAll('[data-tid]');
