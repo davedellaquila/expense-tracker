@@ -916,7 +916,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="btn" id="rep-print">🖨 Print / PDF</button>
         </div>
         <div style="margin-top:10px">
-          <label class="f" style="margin-top:0">Categories</label>
+          <div class="rowline" id="rep-catfilter-head" role="button" tabindex="0" aria-expanded="true" style="cursor:pointer;border-bottom:none;padding:10px 0">
+            <label class="f" style="margin:0;cursor:pointer">Categories</label>
+            <span class="muted" id="rep-catfilter-chev" style="font-size:14px;flex:none">▾</span>
+          </div>
           <div id="rep-catchips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
       </div>
@@ -2563,6 +2566,14 @@ function renderDashboard(){
    in localStorage; by default every chart shows. */
 var REP_CHART_LIST_KEY = 'expenseTracker.repChartsHidden';
 var repCatSel = []; // reports category filter: [] = all categories
+var REP_CATCOL_KEY = 'expenseTracker.repCatFilterCollapsed';
+function repCatCollapsed(){ try{ return localStorage.getItem(REP_CATCOL_KEY)==='1'; }catch(e){ return false; } }
+function setRepCatCollapsed(c){
+  try{ localStorage.setItem(REP_CATCOL_KEY, c?'1':'0'); }catch(e){}
+  var box = document.getElementById('rep-catchips'); if(box) box.hidden = c;
+  var chev = document.getElementById('rep-catfilter-chev'); if(chev) chev.textContent = c ? '▸' : '▾';
+  var head = document.getElementById('rep-catfilter-head'); if(head) head.setAttribute('aria-expanded', c?'false':'true');
+}
 var REP_CHARTS = {
   catmix:'Category Mix', catmixtable:'Category Mix table', budget:'Budget vs Actual',
   trend:'Monthly Trend', merch:'Top Merchants', week:'Weekday Pattern',
@@ -8082,6 +8093,15 @@ function wireReports(){
   $('rep-from').addEventListener('change', renderReports);
   $('rep-to').addEventListener('change', renderReports);
   $('rep-print').addEventListener('click', function(){ window.print(); });
+  // collapsible category filter chips header: persisted in localStorage, default expanded
+  var cfHead = $('rep-catfilter-head');
+  if(cfHead){
+    cfHead.addEventListener('click', function(){ setRepCatCollapsed(!repCatCollapsed()); });
+    cfHead.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); setRepCatCollapsed(!repCatCollapsed()); }
+    });
+    setRepCatCollapsed(repCatCollapsed());
+  }
 }
 function renderReports(){
   var acct = $('rep-acct').value;
@@ -8115,6 +8135,7 @@ function renderReports(){
       _chipBox.appendChild(_b);
     });
   }
+  setRepCatCollapsed(repCatCollapsed()); // keep collapsed state across re-renders
   if(repCatSel.length){
     rows = rows.filter(function(t){
       if(t.txn_type!=='income' && t.txn_type!=='expense') return true;
