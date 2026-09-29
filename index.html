@@ -395,6 +395,8 @@ textarea{resize:vertical; min-height:64px;}
   .ptable [data-scol="txns"], .ptable [data-scol="avg"], .ptable [data-scol="pct"]{display:none;}
   /* category mix table: drop the 640px min-width so it fits the phone screen */
   .ptable.mix{min-width:0;}
+  /* category mix donuts: stack the three vertically, one per row */
+  .donut-trio{grid-template-columns:1fr;}
   /* transactions filters: keep 2 columns on phones too (Dave's call) */
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
