@@ -8497,10 +8497,24 @@ function renderReports(){
     rfsT.textContent = rangeLabel + ' · ' + rfsCats + (acct==='all' ? '' : ' · '+acct) + ' · ' + rows.length + ' transactions';
   }
   $('rep-stats').innerHTML =
-    statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions') +
-    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions') +
-    statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit') +
-    statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months');
+    statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions', 'data-reptile="income"') +
+    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions', 'data-reptile="expense"') +
+    statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit', 'data-reptile="net"') +
+    statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months', 'data-reptile="avg"');
+  // Summary tiles drill into Transactions filtered to the tile's criterion.
+  var repTiles = $('rep-stats').querySelectorAll('[data-reptile]');
+  for(var rti=0; rti<repTiles.length; rti++)(function(n){
+    n.classList.add('rep-click');
+    n.setAttribute('title', 'Show transactions');
+    n.addEventListener('click', function(){
+      var k = n.getAttribute('data-reptile');
+      var o = {from:from, to:to, bp:bpVal, carryCats:repCatSel};
+      if(k==='income') o.type = 'income';
+      else if(k==='expense' || k==='avg') o.type = 'expense';
+      // Net: no type filter — everything behind the net.
+      drillToTransactions(o);
+    });
+  })(repTiles[rti]);
 
   // --- category mix donut ---
   var cc = $('rep-catchart');
@@ -8844,8 +8858,8 @@ function renderReports(){
   });
   wireRepChartCards();
 }
-function statHtml(label, value, cls, sub){
-  return '<div class="stat"><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
+function statHtml(label, value, cls, sub, attr){
+  return '<div class="stat"'+(attr?' '+attr:'')+'><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
 }
 function renderTaxGroup(node, rows, drillBase){
   node.innerHTML='';
