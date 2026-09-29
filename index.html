@@ -4630,7 +4630,7 @@ function restoreBotDraft(ym){
     var raw = localStorage.getItem(BOT_DRAFT_LS+ym);
     if(!raw) return;
     var d = JSON.parse(raw);
-    if(!d || d.month!==ym || !Array.isArray(d.rows) || !d.rows.length) return;
+    if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
     botProposal = d;
     botRenderTable();
     botRenderGoalInputs();
@@ -4688,6 +4688,15 @@ function botAllocateCuts(rows, gap){
 function botProposalTotal(){
   return botProposal.rows.reduce(function(s,r){ return s + (r.locked ? num(r.amount) : 0); }, 0);
 }
+/* Paycheck or not? Category wins; otherwise look for payroll-like text in the
+   merchant/description. Anything else typed as income (Daily Cash, refunds)
+   doesn't count. */
+function isPaycheckIncome(t){
+  var c = (t.category||'').toLowerCase();
+  if(c==='paycheck' || c==='salary' || c==='wages') return true;
+  var h = ((t.merchant||'')+' '+(t.description||'')).toLowerCase();
+  return /payroll|direct\s*deposit|paycheck|\bsalary\b/.test(h);
+}
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var prior = [monthAdd(ym,-1), monthAdd(ym,-2), monthAdd(ym,-3)];
@@ -4703,12 +4712,14 @@ function botPropose(){
   });
   // Year-to-date totals: Jan 1 of the budget year through the selected month,
   // divided by the calendar months elapsed. Transfers excluded throughout.
+  // Income counts paychecks only (category or payroll-like text), so Daily Cash
+  // and refunds don't inflate it.
   var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
   var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncome = 0;
   state.transactions.forEach(function(t){
     if(!t.date || t.date<y0 || t.date>=yEnd) return;
     if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
-    if(t.txn_type==='income'){ ytdIncome += num(t.amount); return; }
+    if(t.txn_type==='income'){ if(isPaycheckIncome(t)) ytdIncome += num(t.amount); return; }
     if(t.txn_type!=='expense') return;
     var c = t.category || 'Uncategorized';
     ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
@@ -4719,7 +4730,7 @@ function botPropose(){
     var ytdAvg = ytdSums[c]/ytdMonths;
     return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  botProposal = {month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdMonths:ytdMonths};
+  botProposal = {v:2, month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdMonths:ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -4789,7 +4800,7 @@ function botRenderTable(){
   host.appendChild(tot);
   if(botProposal.avgIncome > 0){
     host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
-      'You bring in about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
+      'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
   }
   persistBotDraft();
 }
@@ -4827,7 +4838,7 @@ function botSuggest(){
     if(!(want>0)){ toast('Enter how much you want to save per month.', true); return; }
     var projected = botProposal.avgIncome - total;
     var gap = want - Math.max(0, projected);
-    note = 'You bring in ~'+money(Math.round(botProposal.avgIncome))+'/mo; this draft spends '+money(Math.round(total))+'/mo.';
+    note = 'Your paycheck averages ~'+money(Math.round(botProposal.avgIncome))+'/mo; this draft spends '+money(Math.round(total))+'/mo.';
     if(gap<=0){
       host.appendChild(el('p',{style:'margin:0'},'Good news — this draft already leaves about '+money(Math.round(projected))+'/mo unspent, which covers your '+money(want)+' goal.'));
       return;
