@@ -747,6 +747,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
               <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
               <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
               <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
+              <button class="linkbtn" id="f-export" type="button" style="flex:none">Export CSV</button>
             </div></div>
         </div>
       </div>
@@ -775,6 +776,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
           <button class="linkbtn" id="f-tidy-stick" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
           <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
+          <button class="linkbtn" id="f-export-stick" type="button" style="flex:none">Export CSV</button>
         </div>
       </div>
       <div id="txn-drill"></div>
@@ -3369,6 +3371,8 @@ function wireTransactions(){
   });
   $('f-reset').addEventListener('click', resetTxnFilters);
   $('f-reset-stick').addEventListener('click', resetTxnFilters);
+  $('f-export').addEventListener('click', exportVisibleTxns);
+  $('f-export-stick').addEventListener('click', exportVisibleTxns);
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
@@ -3845,6 +3849,17 @@ function resetTxnFilters(){
   txnDrill = null; // also clear any chart drill selection
   saveTxnFilters(); // persist the reset (cleared) filter state
   renderTransactions();
+}
+/* Export the currently visible Transactions list (same filters and sort as the
+   page shows) to a spreadsheet-ready CSV. */
+function exportVisibleTxns(){
+  var rows = state.transactions.filter(txnVisible);
+  txnSortRows(rows);
+  if(!rows.length){ toast('Nothing to export — no transactions match the current filters.', true); return; }
+  var d = new Date(), p = function(n){ return String(n).padStart(2,'0'); };
+  var stamp = d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+  downloadCsv('transactions-'+stamp+'.csv', TXN_HEADERS, rows);
+  toast('Exported '+rows.length+' transaction'+(rows.length===1?'':'s')+'.');
 }
 /* Chart drill-through: single-category drills set the native Transactions
    category dropdown (the pre-pill behavior); multi-category drills set the
