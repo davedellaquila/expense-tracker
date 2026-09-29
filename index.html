@@ -598,6 +598,13 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             </select>
           </div>
         </div>
+        <div style="margin-top:10px">
+          <div class="rowline" id="dash-catfilter-head" role="button" tabindex="0" aria-expanded="true" style="cursor:pointer;border-bottom:none;padding:10px 0">
+            <label class="f" style="margin:0;cursor:pointer">Categories</label>
+            <span class="muted" id="dash-catfilter-chev" style="font-size:14px;flex:none">▾</span>
+          </div>
+          <div id="dash-catchips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
       </div>
       <div class="stat-grid">
         <div class="stat" id="tile-income" style="cursor:pointer"><div class="label">Income</div><div class="value pos" id="stat-income">$0</div><div class="split" id="stat-income-split"></div></div>
@@ -2463,6 +2470,15 @@ function wireDashboard(){
   $('dash-from').addEventListener('change', renderDashboard);
   $('dash-to').addEventListener('change', renderDashboard);
   $('dash-acct').addEventListener('change', renderDashboard);
+  // collapsible category filter chips header: persisted in localStorage, default expanded
+  var cfHead = $('dash-catfilter-head');
+  if(cfHead){
+    cfHead.addEventListener('click', function(){ setDashCatCollapsed(!dashCatCollapsed()); });
+    cfHead.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); setDashCatCollapsed(!dashCatCollapsed()); }
+    });
+    setDashCatCollapsed(dashCatCollapsed());
+  }
   $('dash-add-chart').addEventListener('change', function(){
     if(!this.value) return;
     var l = dashChartList();
@@ -2475,6 +2491,43 @@ function renderDashboard(){
   var from = range.from, to = range.to, acct = $('dash-acct').value;
   var bpVal = acct==='all' ? '' : acct;
   var rows = txnsForRange(from, to, acct);
+  // --- category filter chips (multi-select, same pattern as the Reports page) ---
+  var _dCatSeen = {}, _dAllCats = [];
+  rows.forEach(function(t){
+    if(t.txn_type!=='income' && t.txn_type!=='expense') return; // transfers never filtered
+    var _cc = repDisplayCat(t);
+    if(_cc==='Transfers') return;
+    if(!_dCatSeen[_cc]){ _dCatSeen[_cc] = 1; _dAllCats.push(_cc); }
+  });
+  _dAllCats.sort();
+  dashCatSel = dashCatSel.filter(function(c){ return !!_dCatSeen[c]; }); // prune cats absent this period
+  var _dSel = {};
+  dashCatSel.forEach(function(c){ _dSel[c] = 1; });
+  var _dChipBox = $('dash-catchips');
+  if(_dChipBox){
+    _dChipBox.innerHTML = '';
+    var _dAll = el('button',{class:'catchip'+(dashCatSel.length?'':' on'), type:'button'},'All');
+    _dAll.addEventListener('click', function(){ dashCatSel = []; renderDashboard(); });
+    _dChipBox.appendChild(_dAll);
+    _dAllCats.forEach(function(c){
+      var _b = el('button',{class:'catchip'+(_dSel[c]?' on':''), type:'button'}, c);
+      _b.addEventListener('click', function(){
+        var _i = dashCatSel.indexOf(c);
+        if(_i>=0) dashCatSel.splice(_i,1); else dashCatSel.push(c);
+        renderDashboard();
+      });
+      _dChipBox.appendChild(_b);
+    });
+  }
+  setDashCatCollapsed(dashCatCollapsed()); // keep collapsed state across re-renders
+  if(dashCatSel.length){
+    rows = rows.filter(function(t){
+      if(t.txn_type!=='income' && t.txn_type!=='expense') return true; // transfers always pass
+      var _cc = repDisplayCat(t);
+      if(_cc==='Transfers') return true;
+      return !!_dSel[_cc];
+    });
+  }
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
   var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatNInc = {}, byMonth = {};
@@ -2573,6 +2626,21 @@ function setRepCatCollapsed(c){
   var box = document.getElementById('rep-catchips'); if(box) box.hidden = c;
   var chev = document.getElementById('rep-catfilter-chev'); if(chev) chev.textContent = c ? '▸' : '▾';
   var head = document.getElementById('rep-catfilter-head'); if(head) head.setAttribute('aria-expanded', c?'false':'true');
+}
+
+/* ---- home page category filter chips ----
+   Same multi-select pattern as the Reports page. dashCatSel holds the selected
+   display categories ([] = all); transfers are never filtered out. Selection is
+   in-memory and independent of the Reports filter; only the collapsed state
+   persists, under its own localStorage key. */
+var dashCatSel = [];
+var DASH_CATCOL_KEY = 'expenseTracker.dashCatFilterCollapsed';
+function dashCatCollapsed(){ try{ return localStorage.getItem(DASH_CATCOL_KEY)==='1'; }catch(e){ return false; } }
+function setDashCatCollapsed(c){
+  try{ localStorage.setItem(DASH_CATCOL_KEY, c?'1':'0'); }catch(e){}
+  var box = document.getElementById('dash-catchips'); if(box) box.hidden = c;
+  var chev = document.getElementById('dash-catfilter-chev'); if(chev) chev.textContent = c ? '▸' : '▾';
+  var head = document.getElementById('dash-catfilter-head'); if(head) head.setAttribute('aria-expanded', c?'false':'true');
 }
 var REP_CHARTS = {
   catmix:'Category Mix', catmixtable:'Category Mix table', budget:'Budget vs Actual',
