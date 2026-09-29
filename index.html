@@ -2095,7 +2095,8 @@ document.addEventListener('DOMContentLoaded', function(){
 /* Keyboard shortcuts: number keys 1-8 jump straight to tabs (browsers reserve
    Cmd+1..8 for their own tab switching and never deliver them to the page),
    and Cmd+Shift+1..8 (or Ctrl+Shift+1..8) does the same with a modifier.
-   Ignored while typing in a field or when a sheet is open. */
+   Ignored while typing in a field or when a sheet is open.
+   Escape clicks the visible Cancel button of the topmost open sheet. */
 (function(){
   var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings'];
   document.addEventListener('keydown', function(e){
@@ -2112,6 +2113,21 @@ document.addEventListener('DOMContentLoaded', function(){
     if(document.querySelector('#modal-root .overlay')) return;
     e.preventDefault();
     showScreen(name);
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Escape' || e.defaultPrevented) return;
+    var ovs = document.querySelectorAll('#modal-root .overlay');
+    if(!ovs.length) return;
+    var top = ovs[ovs.length - 1];
+    var btns = top.querySelectorAll('button');
+    for(var i = btns.length - 1; i >= 0; i--){
+      var b = btns[i];
+      if(!b.disabled && b.offsetParent !== null && /^\s*cancel\s*$/i.test(b.textContent)){
+        e.preventDefault();
+        b.click();
+        return;
+      }
+    }
   });
 })();
 async function boot(){
