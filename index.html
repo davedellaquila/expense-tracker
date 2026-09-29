@@ -629,10 +629,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div id="selbar" class="selbar" hidden>
         <span id="selbar-count">0 selected</span>
         <button class="btn small ghost" id="selbar-all" type="button">All</button>
+        <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
         <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
         <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
-        <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         <button class="btn small" id="selbar-done" type="button">Done</button>
       </div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
@@ -1549,13 +1549,35 @@ function firebaseSdk(){
   return _fbSdk;
 }
 var _fbSignin = null; // in-flight anonymous sign-in (dedupes concurrent calls)
-function firebaseReady(){
+var _fbAuthUser = null;      // last auth user seen via onAuthStateChanged (null = signed out)
+var _fbAuthSettled = false;  // true once the first onAuthStateChanged has fired
+var _fbWatchUid = null;      // uid (or 'none') the app has already loaded data for
+/* Wait for Firebase Auth to finish restoring the persisted session before deciding
+   who the user is. Reading auth.currentUser synchronously races restoration: on a
+   reload it is null for a moment, and signing in anonymously at that point lands a
+   returning user on a fresh empty dataset. */
+function firebaseAuthUser(){
   return firebaseSdk().then(function(){
+    if(_fbAuthSettled) return _fbAuthUser;
+    return new Promise(function(resolve){
+      var unsub = firebase.auth().onAuthStateChanged(function(user){
+        _fbAuthUser = user || null;
+        _fbAuthSettled = true;
+        unsub();
+        resolve(_fbAuthUser);
+      });
+    });
+  });
+}
+function firebaseReady(){
+  return firebaseAuthUser().then(function(user){
+    if(user) return {db: firebase.firestore(), uid: user.uid};
     var auth = firebase.auth();
-    if(auth.currentUser) return {db: firebase.firestore(), uid: auth.currentUser.uid};
     if(!_fbSignin){
       _fbSignin = auth.signInAnonymously().then(function(cred){
         _fbSignin = null;
+        _fbAuthUser = cred.user; _fbAuthSettled = true;
+        _fbWatchUid = cred.user.uid; // the watcher's event for this sign-in is expected
         return cred.user;
       }, function(){
         _fbSignin = null;
@@ -1564,6 +1586,25 @@ function firebaseReady(){
     }
     return _fbSignin.then(function(u){ return {db: firebase.firestore(), uid: u.uid}; });
   });
+}
+/* Persistent auth listener: reload data when the signed-in user actually changes
+   (sign-in/out here or in another tab). The first event is the initial restore,
+   which boot already handles; repeat events for the already-loaded uid are ignored. */
+var _fbWatching = false;
+function firebaseWatchAuth(){
+  firebaseSdk().then(function(){
+    if(_fbWatching) return;
+    _fbWatching = true;
+    firebase.auth().onAuthStateChanged(function(user){
+      _fbAuthUser = user || null;
+      _fbAuthSettled = true;
+      var uid = user ? user.uid : 'none';
+      if(_fbWatchUid === null){ _fbWatchUid = uid; return; }
+      if(uid === _fbWatchUid) return;
+      _fbWatchUid = uid;
+      afterAuthChange(user ? (user.isAnonymous ? 'Signed in anonymously.' : 'Signed in — sync is on.') : 'Signed out.');
+    });
+  }).catch(function(){ _fbWatching = false; });
 }
 /* Surface Google redirect sign-in errors once per page load. */
 var _fbRedirectChecked = false;
@@ -1843,6 +1884,7 @@ async function boot(){
   var kind = storeKind();
   if(kind==='firebase' && !firebaseConfigured()) kind = null; // config removed: choose again
   if(kind==='firebase'){
+    firebaseWatchAuth(); // reload if the user changes after boot (sign-in/out, late restore)
     // Coming back from Google sign-in? Settle it before loading data.
     try{
       var redir = await firebaseCheckRedirect();
@@ -1976,6 +2018,7 @@ async function switchStoreKind(k){
   if(k==='firebase' && !firebaseConfigured()){ toast('Firebase is not set up in this copy of the app yet.', true); return; }
   setStoreKind(k);
   syncStoreSettings();
+  if(k==='firebase') firebaseWatchAuth(); // reload if the user changes after the switch
   if(k==='sheets' && !state.apiUrl){
     toast('Paste your Web app URL below to connect Google Sheets.');
     return;
@@ -2134,13 +2177,24 @@ async function authEmailFlow(mode, btn){
   }
 }
 /* Refresh everything after the Firebase auth user changes. */
-async function afterAuthChange(msg){
+var _authChangeP = null; // in-flight afterAuthChange: concurrent triggers join it instead of double-loading
+function afterAuthChange(msg){
   toast(msg);
-  _store = null; _fbSignin = null; // auth changed: drop the cached store/uid so reads use the new user
-  try{ await loadAll(); }
-  catch(e){ toast('Signed in, but data would not load: '+e.message, true); }
-  try{ await syncStoreSettings(); }catch(e){}
-  showScreen(state.screen);
+  if(_authChangeP) return _authChangeP;
+  _authChangeP = (async function(){
+    _store = null; _fbSignin = null; // auth changed: drop the cached store/uid so reads use the new user
+    try{
+      var cu = firebase.auth().currentUser; // synchronous read: dedupes the watcher's event for this change
+      _fbAuthUser = cu || null; _fbAuthSettled = true;
+      _fbWatchUid = cu ? cu.uid : 'none';
+    }catch(e){}
+    try{ await loadAll(); }
+    catch(e){ toast('Signed in, but data would not load: '+e.message, true); }
+    try{ await syncStoreSettings(); }catch(e){}
+    showScreen(state.screen);
+  })();
+  _authChangeP.then(function(){ _authChangeP = null; }, function(){ _authChangeP = null; });
+  return _authChangeP;
 }
 function wireSettings(){
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
