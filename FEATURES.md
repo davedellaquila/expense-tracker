@@ -25,9 +25,9 @@ live copy of this list.
 - Sort menu in the filter card and in the sticky search bar, kept in sync.
 - Floating sticky search bar appears on scroll, with Bulk update / Tidy / Reset
   shortcuts.
-- Chart drill-through lands here via a dismissible filter pill (temporary — it
-  never rewrites your filters); single-category drills also set the category
-  dropdown.
+- Chart drill-through starts from a clean slate: previous filters are cleared first,
+  then a dismissible filter pill holds the drill context (temporary);
+  single-category drills also set the category dropdown.
 - Select mode with floating action bar: bulk update (bank, merchant name), bulk
   delete with undo.
 - Tidy merchant names: editable suggestions, applied in bulk.
@@ -36,12 +36,18 @@ live copy of this list.
 
 ### Home
 - Income / Expenses / Net tiles (whole dollars), tappable for drill-through.
+- Sticky filter-summary tile appears when the filters scroll off-screen (tap
+  jumps back to the filters).
 - Category Mix donut + table, tappable; Income listed above Expenses.
 - Category chips: multi-select filter for the whole page ("All" clears).
 - Bills card: overdue and due-this-week at a glance.
 - Chart cards: add/remove, drag to reorder, order saved.
 
 ### Reports
+- Summary tiles (Income, Expenses, Net, Avg/month) tappable: each opens
+  Transactions filtered to that tile's data, carrying the report filters.
+- Sticky filter-summary panel appears when the filters scroll off-screen (tap
+  jumps back to the filters).
 - 17 chart cards: monthly trend, weekday pattern, top merchants, category mix
   donut, transaction size bands, owner split (Dave/Nancy), card split by bank,
   category volume, average ticket, category spend trend, owner vs category,
@@ -53,6 +59,8 @@ live copy of this list.
 - Chart cards: add/remove, drag to reorder via grip, order saved per page;
   re-added charts land at the bottom.
 - Collapsible category picker (state saved).
+- Largest expenses card: merchant prominent, description below, both wrap so
+  Category and Amount stay visible on iPhone.
 
 ### Budget
 - Budget Bot: monthly proposals per category with locks, YTD averages,
@@ -89,6 +97,11 @@ live copy of this list.
   on-device options.
 - Signed-in status card in Settings with sign-out beside it.
 - Robust sign-in migration (fixed the stale anonymous identity bug).
+
+### General
+- Filter selections persist across page reloads (Transactions, Reports, Home,
+  Budget month); search text and the drill pill stay transient by design.
+- Icon bar order: Home, Transactions, Reports, Import, Budget, Bills, Tax, Setup.
 
 ## Shipped
 
