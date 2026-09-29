@@ -1,0 +1,1 @@
+{"background_color":"#ffffff","description":"Personal and business expense tracking with tax summaries","display":"standalone","icons":[{"sizes":"192x192","src":"icons/icon-192.png","type":"image/png"},{"sizes":"512x512","src":"icons/icon-512.png","type":"image/png"}],"name":"Expense Tracker","short_name":"Expenses","start_url":"./index.html","theme_color":"#177a52"}
