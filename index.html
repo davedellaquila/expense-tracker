@@ -1661,7 +1661,11 @@ function lastScreen(){
     return SCREENS.indexOf(s)>=0 ? s : null;
   }catch(e){ return null; }
 }
+var scrollPosByScreen = {}; // tab name -> remembered window.scrollY
 function showScreen(name){
+  var same = (state.screen === name);
+  // remember each tab's vertical scroll; restore it when coming back
+  if(state.screen && !same){ scrollPosByScreen[state.screen] = window.scrollY; }
   state.screen = name;
   if(screenPersistOk && SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
   SCREENS.forEach(function(s){
@@ -1678,7 +1682,7 @@ function showScreen(name){
     else if(name==='settings') syncStoreSettings();
   }
   updateFloatTotals();
-  window.scrollTo(0,0);
+  if(!same) window.scrollTo(0, scrollPosByScreen[name] || 0);
 }
 function updateUserChip(){
   $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
