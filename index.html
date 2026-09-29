@@ -4487,7 +4487,7 @@ function mergeImportLogs(remote, local){
     if(!f || !f.h) return;
     var cur = byH[f.h];
     if(!cur){ byH[f.h] = f; return; }
-    var score = function(x){ return (x.bank?2:0)+(importYm(x)?2:0)+(x.filePath?2:0)+(x.period?1:0); };
+    var score = function(x){ return (x.bank?2:0)+(x.acct?2:0)+(importYm(x)?2:0)+(x.filePath?2:0)+(x.period?1:0); };
     if(score(f) > score(cur)) byH[f.h] = f;
   });
   return Object.keys(byH).map(function(h){ return byH[h]; });
@@ -4542,12 +4542,12 @@ function getImportedFiles(){
 function recordImportedFile(info, count, filePath){
   if(!info || !info.h) return;
   var a = getImportedFiles();
-  a.push({h:info.h, name:info.name, bank:info.bank||null, ym:info.ym||null,
+  a.push({h:info.h, name:info.name, bank:info.bank||null, acct:info.acct||null, ym:info.ym||null,
     period:info.ym?null:(info.period||null),
     filePath:filePath||null,
     at:new Date().toISOString(), count:count});
   try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-100))); }catch(e){}
-  renderImportLog(info.bank || 'Other');
+  renderImportLog(info.bank || 'Other', info.acct || 'Unknown account');
   persistImportLog();
 }
 /* Months ('YYYY-MM') covered by a set of import rows. */
@@ -4671,9 +4671,16 @@ function importLogRow(w){
   r.appendChild(left); r.appendChild(right);
   return r;
 }
-/* Import log grouped by bank/card, newest activity first. Tap a group to
-   expand its statements. expandKey opens one group (used after an import). */
-function renderImportLog(expandKey){
+/* Import log grouped by bank/card, then by account under each bank.
+   Tap a group to expand its accounts; tap an account to see its statements.
+   expandKey opens one bank group (expandAcct opens one account within it),
+   used after an import. */
+function acctDisplayLabel(acct, bankKey){
+  var a = String(acct||''), b = String(bankKey||'');
+  if(b && a.toLowerCase().indexOf(b.toLowerCase()+' ')===0) a = a.slice(b.length+1).trim();
+  return a || 'Unknown account';
+}
+function renderImportLog(expandKey, expandAcct){
   var box = $('import-log');
   if(!box) return;
   box.innerHTML='';
@@ -4709,23 +4716,35 @@ function renderImportLog(expandKey){
   var groups = {};
   stored.forEach(function(f, i){
     var k = f.bank || 'Other';
-    var g = groups[k] || (groups[k] = {key:k, entries:[], maxAt:''});
-    g.entries.push({f:f, i:i});
+    var g = groups[k] || (groups[k] = {key:k, entries:[], maxAt:'', accounts:{}});
+    var w = {f:f, i:i};
+    g.entries.push(w);
     if((f.at||'') > g.maxAt) g.maxAt = f.at || '';
+    var ak = f.acct || 'Unknown account';
+    var ag = g.accounts[ak] || (g.accounts[ak] = {key:ak, entries:[], maxAt:''});
+    ag.entries.push(w);
+    if((f.at||'') > ag.maxAt) ag.maxAt = f.at || '';
   });
-  Object.keys(groups).sort(function(a,b){ return groups[a].maxAt < groups[b].maxAt ? 1 : -1; }).forEach(function(k){
-    var g = groups[k];
-    g.entries.sort(function(a,b){ // by statement month, newest first; no-month entries last
+  function sortEntries(arr){
+    arr.sort(function(a,b){ // by statement month, newest first; no-month entries last
       var ya = importYm(a.f), yb = importYm(b.f);
       if(ya && yb && ya!==yb) return ya < yb ? 1 : -1;
       if(ya && !yb) return -1;
       if(yb && !ya) return 1;
       return (a.f.at||'') < (b.f.at||'') ? 1 : -1;
     });
-    var yms = g.entries.map(function(w){ return importYm(w.f); }).filter(Boolean).sort();
+  }
+  function rangeTx(arr){
+    var yms = arr.map(function(w){ return importYm(w.f); }).filter(Boolean).sort();
     var range = yms.length ? fmtMonthPretty(yms[0]) +
       ((yms.length>1 && yms[yms.length-1]!==yms[0]) ? ' – '+fmtMonthPretty(yms[yms.length-1]) : '') : null;
-    var tx = g.entries.reduce(function(s,w){ return s + (+w.f.count||0); }, 0);
+    var tx = arr.reduce(function(s,w){ return s + (+w.f.count||0); }, 0);
+    return {range:range, tx:tx};
+  }
+  Object.keys(groups).sort(function(a,b){ return groups[a].maxAt < groups[b].maxAt ? 1 : -1; }).forEach(function(k){
+    var g = groups[k];
+    sortEntries(g.entries);
+    var grt = rangeTx(g.entries);
     var wrap = el('div',{style:'margin-bottom:2px'});
     var head = el('div',{class:'rowline', style:'cursor:pointer'});
     var hl = el('div');
@@ -4733,12 +4752,40 @@ function renderImportLog(expandKey){
     hl.appendChild(el('span',{class:'muted',style:'font-size:12px;margin-left:6px'},
       g.entries.length+' statement'+(g.entries.length>1?'s':'')));
     hl.appendChild(el('div',{class:'muted',style:'font-size:12px'},
-      (range ? range+' · ' : '')+tx+' txns'));
+      (grt.range ? grt.range+' · ' : '')+grt.tx+' txns'));
     var chev = el('span',{class:'muted',style:'font-size:14px;flex:none'},'▸');
     head.appendChild(hl); head.appendChild(chev);
     var body = el('div',{style:'padding-left:12px'});
     body.hidden = true;
-    g.entries.forEach(function(w){ body.appendChild(importLogRow(w)); });
+    // Account sub-groups under this bank, newest activity first.
+    Object.keys(g.accounts).sort(function(a,b){ return g.accounts[a].maxAt < g.accounts[b].maxAt ? 1 : -1; }).forEach(function(ak){
+      var ag = g.accounts[ak];
+      sortEntries(ag.entries);
+      var art = rangeTx(ag.entries);
+      var awrap = el('div',{style:'margin-bottom:2px'});
+      var ahead = el('div',{class:'rowline', style:'cursor:pointer'});
+      var ahl = el('div');
+      ahl.appendChild(el('b',{style:'font-weight:600'},acctDisplayLabel(ak, g.key)));
+      ahl.appendChild(el('span',{class:'muted',style:'font-size:12px;margin-left:6px'},
+        ag.entries.length+' statement'+(ag.entries.length>1?'s':'')));
+      ahl.appendChild(el('div',{class:'muted',style:'font-size:12px'},
+        (art.range ? art.range+' · ' : '')+art.tx+' txns'));
+      var achev = el('span',{class:'muted',style:'font-size:14px;flex:none'},'▸');
+      ahead.appendChild(ahl); ahead.appendChild(achev);
+      var abody = el('div',{style:'padding-left:12px'});
+      abody.hidden = true;
+      ag.entries.forEach(function(w){ abody.appendChild(importLogRow(w)); });
+      var aopen = false;
+      ahead.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        aopen = !aopen; abody.hidden = !aopen; achev.textContent = aopen ? '▾' : '▸';
+      });
+      if(expandKey && k===expandKey && expandAcct && ak===expandAcct){
+        aopen = true; abody.hidden = false; achev.textContent = '▾';
+      }
+      awrap.appendChild(ahead); awrap.appendChild(abody);
+      body.appendChild(awrap);
+    });
     var open = false;
     head.addEventListener('click', function(){
       open = !open; body.hidden = !open; chev.textContent = open ? '▾' : '▸';
@@ -5169,10 +5216,14 @@ function buildPreviewFromCsv(){
   if(noDate) notices.push(noDate+' row(s) had dates we could not parse — fix them in the preview (YYYY-MM-DD).');
   importRows = out;
   var _mths = importMonthsOfRows(out);
+  var _pmCount = {};
+  out.forEach(function(r){ if(r.payment_method && r.payment_method!=='Other') _pmCount[r.payment_method]=(_pmCount[r.payment_method]||0)+1; });
+  var _acct = Object.keys(_pmCount).sort(function(a,b){ return _pmCount[b]-_pmCount[a]; })[0] || null;
   importFileInfo = csvFileInfo ? Object.assign({}, csvFileInfo, {
     bank:'CSV',
     ym: _mths.length===1 ? _mths[0] : null,
     period: _mths.length>1 ? fmtMonthPretty(_mths[0])+' – '+fmtMonthPretty(_mths[_mths.length-1]) : null,
+    acct: _acct,
     file: csvFileObj || null
   }) : null;
   markDuplicates(out);
@@ -5399,16 +5450,23 @@ function citiPaymentMethod(lines){
          || joined.match(/x{2,}\s*-?\s*\d{3,4}/i);
   return paymentMethodFromAccount(m ? m[0] : '', 'Citibank');
 }
+/* Account label for a statement (e.g. "Wells Fargo xxxxxx8345"), used to
+   sub-group the import log by account under each bank. */
+function stmtAccountLabel(bank, lines){
+  var bankName = bank && bank.name;
+  if(bankName==='Capital One') return capOnePaymentMethod(lines);
+  if(bankName==='Wells Fargo') return wfPaymentMethod(lines);
+  if(bankName==='Citibank') return citiPaymentMethod(lines);
+  if(bankName==='Apple Card') return 'Apple Card';
+  return null;
+}
 function parsePdfTransactions(lines, bank, year, stmtMonth){
   var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
   var done = false; // reached the fine-print disclosures: ignore everything after
   var bankName = bank && bank.name;
-  var stmtPayMethod = bankName==='Capital One' ? capOnePaymentMethod(lines)
-    : bankName==='Wells Fargo' ? wfPaymentMethod(lines)
-    : bankName==='Citibank' ? citiPaymentMethod(lines)
-    : bankName==='Apple Card' ? 'Apple Card' : null;
+  var stmtPayMethod = stmtAccountLabel(bank, lines);
   function setSection(line){
     if(!bank) return false;
     // Checking-statement column headers name both sides at once
@@ -5578,6 +5636,7 @@ function finishPdfParse(pending, year, stmtMonth){
   importFileInfo = pending.fileInfo
     ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, ym:_pdfYm,
         period: _pdfYm ? null : (stmtPeriodLabel(year, stmtMonth)||null),
+        acct: stmtAccountLabel(pending.bank, pending.lines),
         file: pending.file || null})
     : null;
   markDuplicates(rows);
