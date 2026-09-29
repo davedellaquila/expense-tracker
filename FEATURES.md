@@ -17,6 +17,11 @@ it's where ideas wait until Dave says "build it."
   without a walkthrough.
 - **Better app name** (2026-09-29, Dave): think about a better name for the app
   than "Expense Tracker".
+- **Export transactions to CSV** (2026-09-29, Dave): one-tap export from the
+  Transactions page to a spreadsheet-ready CSV with all the necessary fields
+  (date, merchant, amount, type, category, account/bank, notes, ...). Note: the
+  app already has a `downloadCsv()` helper plus CSV downloads on the Tax page,
+  so the building blocks exist.
 
 ## Completed features
 
