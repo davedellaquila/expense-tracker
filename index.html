@@ -1624,6 +1624,7 @@ function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(
 
 /* ================= navigation ================= */
 var SCREENS = ['dashboard','transactions','import','budgets','tax','reports','settings'];
+var screenPersistOk = false; // boot-time renders (dash cache) must not clobber the saved tab
 function lastScreen(){
   try{
     var s = localStorage.getItem('expTrackerScreen');
@@ -1632,7 +1633,7 @@ function lastScreen(){
 }
 function showScreen(name){
   state.screen = name;
-  if(SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
+  if(screenPersistOk && SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
   SCREENS.forEach(function(s){
     $('screen-'+s).hidden = (s!==name);
   });
@@ -1723,6 +1724,7 @@ async function enterApp(){
       showScreen('settings');
     }
   }
+  screenPersistOk = true; // boot done: tab switches now count as the current page
 }
 
 /* ================= setup & settings ================= */
