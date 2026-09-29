@@ -2588,6 +2588,11 @@ function wireTransactions(){
     // filters are always the single source of truth (search composes)
     $(id).addEventListener('change', function(){
       txnDrill = null;
+      if(id==='f-from'){
+        // keep the range valid: To can never be before From
+        var f = $('f-from'), t = $('f-to');
+        if(f.value && t.value && t.value < f.value) t.value = f.value;
+      }
       if(id==='f-preset'||id==='f-from'||id==='f-to') saveTxnPeriod();
       renderTransactions();
     });
