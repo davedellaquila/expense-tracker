@@ -461,6 +461,14 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   .bill-cal .day{min-height:52px;}
 }
 
+/* ---------- desktop: the app is a centered 760px column; scale it down a touch
+   so type doesn't feel oversized on wide screens. Root-level zoom acts like
+   page zoom, so fixed/sticky chrome keeps working. iPads (<=1194px landscape)
+   are untouched. ---------- */
+@media (min-width:1200px){
+  html{ zoom:.85; }
+}
+
 /* ---------- modal ---------- */
 .overlay{
   position:fixed; inset:0; z-index:60; background:rgba(15,20,25,.5);
