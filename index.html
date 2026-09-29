@@ -347,6 +347,7 @@ textarea{resize:vertical; min-height:64px;}
 .repfilterstick .rf-cap{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
 .repfilterstick .rf-sum{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 #rep-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
+#dash-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
 /* Largest expenses: fixed layout so Category/Amount stay visible; merchant wraps */
 table.ptable.top-table{min-width:0; table-layout:fixed; width:100%;}
 table.ptable.top-table th:nth-child(1){width:20%;}
@@ -599,7 +600,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
   <main>
     <!-- DASHBOARD -->
     <section id="screen-dashboard" class="screen">
-      <div class="card">
+      <div class="card" id="dash-filtercard">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
           <div style="flex:1; min-width:150px">
             <label class="f" style="margin-top:0" for="dash-preset">Period</label>
@@ -632,6 +633,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
           <div id="dash-catchips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
+      </div>
+      <div class="searchstick repfilterstick" id="dashfilterstick" hidden role="button" tabindex="0" aria-label="Home filters — activate to scroll back to the filters">
+        <div class="rf-cap">Home filters</div>
+        <div class="rf-sum" id="dashfilterstick-text"></div>
       </div>
       <div class="stat-grid">
         <div class="stat" id="tile-income" style="cursor:pointer"><div class="label">Income</div><div class="value pos" id="stat-income">$0</div><div class="split" id="stat-income-split"></div></div>
@@ -2523,6 +2528,24 @@ function wireDashboard(){
     if(l.indexOf(this.value)<0){ l.push(this.value); saveDashChartList(l); }
     renderDashCharts();
   });
+  // sticky filter summary: appears once the filter card scrolls off-screen
+  // (same IntersectionObserver pattern as Reports); tapping it smooth-scrolls
+  // back to the filters.
+  var dfs = $('dashfilterstick'), dfc = $('dash-filtercard');
+  if(dfs && dfc){
+    var scrollToDashFilters = function(){ dfc.scrollIntoView({behavior:'smooth', block:'start'}); };
+    dfs.addEventListener('click', scrollToDashFilters);
+    dfs.addEventListener('keydown', function(ev){
+      if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); scrollToDashFilters(); }
+    });
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries){
+        var r = entries[0].boundingClientRect;
+        var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='dashboard';
+        dfs.hidden = !offTop;
+      }, {threshold:0}).observe(dfc);
+    }
+  }
   restoreHomeFilters(); // reopen on the saved home filters
 }
 function renderDashboard(){
@@ -2600,6 +2623,14 @@ function renderDashboard(){
   $('stat-income-split').textContent = 'Biz '+money0(incB)+' · Per '+money0(incP);
   $('stat-expense-split').textContent = 'Biz '+money0(expB)+' · Per '+money0(expP);
   $('stat-net-split').textContent = rangeLabel + (acct==='all' ? '' : ' · '+acct);
+  // sticky filter summary tile (shown once the filter card scrolls off-screen)
+  var dfsT = $('dashfilterstick-text');
+  if(dfsT){
+    var dfsCats = !dashCatSel.length ? 'All categories'
+      : dashCatSel.length===1 ? dashCatSel[0]
+      : dashCatSel[0]+' + '+(dashCatSel.length-1)+' more';
+    dfsT.textContent = rangeLabel + ' · ' + dfsCats + (acct==='all' ? '' : ' · '+acct) + ' · ' + rows.length + ' transactions';
+  }
 
   // Bills card: due this week + overdue. Tap to open the Bills page.
   (function(){
