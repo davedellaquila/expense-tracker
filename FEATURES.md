@@ -12,6 +12,84 @@ it's where ideas wait until Dave says "build it."
   one of This device / Google Sheets / Firebase). Build data connectors for
   Supabase, Airtable, and other popular database systems.
 
+## Completed features
+
+Everything built so far, grouped by area (late Sep 2026). The Google Doc is the
+live copy of this list.
+
+### Transactions
+- Full add/edit form: full-width fields, auto-growing merchant/description,
+  compact date picker.
+- Filter card: search, category dropdown, type, bank, period presets + custom;
+  two-column layout on iPhone.
+- Sort menu in the filter card and in the sticky search bar, kept in sync.
+- Floating sticky search bar appears on scroll, with Bulk update / Tidy / Reset
+  shortcuts.
+- Chart drill-through lands here via a dismissible filter pill (temporary — it
+  never rewrites your filters); single-category drills also set the category
+  dropdown.
+- Select mode with floating action bar: bulk update (bank, merchant name), bulk
+  delete with undo.
+- Tidy merchant names: editable suggestions, applied in bulk.
+- Data cleanup: strip statement headers/boilerplate and Wells Fargo debit-card
+  prefixes from merchants, with preview.
+
+### Home
+- Income / Expenses / Net tiles (whole dollars), tappable for drill-through.
+- Category Mix donut + table, tappable; Income listed above Expenses.
+- Category chips: multi-select filter for the whole page ("All" clears).
+- Bills card: overdue and due-this-week at a glance.
+- Chart cards: add/remove, drag to reorder, order saved.
+
+### Reports
+- 17 chart cards: monthly trend, weekday pattern, top merchants, category mix
+  donut, transaction size bands, owner split (Dave/Nancy), card split by bank,
+  category volume, average ticket, category spend trend, owner vs category,
+  spend Pareto, category x month heatmap, budget vs actual, income by category,
+  largest expenses.
+- Category chips multi-select: each selected category renders as its own colored
+  series with a legend.
+- Every chart element clickable, drilling into the transactions behind it.
+- Chart cards: add/remove, drag to reorder via grip, order saved per page;
+  re-added charts land at the bottom.
+- Collapsible category picker (state saved).
+
+### Budget
+- Budget Bot: monthly proposals per category with locks, YTD averages,
+  paycheck-only income detection.
+- Recurring bills floor the proposals; warns when bills + budget exceed income.
+- Sticky summary pill: proposed total, percent of income, expected income.
+
+### Bills
+- Bills tab: month calendar with bill dots (red = overdue), tap-a-day details,
+  upcoming list with badges.
+- Add/edit bills (name, amount, due date, recurrence, category, account, notes);
+  mark paid with optional transaction creation (off by default); recurring bills
+  advance with month-end clamping; delete with confirmation.
+
+### Import
+- In-browser CSV + PDF statement import with auto-categorization and duplicate
+  detection.
+- Transfer auto-detection: "Transfer" in the description imports as a transfer,
+  not income/expense.
+- Credit-card cash back imports as separate income rows (uncheckable in preview).
+- Citi AAdvantage parser: strips rewards boilerplate, cardholder headers, sale
+  dates.
+- Apple Card boilerplate scrubber.
+- Import log: 100 statements grouped by bank, then account, with month
+  backfill; original files kept in Firebase Storage with View buttons.
+
+### Scanners
+- On-device bill scanner (nothing uploaded): pre-fills biller, amount, due date.
+- On-device receipt scanner: pre-fills merchant, total, date.
+- Verify-before-save always; scanned photos retained.
+
+### Sync & storage
+- Firebase (Firestore) backend with multi-device sync; Google Sheets and
+  on-device options.
+- Signed-in status card in Settings with sign-out beside it.
+- Robust sign-in migration (fixed the stale anonymous identity bug).
+
 ## Shipped
 
 _(Ideas move here with the date they went live.)_
