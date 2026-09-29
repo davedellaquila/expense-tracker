@@ -5785,7 +5785,7 @@ function renderReports(){
     bItems.forEach(function(it){
       totB += it.budget; totA += it.actual;
       var v = it.actual - it.budget;
-      bh += '<tr><td>'+esc(it.name)+'</td><td style="text-align:right">'+money(it.budget)+'</td>'+
+      bh += '<tr class="rep-click" data-bcat="'+esc(it.name)+'"><td>'+esc(it.name)+'</td><td style="text-align:right">'+money(it.budget)+'</td>'+
         '<td style="text-align:right">'+money(it.actual)+'</td>'+
         '<td style="text-align:right" class="'+(v>0?'neg':'')+'">'+(v>0?'+':'')+money(v)+'</td>'+
         '<td style="text-align:right">'+(it.budget>0 ? Math.round(it.actual/it.budget*100)+'%' : '—')+'</td></tr>';
@@ -5798,6 +5798,14 @@ function renderReports(){
     bh += '</table></div>';
     if(acct!=='all') bh += '<p class="muted" style="font-size:12px;margin:6px 0 0">Budgets aren\'t split by account — actuals above reflect the '+esc(acct)+' filter.</p>';
     btbl.innerHTML = bh;
+    var bRows = btbl.querySelectorAll('[data-bcat]');
+    for(var bi=0; bi<bRows.length; bi++)(function(n){
+      n.addEventListener('click', function(){
+        var c = n.getAttribute('data-bcat');
+        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[c],
+          label: c + ' · Budget vs Actual · ' + rangeLabel});
+      });
+    })(bRows[bi]);
   }
 
   // --- monthly trend: bars + cumulative line ---
