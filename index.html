@@ -2146,11 +2146,32 @@ document.addEventListener('DOMContentLoaded', function(){
       }
       return;
     }
-    // No sheet open: on the Transactions screen, Escape resets the filter card.
+    // No sheet open: in select mode, Escape exits it via the Done button
+    // (the panel's cancel action); otherwise on the Transactions screen
+    // Escape resets the filter card.
+    if(txnSelectMode){ e.preventDefault(); setTxnSelectMode(false); return; }
     var txnScreen = document.querySelector('#screen-transactions');
     if(txnScreen && !txnScreen.hidden){
       e.preventDefault();
       resetTxnFilters();
+    }
+  });
+  /* Shift+Return clicks the primary ("OK") button of the topmost open sheet:
+     Submit, Save, Delete, Use these details, etc. The primary is the .btn
+     without .ghost; Cancel/secondary buttons are .ghost. Skipped in textareas
+     (Shift+Return stays a newline there) and on focused buttons, which the
+     browser already activates natively. */
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' || !e.shiftKey || e.defaultPrevented) return;
+    var t = e.target;
+    if(t && (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || t.isContentEditable)) return;
+    var ovs = document.querySelectorAll('#modal-root .overlay');
+    if(!ovs.length) return;
+    var top = ovs[ovs.length - 1];
+    var ok = top.querySelector('.btnrow .btn:not(.ghost)') || top.querySelector('.sheet .btn:not(.ghost)');
+    if(ok && !ok.disabled && ok.offsetParent !== null){
+      e.preventDefault();
+      ok.click();
     }
   });
 })();
