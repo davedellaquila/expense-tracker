@@ -272,6 +272,10 @@ textarea{resize:vertical; min-height:64px;}
 .allchip{flex:none; border:1px solid var(--border); background:var(--bg); color:var(--muted);
   border-radius:14px; padding:8px 11px; font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap;}
 .allchip.on{background:var(--blue); border-color:var(--blue); color:#fff;}
+/* reports category filter chips: multi-select, Capital One tracker pattern */
+.catchip{border:1px solid var(--border); background:var(--bg); color:var(--text);
+  border-radius:14px; padding:8px 12px; font-size:15px; font-weight:600; cursor:pointer; white-space:nowrap;}
+.catchip.on{background:var(--blue); border-color:var(--blue); color:#fff;}
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   border:none; border-radius:12px; padding:12px 18px; font-size:17.5px; font-weight:700;
@@ -911,6 +915,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
           <button class="btn" id="rep-print">🖨 Print / PDF</button>
         </div>
+        <div style="margin-top:10px">
+          <label class="f" style="margin-top:0">Categories</label>
+          <div id="rep-catchips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
       </div>
       <div class="card">
         <h2 id="rep-title" style="margin-bottom:2px">Expense report</h2>
@@ -918,22 +926,28 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <p class="muted" style="font-size:12.5px; margin:6px 0 0">Tip: tap any chart to see the underlying transactions.</p>
         <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
       </div>
-      <div class="card"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div><div id="rep-cattable"></div></div>
-      <div class="card"><h2>Budget vs Actual</h2><p class="chart-sub">Budgeted vs spent by category for the selected period</p><div id="rep-budgetchart"></div><div id="rep-budgettable"></div></div>
-      <div class="card"><h2>Monthly Trend</h2><p class="chart-sub">Spend and cumulative total by month</p><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
-      <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants by spend</p><div id="rep-merchchart"></div></div>
-      <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="rep-weekchart"></div></div>
-      <div class="card"><h2>Largest expenses</h2><div id="rep-top"></div></div>
-      <div class="card"><h2>Income by category</h2><div id="rep-inc"></div></div>
-      <div class="card"><h2>Transaction Size Bands</h2><p class="chart-sub">Count of expenses by amount range</p><div id="rep-sizebands"></div></div>
-      <div class="card"><h2>Owner Split</h2><p class="chart-sub">Spend by who entered the transaction</p><div id="rep-ownersplit"></div></div>
-      <div class="card"><h2>Card Split</h2><p class="chart-sub">Spend by bank / payment method</p><div id="rep-cardsplit"></div></div>
-      <div class="card"><h2>Category Volume</h2><p class="chart-sub">Transaction count by category — tap a bar to drill in</p><div id="rep-catvol"></div></div>
-      <div class="card"><h2>Average Ticket</h2><p class="chart-sub">Average expense amount by category — tap a bar to drill in</p><div id="rep-avgticket"></div></div>
-      <div class="card"><h2>Category Spend Trend</h2><p class="chart-sub">Monthly spend stacked by top categories — tap a segment to drill in</p><div id="rep-cattrend"></div></div>
-      <div class="card"><h2>Owner vs Category</h2><p class="chart-sub">Top categories compared by owner — tap a bar to drill in</p><div id="rep-ownercat"></div></div>
-      <div class="card"><h2>Spend Pareto</h2><p class="chart-sub">Cumulative share of spend by category (80/20) — tap a bar to drill in</p><div id="rep-pareto"></div></div>
-      <div class="card"><h2>Category × Month Heatmap</h2><p class="chart-sub">Spend intensity by category and month — tap a cell to drill in</p><div id="rep-heatmap"></div></div>
+      <div class="card" data-repchart="catmix"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div></div>
+      <div class="card" data-repchart="catmixtable"><h2>Category Mix table</h2><p class="chart-sub">Income and expenses by category</p><div id="rep-cattable"></div></div>
+      <div class="card" data-repchart="budget"><h2>Budget vs Actual</h2><p class="chart-sub">Budgeted vs spent by category for the selected period</p><div id="rep-budgetchart"></div><div id="rep-budgettable"></div></div>
+      <div class="card" data-repchart="trend"><h2>Monthly Trend</h2><p class="chart-sub">Spend and cumulative total by month</p><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
+      <div class="card" data-repchart="merch"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants by spend</p><div id="rep-merchchart"></div></div>
+      <div class="card" data-repchart="week"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="rep-weekchart"></div></div>
+      <div class="card" data-repchart="largest"><h2>Largest expenses</h2><div id="rep-top"></div></div>
+      <div class="card" data-repchart="inc"><h2>Income by category</h2><div id="rep-inc"></div></div>
+      <div class="card" data-repchart="bands"><h2>Transaction Size Bands</h2><p class="chart-sub">Count of expenses by amount range</p><div id="rep-sizebands"></div></div>
+      <div class="card" data-repchart="owner"><h2>Owner Split</h2><p class="chart-sub">Spend by who entered the transaction</p><div id="rep-ownersplit"></div></div>
+      <div class="card" data-repchart="card"><h2>Card Split</h2><p class="chart-sub">Spend by bank / payment method</p><div id="rep-cardsplit"></div></div>
+      <div class="card" data-repchart="catvol"><h2>Category Volume</h2><p class="chart-sub">Transaction count by category — tap a bar to drill in</p><div id="rep-catvol"></div></div>
+      <div class="card" data-repchart="avgticket"><h2>Average Ticket</h2><p class="chart-sub">Average expense amount by category — tap a bar to drill in</p><div id="rep-avgticket"></div></div>
+      <div class="card" data-repchart="cattrend"><h2>Category Spend Trend</h2><p class="chart-sub">Monthly spend stacked by top categories — tap a segment to drill in</p><div id="rep-cattrend"></div></div>
+      <div class="card" data-repchart="ownercat"><h2>Owner vs Category</h2><p class="chart-sub">Top categories compared by owner — tap a bar to drill in</p><div id="rep-ownercat"></div></div>
+      <div class="card" data-repchart="pareto"><h2>Spend Pareto</h2><p class="chart-sub">Cumulative share of spend by category (80/20) — tap a bar to drill in</p><div id="rep-pareto"></div></div>
+      <div class="card" data-repchart="heatmap"><h2>Category × Month Heatmap</h2><p class="chart-sub">Spend intensity by category and month — tap a cell to drill in</p><div id="rep-heatmap"></div></div>
+      <div class="card no-print" style="text-align:center">
+        <select id="rep-add-chart" aria-label="Add a chart to the reports page" style="max-width:100%">
+          <option value="">&#65291; Add chart&hellip;</option>
+        </select>
+      </div>
       <div class="card"><p class="muted" style="margin:0">Internal account movements (brokerage, savings, line-of-credit, transfers) are grouped as “Transfers” for display only — your sheet categories are unchanged.</p></div>
     </section>
 
@@ -958,12 +972,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
         </div>
         <div id="set-firebase-box" hidden>
-          <div class="authcard" id="set-auth-card">
-            <span class="authdot"></span>
-            <div style="flex:1;min-width:0">
-              <div class="authtitle" id="set-auth-title">Checking Firebase connection…</div>
-              <div class="muted" id="set-auth-desc" style="font-size:13px;margin-top:3px"></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="authcard" id="set-auth-card" style="flex:1;min-width:0">
+              <span class="authdot"></span>
+              <div style="flex:1;min-width:0">
+                <div class="authtitle" id="set-auth-title">Checking Firebase connection…</div>
+                <div class="muted" id="set-auth-desc" style="font-size:13px;margin-top:3px"></div>
+              </div>
             </div>
+            <button class="btn ghost" id="set-auth-signout" hidden style="flex:none;width:auto">Sign out</button>
           </div>
           <div id="set-auth-box">
             <label class="f">Sync across devices</label>
@@ -980,9 +997,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
                 <button class="btn ghost" id="set-auth-google">Continue with Google</button>
                 <button class="btn ghost" id="set-auth-forgot">Forgot password?</button>
               </div>
-            </div>
-            <div class="btnrow" id="set-auth-out-row" hidden>
-              <button class="btn ghost" id="set-auth-signout">Sign out</button>
             </div>
           </div>
         </div>
@@ -2155,7 +2169,9 @@ async function switchStoreKind(k){
     toast('Could not load from the new storage: '+err.message, true);
   }
 }
+var _copyListRun = 0; // guards the copy-button list against overlapping refreshes
 async function syncStoreSettings(){
+  var _runId = ++_copyListRun;
   var bs = $('build-stamp');
   if(bs) bs.textContent = 'Build ' + BUILD_STAMP;
   var k = storeKind() || 'local';
@@ -2177,7 +2193,7 @@ async function syncStoreSettings(){
     title.textContent = 'Checking Firebase connection…';
     desc.textContent = '';
     $('set-auth-form').hidden = true;
-    $('set-auth-out-row').hidden = true;
+    $('set-auth-signout').hidden = true;
     try{
       var fs = getStore();
       await fs.ping();
@@ -2198,7 +2214,7 @@ async function syncStoreSettings(){
         var method = prov.indexOf('google.com')>=0 ? 'Google' : (prov.indexOf('password')>=0 ? 'email' : 'account');
         title.textContent = 'Signed in as '+(ast.email||ast.uid);
         desc.textContent = 'Signed in with '+method+' — your data syncs across every device signed in to this account.';
-        $('set-auth-out-row').hidden = false;
+        $('set-auth-signout').hidden = false;
       }
     }catch(e){
       card.classList.add('anon');
@@ -2214,6 +2230,7 @@ async function syncStoreSettings(){
     if(other==='firebase' && !firebaseConfigured()) return;
     if(other==='sheets' && !state.apiUrl) return;
     storeForKind(other).list('Transactions').then(function(rows){
+      if(_runId!==_copyListRun) return; // a newer refresh started; don't append stale buttons
       if(!rows.length) return;
       var wrap = el('div', {class:'btnrow'});
       var b = el('button', {class:'btn ghost'});
@@ -2540,12 +2557,80 @@ function renderDashboard(){
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
 
+/* ---- reports page chart picker ----
+   Same UX as the home page: each chart card gets a remove button, and the
+   "Add chart" menu underneath offers whatever is hidden. Hidden picks persist
+   in localStorage; by default every chart shows. */
+var REP_CHART_LIST_KEY = 'expenseTracker.repChartsHidden';
+var repCatSel = []; // reports category filter: [] = all categories
+var REP_CHARTS = {
+  catmix:'Category Mix', catmixtable:'Category Mix table', budget:'Budget vs Actual',
+  trend:'Monthly Trend', merch:'Top Merchants', week:'Weekday Pattern',
+  largest:'Largest expenses', inc:'Income by category', bands:'Transaction Size Bands',
+  owner:'Owner Split', card:'Card Split', catvol:'Category Volume',
+  avgticket:'Average Ticket', cattrend:'Category Spend Trend',
+  ownercat:'Owner vs Category', pareto:'Spend Pareto', heatmap:'Category \u00D7 Month Heatmap'
+};
+function repHiddenCharts(){
+  try{
+    var l = JSON.parse(localStorage.getItem(REP_CHART_LIST_KEY) || 'null');
+    if(Array.isArray(l)) return l.filter(function(k){ return !!REP_CHARTS[k]; });
+  }catch(e){}
+  return [];
+}
+function saveRepHiddenCharts(l){
+  try{ localStorage.setItem(REP_CHART_LIST_KEY, JSON.stringify(l)); }catch(e){}
+}
+function wireRepChartCards(){
+  var hidden = repHiddenCharts();
+  document.querySelectorAll('#screen-reports [data-repchart]').forEach(function(card){
+    var key = card.getAttribute('data-repchart');
+    if(!card.dataset.repWired){
+      card.dataset.repWired = '1';
+      var h2 = card.querySelector('h2');
+      if(h2){
+        var head = el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:8px'});
+        h2.parentNode.insertBefore(head, h2);
+        head.appendChild(h2);
+        h2.style.margin = '0';
+        var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+(REP_CHARTS[key]||key)+' from reports page'},'\u00D7');
+        rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
+        rm.addEventListener('click', function(){
+          saveRepHiddenCharts(repHiddenCharts().concat([key]));
+          wireRepChartCards();
+        });
+        head.appendChild(rm);
+      }
+    }
+    card.style.display = hidden.indexOf(key)>=0 ? 'none' : '';
+  });
+  var addSel = $('rep-add-chart');
+  if(addSel){
+    if(!addSel.dataset.repWired){
+      addSel.dataset.repWired = '1';
+      addSel.addEventListener('change', function(){
+        if(!addSel.value) return;
+        saveRepHiddenCharts(repHiddenCharts().filter(function(x){ return x!==addSel.value; }));
+        wireRepChartCards();
+      });
+    }
+    addSel.innerHTML = '';
+    addSel.appendChild(el('option',{value:''},'\uFF0B Add chart\u2026'));
+    Object.keys(REP_CHARTS).forEach(function(k){
+      if(hidden.indexOf(k)<0) return;
+      addSel.appendChild(el('option',{value:k}, REP_CHARTS[k]));
+    });
+    addSel.value = '';
+  }
+}
+
 /* ---- home page chart picker ----
    One chart viewport; the menu chooses which chart renders. The pick persists. */
 var dashData = null;
 var DASH_CHART_LIST_KEY = 'expenseTracker.dashCharts';
 var DASH_CHARTS = {
   catmix:   {title:'Category Mix',           sub:'Share of total spend'},
+  catmixtable:{title:'Category Mix table',   sub:'Income and expenses by category'},
   merch:    {title:'Top Merchants',          sub:'Largest merchants'},
   week:     {title:'Weekday Pattern',        sub:'Spend by day of week'},
   trend:    {title:'Monthly Trend',          sub:'Spend by month'},
@@ -2560,7 +2645,7 @@ var DASH_CHARTS = {
   pareto:   {title:'Spend Pareto',           sub:'Cumulative share of spend by category (80/20)'},
   heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'}
 };
-var DASH_CHART_DEFAULTS = ['catmix','merch','week','trend','budget'];
+var DASH_CHART_DEFAULTS = ['catmix','catmixtable','merch','week','trend','budget'];
 function dashChartList(){
   try{
     var l = JSON.parse(localStorage.getItem(DASH_CHART_LIST_KEY) || 'null');
@@ -2573,7 +2658,8 @@ function saveDashChartList(l){
 }
 /* Home page: a customizable stack of chart cards. Each card has a remove
    button; the "Add chart" menu underneath offers whatever isn't shown yet.
-   Choices persist. The Reports page always shows every chart type. */
+   Choices persist. The Reports page has the same add/remove UX with its own
+   saved list (every chart shows by default). */
 function renderDashCharts(){
   var d = dashData, wrap = $('dash-charts');
   var list = dashChartList();
@@ -2626,7 +2712,7 @@ function renderDashChartBody(pick, box, c){
       '<div><h3 class="donut-trio-title">Income</h3><div data-dd="inc"></div></div>'+
       '<div><h3 class="donut-trio-title">Expenses</h3><div data-dd="exp"></div></div>'+
       '<div><h3 class="donut-trio-title">Transfers</h3><div data-dd="xfer"></div></div>'+
-      '</div><div data-dd-table></div>';
+      '</div>';
     var catsI = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
     var catsE = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; });
     var catsX = Object.keys(d.byCatXfer).sort(function(a,b){ return d.byCatXfer[b]-d.byCatXfer[a]; });
@@ -2657,19 +2743,20 @@ function renderDashChartBody(pick, box, c){
     donutAllDrill('inc', {type:'income', label:'Income · '+rangeLabel});
     donutAllDrill('exp', {type:'expense', label:'Expenses · '+rangeLabel});
     donutAllDrill('xfer', {type:'', xferOnly:true, label:'Transfers · '+rangeLabel});
-    var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
-    var totI = catsI.reduce(function(sum,c){ return sum+d.byCatInc[c]; }, 0);
-    var tblBox = box.querySelector('[data-dd-table]');
-    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {periodMonths:monthsInRange(d.from, d.to), clickable:true,
-      inc:{byCat:d.byCatInc, byCatN:d.byCatNInc, total:totI}}));
-    var catRows = tblBox.querySelectorAll('[data-catrow]');
+  } else if(pick==='catmixtable'){
+    var tE = 0, tI = 0, kk;
+    for(kk in d.byCatExp) tE += d.byCatExp[kk];
+    for(kk in d.byCatInc) tI += d.byCatInc[kk];
+    box.innerHTML = catMixTable(d.byCatExp, d.byCatNExp, tE, {periodMonths:monthsInRange(d.from, d.to), clickable:true,
+      inc:{byCat:d.byCatInc, byCatN:d.byCatNInc, total:tI}});
+    var catRows = box.querySelectorAll('[data-catrow]');
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-catrow'), ct = n.getAttribute('data-cattype')||'expense';
         dashDrill({type:ct, dispCats:[c], label: c + ' \u00B7 ' + (ct==='income'?'Income':'Expenses') + ' \u00B7 ' + rangeLabel});
       });
     })(catRows[ri]);
-    wireCatMixSorting(tblBox);
+    wireCatMixSorting(box);
   } else if(pick==='merch'){
     var merch = Object.keys(d.byMerch).sort(function(a,b){ return d.byMerch[b]-d.byMerch[a]; }).slice(0,8);
     repHBars(box, merch.map(function(k){ return {name:k, value:d.byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
@@ -7990,6 +8077,40 @@ function renderReports(){
   var bpVal = acct==='all' ? '' : acct;
   var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
   var rows = txnsForRange(from, to, acct);
+  // --- category filter chips (multi-select, Capital One tracker pattern) ---
+  var _catSeen = {}, _allCats = [];
+  rows.forEach(function(t){
+    if(t.txn_type!=='income' && t.txn_type!=='expense') return;
+    var cc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
+    if(!_catSeen[cc]){ _catSeen[cc] = 1; _allCats.push(cc); }
+  });
+  _allCats.sort();
+  repCatSel = repCatSel.filter(function(c){ return !!_catSeen[c]; }); // prune cats absent this period
+  var _sel = {};
+  repCatSel.forEach(function(c){ _sel[c] = 1; });
+  var _chipBox = $('rep-catchips');
+  if(_chipBox){
+    _chipBox.innerHTML = '';
+    var _all = el('button',{class:'catchip'+(repCatSel.length?'':' on'), type:'button'},'All');
+    _all.addEventListener('click', function(){ repCatSel = []; renderReports(); });
+    _chipBox.appendChild(_all);
+    _allCats.forEach(function(c){
+      var _b = el('button',{class:'catchip'+(_sel[c]?' on':''), type:'button'}, c);
+      _b.addEventListener('click', function(){
+        var _i = repCatSel.indexOf(c);
+        if(_i>=0) repCatSel.splice(_i,1); else repCatSel.push(c);
+        renderReports();
+      });
+      _chipBox.appendChild(_b);
+    });
+  }
+  if(repCatSel.length){
+    rows = rows.filter(function(t){
+      if(t.txn_type!=='income' && t.txn_type!=='expense') return true;
+      var cc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
+      return !!_sel[cc];
+    });
+  }
   var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byIncN={}, byMonth={}, byMerch={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
@@ -8007,8 +8128,8 @@ function renderReports(){
   $('rep-title').textContent = 'Expense report';
   $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
   $('rep-stats').innerHTML =
-    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions') +
     statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions') +
+    statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions') +
     statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit') +
     statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months');
 
@@ -8231,6 +8352,7 @@ function renderReports(){
     drillToTransactions({singleMonth:hmMonths[ci], type:'expense', bp:bpVal, dispCats:[hmCats[ri]],
       label: hmCats[ri] + ' · ' + fmtMonthPretty(hmMonths[ci])});
   });
+  wireRepChartCards();
 }
 function statHtml(label, value, cls, sub){
   return '<div class="stat"><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
