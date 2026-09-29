@@ -4244,17 +4244,57 @@ function importPeriodForRows(rows){
   if(!keys.length) return null;
   return keys.length===1 ? fmtMonthPretty(keys[0]) : fmtMonthPretty(keys[0])+' – '+fmtMonthPretty(keys[keys.length-1]);
 }
+/* Best-effort statement-month guess from a filename ("stmt-2026-08.pdf",
+   "August 2026.pdf"). Returns 'YYYY-MM' or null. Only used to prefill the
+   month picker — the user confirms. */
+function guessPeriodFromName(name){
+  var s = String(name||''), m;
+  if((m = s.match(/(20\d{2})[-_]?(\d{2})/)) && +m[2]>=1 && +m[2]<=12) return m[1]+'-'+m[2];
+  if((m = s.match(/(\d{2})[-_](20\d{2})/)) && +m[1]>=1 && +m[1]<=12) return m[2]+'-'+m[1];
+  var mon = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+             jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+  if((m = s.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[-_ ]?(20\d{2})/i))){
+    var k = m[1].slice(0,3).toLowerCase();
+    if(mon[k]) return m[2]+'-'+mon[k];
+  }
+  return null;
+}
+function setImportPeriod(storedIdx, ym){
+  var arr = getImportedFiles();
+  if(!arr[storedIdx] || !/^\d{4}-\d{2}$/.test(ym||'')) return;
+  arr[storedIdx].period = fmtMonthPretty(ym);
+  try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
+  renderImportLog();
+}
 function renderImportLog(){
   var box = $('import-log');
   if(!box) return;
   box.innerHTML='';
-  var a = getImportedFiles().slice().reverse(); // newest first
-  if(!a.length){ box.appendChild(el('p',{class:'muted'},'No imports logged yet.')); return; }
-  a.forEach(function(f){
+  var stored = getImportedFiles();
+  if(!stored.length){ box.appendChild(el('p',{class:'muted'},'No imports logged yet.')); return; }
+  stored.map(function(f, i){ return {f:f, i:i}; }).reverse().forEach(function(w){ // newest first
+    var f = w.f;
     var r = el('div',{class:'rowline'});
     var left = el('div');
     left.appendChild(el('b',null,(f.bank||'File')+(f.period?' · '+f.period:'')));
     left.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.name||'')));
+    if(!f.period){
+      // Imports logged before the month was recorded: one-tap to fill it in.
+      var add = el('button',{class:'linkbtn',type:'button',style:'font-size:12px;padding:2px 0'},'+ add month');
+      add.addEventListener('click', function(){
+        var wrap = el('span');
+        var inp = document.createElement('input');
+        inp.type = 'month';
+        var g = guessPeriodFromName(f.name);
+        if(g) inp.value = g;
+        inp.style.fontSize = '13px';
+        var okb = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
+        okb.addEventListener('click', function(){ if(inp.value) setImportPeriod(w.i, inp.value); });
+        wrap.appendChild(inp); wrap.appendChild(okb);
+        add.replaceWith(wrap);
+      });
+      left.appendChild(add);
+    }
     var right = el('div',{style:'text-align:right;flex:none'});
     right.appendChild(el('b',null,String(f.count||0)+' txns'));
     right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
