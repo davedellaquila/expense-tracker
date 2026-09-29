@@ -2707,6 +2707,9 @@ function setTxnSelectMode(on){
     state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
   }else{
     txnSelected = {};
+    // result tints have served their purpose once the bar is gone
+    bulkDoneIds = {};
+    bulkFailIds = {};
   }
   $('f-select').textContent = on ? 'Done' : 'Bulk update';
   $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
