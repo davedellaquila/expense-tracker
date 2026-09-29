@@ -499,9 +499,9 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
       </div>
       <div class="stat-grid">
-        <div class="stat"><div class="label">Income</div><div class="value pos" id="stat-income">$0</div><div class="split" id="stat-income-split"></div></div>
-        <div class="stat"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
-        <div class="stat"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
+        <div class="stat" id="tile-income" style="cursor:pointer"><div class="label">Income</div><div class="value pos" id="stat-income">$0</div><div class="split" id="stat-income-split"></div></div>
+        <div class="stat" id="tile-expenses" style="cursor:pointer"><div class="label">Expenses</div><div class="value neg" id="stat-expense">$0</div><div class="split" id="stat-expense-split"></div></div>
+        <div class="stat" id="tile-net" style="cursor:pointer"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
       <div class="card">
         <div class="chart-pick-row">
@@ -2252,6 +2252,18 @@ function renderDashboard(){
   $('stat-expense-split').textContent = 'Biz '+money(expB)+' · Per '+money(expP);
   $('stat-net-split').textContent = rangeLabel + (acct==='all' ? '' : ' · '+acct);
 
+  // Tapping a stat tile opens its transactions for this period on the
+  // Transactions page. Net = income + expenses (transfers excluded).
+  function tileDrill(extra){
+    var o = {bp:bpVal};
+    if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
+    for(var k in extra) o[k] = extra[k];
+    drillToTransactions(o);
+  }
+  $('tile-income').onclick = function(){ tileDrill({type:'income', label:'Income · '+rangeLabel}); };
+  $('tile-expenses').onclick = function(){ tileDrill({type:'expense', label:'Expenses · '+rangeLabel}); };
+  $('tile-net').onclick = function(){ tileDrill({type:'', noXfer:true, label:'Net · '+rangeLabel}); };
+
   // best charts: category mix donut, top merchants, weekday pattern
   var byMerch = {}, byDay = [0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
@@ -2320,6 +2332,20 @@ function renderDashChart(){
       dashDrill({type:'', xferOnly:true, rawCats: raws,
         label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Transfers \u00B7 ' + rangeLabel});
     }, 'No transfers in this period.');
+    // Tapping a donut's title or center total drills to every transaction of
+    // that type in the period (slices/legend rows still drill per category).
+    function donutAllDrill(ddKey, extra){
+      var wrap = box.querySelector('[data-dd="'+ddKey+'"]');
+      if(!wrap) return;
+      var fire = function(){ dashDrill(extra); };
+      var title = wrap.parentNode.querySelector('.donut-trio-title');
+      if(title){ title.classList.add('rep-click'); title.addEventListener('click', fire); }
+      var cx = wrap.querySelector('.cx-text');
+      if(cx){ cx.classList.add('rep-click'); cx.addEventListener('click', fire); }
+    }
+    donutAllDrill('inc', {type:'income', label:'Income · '+rangeLabel});
+    donutAllDrill('exp', {type:'expense', label:'Expenses · '+rangeLabel});
+    donutAllDrill('xfer', {type:'', xferOnly:true, label:'Transfers · '+rangeLabel});
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
     var totI = catsI.reduce(function(sum,c){ return sum+d.byCatInc[c]; }, 0);
     var tblBox = box.querySelector('[data-dd-table]');
@@ -2712,6 +2738,9 @@ function txnSortRows(rows){
   });
   return s;
 }
+/* A transfer for display/filter purposes: explicit transfer type, or a
+   transfer-looking category (mirrors the dashboard aggregation). */
+function txnIsTransfer(t){ return t.txn_type==='transfer' || repDisplayCat(t)==='Transfers'; }
 function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
       cat = $('f-cat').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
@@ -2725,7 +2754,8 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(bp && t.business_personal!==bp) return false;
   if(cat && t.category!==cat) return false;
   if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
-  if(txnDrill && txnDrill.xferOnly && repDisplayCat(t)!=='Transfers') return false;
+  if(txnDrill && txnDrill.xferOnly && !txnIsTransfer(t)) return false;
+  if(txnDrill && txnDrill.noXfer && txnIsTransfer(t)) return false;
   if(txnDrill && txnDrill.rawCats && txnDrill.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
   if(txnDrill && txnDrill.weekday!=null){
     if(weekdayIdx(t.date)!==txnDrill.weekday) return false;
@@ -2804,10 +2834,10 @@ function setCatFilter(name){
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var ranged = !!(o.from || o.to);
-  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly)
+  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer)
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
        dispCats:o.dispCats||null, label:o.label||'Report selection',
-       xferOnly:!!o.xferOnly, rawCats:o.rawCats||null}
+       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, rawCats:o.rawCats||null}
     : null;
   if(from && to){
     $('f-preset').value = 'custom';
