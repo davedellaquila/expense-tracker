@@ -559,6 +559,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               <button class="allchip on" id="allchip-f-bank" data-for="f-bank" type="button">All</button>
               <select id="f-bank" style="flex:1;min-width:0"><option value="">All</option></select>
             </div></div>
+          <div><label class="f" style="margin-top:0" for="f-tax">Tax category</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="allchip on" id="allchip-f-tax" data-for="f-tax" type="button">All</button>
+              <select id="f-tax" style="flex:1;min-width:0"><option value="">All</option></select>
+            </div></div>
           <div id="f-custom" class="full" style="display:none;gap:8px">
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
@@ -2515,13 +2520,13 @@ function allCategories(){
   return Object.keys(s).sort();
 }
 function syncAllChips(){
-  ['f-type','f-bp','f-cat','f-bank'].forEach(function(id){
+  ['f-type','f-bp','f-cat','f-bank','f-tax'].forEach(function(id){
     var chip = document.getElementById('allchip-'+id), sel = document.getElementById(id);
     if(chip && sel) chip.classList.toggle('on', sel.value==='');
   });
 }
 function wireTransactions(){
-  ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-bank'].forEach(function(id){
+  ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-bank','f-tax'].forEach(function(id){
     // a manual filter edit replaces any chart drill-down: the visible
     // filters are always the single source of truth (search composes)
     $(id).addEventListener('change', function(){
@@ -2815,8 +2820,18 @@ function allBanks(){
   });
   return list;
 }
+function allTaxCategories(){
+  var s = {};
+  (state.transactions||[]).forEach(function(t){ s[t.tax_category||'Uncategorized'] = true; });
+  var list = Object.keys(s);
+  list.sort(function(a,b){
+    if(a==='Uncategorized') return 1; if(b==='Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
+  return list;
+}
 function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
-      cat = $('f-cat').value, bk = $('f-bank').value, q = $('f-q').value.trim().toLowerCase();
+      cat = $('f-cat').value, bk = $('f-bank').value, tx = $('f-tax').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
   if(txnDrill && txnDrill.from){
     if(m < txnDrill.from || m > txnDrill.to) return false;
@@ -2828,10 +2843,10 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(bp && t.business_personal!==bp) return false;
   if(cat && t.category!==cat) return false;
   if(bk && txnBank(t)!==bk) return false;
+  if(tx && (t.tax_category||'Uncategorized')!==tx) return false;
   if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
   if(txnDrill && txnDrill.xferOnly && !txnIsTransfer(t)) return false;
   if(txnDrill && txnDrill.noXfer && txnIsTransfer(t)) return false;
-  if(txnDrill && txnDrill.taxCat!=null && (t.tax_category||'Uncategorized')!==txnDrill.taxCat) return false;
   if(txnDrill && txnDrill.rawCats && txnDrill.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
   if(txnDrill && txnDrill.weekday!=null){
     if(weekdayIdx(t.date)!==txnDrill.weekday) return false;
@@ -2888,6 +2903,7 @@ function resetTxnFilters(){
   $('f-bp').value = '';
   $('f-cat').value = '';
   $('f-bank').value = '';
+  $('f-tax').value = '';
   $('f-q').value = '';
   var si = $('f-q-stick'); if(si) si.value = '';
   txnDrill = null; // also clear any chart drill selection
@@ -2905,16 +2921,27 @@ function setCatFilter(name){
   }
   fcat.value = name || '';
 }
+/* Same ensure-the-option-exists treatment for the Tax category filter,
+   used by Tax page drills. */
+function setTaxFilter(name){
+  var ftax = $('f-tax');
+  if(name){
+    var has = false;
+    for(var i=0;i<ftax.options.length;i++) if(ftax.options[i].value===name){ has = true; break; }
+    if(!has) ftax.appendChild(el('option',{value:name},name));
+  }
+  ftax.value = name || '';
+}
 /* Jump to the Transactions screen showing exactly the drilled selection.
    The visible filters are set to match what was clicked (period, type,
    account, category, search) so the selection is transparent and editable. */
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var ranged = !!(o.from || o.to);
-  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer || o.taxCat)
+  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer)
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
        dispCats:o.dispCats||null, label:o.label||'Report selection',
-       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, taxCat:(o.taxCat==null?null:o.taxCat), rawCats:o.rawCats||null}
+       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, rawCats:o.rawCats||null}
     : null;
   if(from && to){
     $('f-preset').value = 'custom';
@@ -2929,6 +2956,9 @@ function drillToTransactions(o){
   setCatFilter((o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
     ? o.dispCats[0] : '');
   $('f-bank').value = ''; // drills don't target banks: never leave a stale bank filter on
+  // tax-category drills (Tax page) show it in the visible Tax category filter
+  // so the selection is transparent; other drills clear any stale tax filter
+  setTaxFilter(o.taxCat || '');
   $('f-q').value = o.q || '';
   var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
   showScreen('transactions');
@@ -2958,6 +2988,15 @@ function renderTransactions(){
     var o = el('option',{value:b},b);
     if(b===keepB) o.selected = true;
     fbank.appendChild(o);
+  });
+  var ftax = $('f-tax');
+  var keepT = ftax.value;
+  ftax.innerHTML='';
+  ftax.appendChild(el('option',{value:''},'All'));
+  allTaxCategories().forEach(function(x){
+    var o = el('option',{value:x},x);
+    if(x===keepT) o.selected = true;
+    ftax.appendChild(o);
   });
 
   renderDrillChip();
