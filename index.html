@@ -699,7 +699,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div class="card">
         <h2>Budget Bot</h2>
-        <p class="muted">Studies your spending so far this year and drafts a monthly budget. Edit any number, lock categories you don't want touched, then set a financial goal and let the bot suggest the trims.</p>
+        <p class="muted">Studies your spending so far this year and drafts a monthly budget. Edit any number, check the categories you don't want the bot to touch, then set a financial goal and let the bot suggest the trims.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="bot-propose" type="button">Propose my budget</button>
         </div>
@@ -5365,7 +5365,7 @@ function botRenderTable(){
   host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-soft);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
@@ -5376,12 +5376,11 @@ function botRenderTable(){
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.disabled = r.locked;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
-    var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — bot may suggest trims':'Lock — bot will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
-    lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
-    line.appendChild(lock);
+    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
+    line.appendChild(check);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
@@ -5655,7 +5654,7 @@ function incBotRenderTable(){
   head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-soft);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
     ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
@@ -5665,12 +5664,11 @@ function incBotRenderTable(){
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.disabled = r.locked;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; incBotRenderTotal(); incBotPersist(); });
     line.appendChild(inp);
-    var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — recalculation may change this':'Lock — recalculation will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
-    lock.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
-    line.appendChild(lock);
+    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
+    line.appendChild(check);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, r.category);
