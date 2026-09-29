@@ -706,7 +706,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <div><label for="aa-cat">Set all: category</label><select id="aa-cat"><option value="">—</option></select></div>
         </div>
         <div class="ptablewrap"><table class="ptable">
-          <thead><tr><th></th><th>Date</th><th>Description</th><th>Amount</th><th>Type</th><th>Account</th><th>Category</th></tr></thead>
+          <thead><tr><th></th><th>Date</th><th>Description</th><th>Amount</th><th>Type</th><th>Account</th><th>Category</th><th>Pay method</th></tr></thead>
           <tbody id="preview-body"></tbody>
         </table></div>
         <div class="btnrow stickybar-page">
@@ -4172,6 +4172,33 @@ function openTxnForm(t){
       var ox=el('option',{value:t.payment_method},t.payment_method);
       ox.selected=true; inPay.appendChild(ox);
     }
+    // Bank is the normalized bank (same list as the Transactions Bank filter);
+    // picking one stores it as the payment method, like Bulk update does.
+    var inBank = field('Bank', el('select'));
+    var bankTouched = false;
+    function refreshBankOptions(){
+      var cur = txnBank({payment_method: inPay.value});
+      var opts = allBanks().slice();
+      if(opts.indexOf(cur)<0) opts.push(cur);
+      var prev = inBank.value || cur;
+      inBank.innerHTML='';
+      opts.forEach(function(b){
+        var o=el('option',{value:b},b);
+        if(b===prev) o.selected=true;
+        inBank.appendChild(o);
+      });
+    }
+    refreshBankOptions();
+    inBank.addEventListener('change', function(){ bankTouched = true; });
+    inPay.addEventListener('change', function(){
+      if(bankTouched) return;
+      // follow the payment method until the user picks a bank explicitly
+      var cur = txnBank({payment_method: inPay.value});
+      var found = false;
+      for(var i=0;i<inBank.options.length;i++) if(inBank.options[i].value===cur){ found=true; break; }
+      if(!found) inBank.appendChild(el('option',{value:cur},cur));
+      inBank.value = cur;
+    });
     var inNotes = field('Notes', el('textarea',{placeholder:'Optional'}));
     if(t&&t.notes) inNotes.value=t.notes;
     fitFieldToContent(inNotes, 20);
@@ -4247,7 +4274,7 @@ function openTxnForm(t){
         category: newCatName,
         tax_category: inTax.value,
         business_personal: curBp,
-        payment_method: inPay.value,
+        payment_method: bankTouched ? inBank.value : inPay.value,
         notes: inNotes.value.trim(),
         entered_by: state.userName||''
       };
@@ -4843,6 +4870,10 @@ function renderPreview(){
       var cb = el('span',{class:'confbadge '+r._conf, title:'Category was guessed automatically — change it if wrong.'},cbLabel);
       td6.appendChild(cb);
     }
+
+    var pIn = el('input',{type:'text',value:r.payment_method||'Other',style:'width:130px'});
+    pIn.addEventListener('change', function(){ r.payment_method = pIn.value.trim()||'Other'; });
+    var td7 = el('td'); td7.appendChild(pIn); tr.appendChild(td7);
 
     body.appendChild(tr);
   });
