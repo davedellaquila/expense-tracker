@@ -408,9 +408,10 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   flex:1; border:none; background:none; cursor:pointer; color:var(--muted);
   font-size:10.5px; font-weight:600; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:3px; padding:6px 0;
+  margin:4px 3px; border-radius:14px;
 }
 .tabbar button svg{width:22px; height:22px;}
-.tabbar button.on{color:var(--accent);}
+.tabbar button.on{color:var(--accent); background:var(--accent-faint);}
 .tabbar .tab-short{display:none;}
 @media (max-width:560px){
   .tabbar .tab-full{display:none;}
@@ -461,12 +462,12 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   .bill-cal .day{min-height:52px;}
 }
 
-/* ---------- desktop: the app is a centered 760px column; scale it down a touch
-   so type doesn't feel oversized on wide screens. Root-level zoom acts like
-   page zoom, so fixed/sticky chrome keeps working. iPads (<=1194px landscape)
-   are untouched. Dropdown menus get an extra step down (~15px effective). ---------- */
+/* ---------- desktop: the app is a centered 760px column; scale type down so it
+   doesn't feel oversized on wide screens (body 18px -> ~10px effective).
+   Root-level zoom acts like page zoom, so fixed/sticky chrome keeps working.
+   iPads (<=1194px landscape) are untouched. ---------- */
 @media (min-width:1200px){
-  html{ zoom:.8; }
+  html{ zoom:.56; }
   select{ font-size:19px; }
 }
 
