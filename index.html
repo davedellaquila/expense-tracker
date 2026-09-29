@@ -5039,16 +5039,35 @@ function openTxnForm(t){
         scanBox.appendChild(ex);
       }
     }
+    var lastReceiptScan = null; // snapshot of what the previous scan set, for rollback
+    function rollbackReceiptScan(){
+      if(!lastReceiptScan) return;
+      if(lastReceiptScan.setMerchant){
+        inMerch.value = lastReceiptScan.prev.merchant;
+        inMerch.dispatchEvent(new Event('input', {bubbles:true}));
+        unmarkScanned(inMerch);
+      }
+      if(lastReceiptScan.setAmount){ inAmt.value = lastReceiptScan.prev.amount; unmarkScanned(inAmt); }
+      if(lastReceiptScan.setDate){ inDate.value = lastReceiptScan.prev.date; unmarkScanned(inDate); }
+      lastReceiptScan = null;
+    }
     function startReceiptScan(){
       openScanSheet('receipt', function(res){
         scanPhoto = {blob:res.blob, dataUrl:res.dataUrl};
+        // A fresh scan replaces the previous scan: roll back what the last scan
+        // set first, so fields the new scan didn't find don't keep stale values.
+        rollbackReceiptScan();
+        var snap = {prev:{merchant:inMerch.value, amount:inAmt.value, date:inDate.value},
+                    setMerchant:false, setAmount:false, setDate:false};
         if(res.values.merchant){
           inMerch.value = res.values.merchant;
           inMerch.dispatchEvent(new Event('input', {bubbles:true}));
           markScanned(inMerch);
+          snap.setMerchant = true;
         }
-        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); }
-        if(res.values.date){ inDate.value = res.values.date; markScanned(inDate); }
+        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = true; }
+        if(res.values.date){ inDate.value = res.values.date; markScanned(inDate); snap.setDate = true; }
+        lastReceiptScan = snap;
         renderScanBox();
         toast('Filled from scan \u2014 check the fields, then pick a category.');
       });
@@ -7966,6 +7985,12 @@ function markScanned(input){
   var note = el('div', {class:'scannote'}, '\u2728 Filled from scan');
   input.parentNode.insertBefore(note, input.nextSibling);
 }
+function unmarkScanned(input){
+  if(!input || !input.getAttribute('data-scanned')) return;
+  input.removeAttribute('data-scanned');
+  var n = input.nextSibling;
+  if(n && n.className === 'scannote' && n.parentNode) n.parentNode.removeChild(n);
+}
 /* Store a scan photo with its record. Firebase -> Storage path on the row;
    local backend -> data URL on the row; Sheets backend -> skipped. */
 function uploadScanPhoto(kind, blob){
@@ -8015,16 +8040,37 @@ function openBillForm(b){
         scanBox.appendChild(ex);
       }
     }
+    var lastBillScan = null; // snapshot of what the previous scan set, for rollback
+    function rollbackBillScan(){
+      if(!lastBillScan) return;
+      if(lastBillScan.setName){ inName.value = lastBillScan.prev.name; unmarkScanned(inName); }
+      if(lastBillScan.setAmount){ inAmt.value = lastBillScan.prev.amount; unmarkScanned(inAmt); }
+      if(lastBillScan.setDate){ inDate.value = lastBillScan.prev.date; unmarkScanned(inDate); }
+      if(lastBillScan.paymentInfo && inNotes.value.indexOf(lastBillScan.paymentInfo) !== -1){
+        inNotes.value = inNotes.value.split(lastBillScan.paymentInfo).join('')
+          .replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
+        unmarkScanned(inNotes);
+      }
+      lastBillScan = null;
+    }
     function startBillScan(){
       openScanSheet('bill', function(res){
         scanPhoto = {blob:res.blob, dataUrl:res.dataUrl};
-        if(res.values.name){ inName.value = res.values.name; markScanned(inName); }
-        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); }
-        if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); }
+        // A fresh scan replaces the previous scan: roll back what the last scan
+        // set first, so fields the new scan didn't find don't keep stale values
+        // (manually typed or previously saved values are restored, not cleared).
+        rollbackBillScan();
+        var snap = {prev:{name:inName.value, amount:inAmt.value, date:inDate.value},
+                    setName:false, setAmount:false, setDate:false, paymentInfo:null};
+        if(res.values.name){ inName.value = res.values.name; markScanned(inName); snap.setName = true; }
+        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = true; }
+        if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); snap.setDate = true; }
         if(res.values.paymentInfo){
-          inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + res.values.paymentInfo;
+          snap.paymentInfo = res.values.paymentInfo;
+          inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + snap.paymentInfo;
           markScanned(inNotes);
         }
+        lastBillScan = snap;
         renderScanBox();
         toast('Filled from scan \u2014 check the fields.');
       });
