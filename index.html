@@ -4724,13 +4724,17 @@ function botPropose(){
   // Income counts paychecks only (category or payroll-like text), so Daily Cash
   // and refunds don't inflate it.
   var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
-  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncome = 0;
+  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncSums = {}, ytdIncome = 0;
   state.transactions.forEach(function(t){
     if(!t.date || t.date<y0 || t.date>=yEnd) return;
     if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
-    if(t.txn_type==='income'){ if(isPaycheckIncome(t)) ytdIncome += num(t.amount); return; }
-    if(t.txn_type!=='expense') return;
     var c = t.category || 'Uncategorized';
+    if(t.txn_type==='income'){
+      ytdIncSums[c] = (ytdIncSums[c]||0) + num(t.amount);
+      if(isPaycheckIncome(t)) ytdIncome += num(t.amount);
+      return;
+    }
+    if(t.txn_type!=='expense') return;
     ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
   });
   // Draft amounts come from the YTD monthly average (nice-rounded). The 3-month
@@ -4739,7 +4743,7 @@ function botPropose(){
     var ytdAvg = ytdSums[c]/ytdMonths;
     return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  botProposal = {v:2, month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdMonths:ytdMonths};
+  botProposal = {v:2, month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -4764,9 +4768,10 @@ function botRenderTable(){
   head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
+    var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:#e6f4ea;border-radius:8px':'')});
     var nm = el('div');
-    nm.appendChild(el('b',{style:r.locked?'color:#1e7e34':''},r.category));
+    nm.appendChild(el('b',{style:'color:'+(isInc?'#1e7e34':'#b3261e')},r.category));
     nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
     line.appendChild(nm);
     var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
