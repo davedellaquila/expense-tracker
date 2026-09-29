@@ -649,7 +649,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
 
       <div class="card">
         <h2>Import from PDF statement</h2>
-        <p class="muted">Wells Fargo, Citibank, and Capital One statements are parsed right in your browser — the PDF never leaves your device.</p>
+        <p class="muted">Wells Fargo, Citibank, and Capital One statements are parsed right in your browser. With Firebase storage, the original file is also kept privately so you can reopen it from the import log later.</p>
         <div class="drop">
           <input type="file" id="pdf-file" accept=".pdf,application/pdf">
           <button class="btn ghost" id="pdf-pick">Choose PDF statement</button>
@@ -1519,6 +1519,7 @@ function firebaseSdk(){
       await loadScriptOnce(FB_SDK_BASE+'firebase-app-compat.js');
       await loadScriptOnce(FB_SDK_BASE+'firebase-auth-compat.js');
       await loadScriptOnce(FB_SDK_BASE+'firebase-firestore-compat.js');
+      await loadScriptOnce(FB_SDK_BASE+'firebase-storage-compat.js');
     }
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   })();
@@ -1696,6 +1697,25 @@ FirebaseStore.prototype.setBudget = function(category, month, amount){
   return this._r().then(function(r){
     var row = {category:category, month:month, amount:amount, updated_at:new Date().toISOString()};
     return fbCol(r, 'Budgets').doc(fbDocId('Budgets', row)).set(row);
+  });
+};
+/* Import log: shared across the user's devices. A single doc holding the
+   entry array; localStorage remains the per-device cache/fallback. */
+FirebaseStore.prototype.getImportLog = function(){
+  return this._r().then(function(r){
+    return fbCol(r, 'Meta').doc('importLog').get().then(function(snap){
+      if(!snap.exists) return [];
+      var d = snap.data()||{};
+      return Array.isArray(d.entries) ? d.entries : [];
+    });
+  });
+};
+FirebaseStore.prototype.saveImportLog = function(entries){
+  return this._r().then(function(r){
+    return fbCol(r, 'Meta').doc('importLog').set({
+      entries: (entries||[]).slice(-100),
+      updated_at: new Date().toISOString()
+    });
   });
 };
 FirebaseStore.prototype.uid = function(){
@@ -4225,17 +4245,80 @@ async function hashFile(file){
   }catch(e){ return null; }
 }
 var importFileInfo = null; // {h, name} for the file currently in the preview
+/* Import-log sync: localStorage is the always-available cache; on the Firebase
+   backend the log also lives in Firestore (users/{uid}/meta/importLog) so it
+   is shared across devices. Other backends stay local-only. */
+function importLogRemote(){
+  return (storeKind()==='firebase' && firebaseConfigured()) ? getStore() : null;
+}
+function mergeImportLogs(remote, local){
+  var byH = {};
+  (remote||[]).concat(local||[]).forEach(function(f){
+    if(!f || !f.h) return;
+    var cur = byH[f.h];
+    if(!cur){ byH[f.h] = f; return; }
+    var score = function(x){ return (x.bank?2:0)+(importYm(x)?2:0)+(x.filePath?2:0)+(x.period?1:0); };
+    if(score(f) > score(cur)) byH[f.h] = f;
+  });
+  return Object.keys(byH).map(function(h){ return byH[h]; });
+}
+function persistImportLog(){
+  var st = importLogRemote();
+  if(!st || !st.saveImportLog) return;
+  var entries = getImportedFiles();
+  st.saveImportLog(entries).catch(function(e){ console.warn('import log sync failed:', e); });
+}
+/* Boot: pull the shared log, merge with this device's entries, re-render. */
+function syncImportLog(){
+  var st = importLogRemote();
+  if(!st || !st.getImportLog) return;
+  st.getImportLog().then(function(remote){
+    var local = getImportedFiles();
+    var merged = mergeImportLogs(remote||[], local);
+    try{ localStorage.setItem('et_imported_files', JSON.stringify(merged.slice(-100))); }catch(e){}
+    renderImportLog();
+    if(JSON.stringify(remote||[]) !== JSON.stringify(merged)) persistImportLog();
+  }).catch(function(e){ console.warn('import log sync failed:', e); });
+}
+/* Firebase Storage: keep the original statement file so it can be reopened
+   from the log later. Firebase backend only; needs Storage enabled + rules. */
+function firebaseStorage(){
+  return firebaseSdk().then(function(){
+    if(!firebase.storage) throw new Error('Storage library failed to load.');
+    return firebase.storage();
+  });
+}
+function uploadStatementFile(info){
+  if(!info || !info.file || storeKind()!=='firebase' || !firebaseConfigured()) return Promise.resolve(null);
+  return firebaseReady().then(function(r){
+    return firebaseStorage().then(function(storage){
+      var safeName = String(info.name||'statement').replace(/[^\w.\-]+/g,'_').slice(0,80);
+      var path = 'users/'+r.uid+'/statements/'+String(info.h||'nofp').slice(0,16)+'-'+safeName;
+      return storage.ref(path).put(info.file).then(function(){ return path; });
+    });
+  }).catch(function(e){
+    console.warn('statement upload failed:', e);
+    return null;
+  });
+}
+function openStatementFile(path){
+  firebaseStorage().then(function(storage){ return storage.ref(path).getDownloadURL(); })
+    .then(function(url){ window.open(url, '_blank'); })
+    .catch(function(){ toast('Could not open the statement file.', true); });
+}
 function getImportedFiles(){
   try{ return JSON.parse(localStorage.getItem('et_imported_files')||'[]'); }catch(e){ return []; }
 }
-function recordImportedFile(info, count){
+function recordImportedFile(info, count, filePath){
   if(!info || !info.h) return;
   var a = getImportedFiles();
   a.push({h:info.h, name:info.name, bank:info.bank||null, ym:info.ym||null,
     period:info.ym?null:(info.period||null),
+    filePath:filePath||null,
     at:new Date().toISOString(), count:count});
-  try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-50))); }catch(e){}
+  try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-100))); }catch(e){}
   renderImportLog(info.bank || 'Other');
+  persistImportLog();
 }
 /* Months ('YYYY-MM') covered by a set of import rows. */
 function importMonthsOfRows(rows){
@@ -4278,6 +4361,7 @@ function setImportBank(storedIdx, bank){
   arr[storedIdx].bank = (bank && bank!=='Other') ? bank : null;
   try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
   renderImportLog(arr[storedIdx].bank || 'Other');
+  persistImportLog();
 }
 function bankSelectFor(w){
   var sel = document.createElement('select');
@@ -4315,6 +4399,7 @@ function setImportPeriod(storedIdx, ym){
   delete arr[storedIdx].period;
   try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
   renderImportLog(arr[storedIdx].bank || 'Other');
+  persistImportLog();
 }
 function importLogRow(w){
   var f = w.f;
@@ -4348,6 +4433,11 @@ function importLogRow(w){
   var right = el('div',{style:'text-align:right;flex:none'});
   right.appendChild(el('b',null,String(f.count||0)+' txns'));
   right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
+  if(f.filePath){
+    var vw = el('button',{class:'linkbtn',type:'button',style:'font-size:12px; padding:0; margin-top:2px'},'View');
+    vw.addEventListener('click', function(){ openStatementFile(f.filePath); });
+    right.appendChild(vw);
+  }
   r.appendChild(left); r.appendChild(right);
   return r;
 }
@@ -4432,6 +4522,7 @@ function renderImportLog(expandKey){
     if(!confirm('Forget the list of imported statements? (Your transactions stay untouched.)')) return;
     try{ localStorage.removeItem('et_imported_files'); }catch(e){}
     renderImportLog();
+    persistImportLog();
   });
   box.appendChild(clr);
 }
@@ -4575,6 +4666,7 @@ var TXN_HEADERS = ['id','date','merchant','description','amount','txn_type','cat
 /* ================= import: CSV ================= */
 var csvData = []; // parsed rows (arrays)
 var csvFileInfo = null; // {h, name} fingerprint of the picked CSV
+var csvFileObj = null; // the picked CSV File, kept for statement-file upload
 function parseCsv(text){
   var rows=[], row=[], cur='', inQ=false;
   for(var i=0;i<text.length;i++){
@@ -4625,6 +4717,7 @@ function parseDateFlex(s){
 }
 function wireImport(){
   renderImportLog();
+  syncImportLog(); // pull the shared Firebase log (no-op on other backends)
   /* --- CSV --- */
   $('csv-pick').addEventListener('click', function(){ $('csv-file').click(); });
   $('csv-file').addEventListener('change', function(){
@@ -4632,6 +4725,7 @@ function wireImport(){
     if(!f) return;
     $('csv-name').textContent = f.name;
     csvFileInfo = null;
+    csvFileObj = f;
     hashFile(f).then(function(h){ csvFileInfo = h?{h:h,name:f.name}:null; });
     var rd = new FileReader();
     rd.onload = function(){
@@ -4688,8 +4782,12 @@ function wireImport(){
       await getStore().appendMany('Transactions', rows);
       await loadAll();
       toast(rows.length+' transactions imported.');
-      recordImportedFile(importFileInfo, rows.length);
+      var _fp = await uploadStatementFile(importFileInfo);
+      if(importFileInfo && importFileInfo.file && !_fp && storeKind()==='firebase')
+        toast('Transactions imported, but the original file could not be saved — check Firebase Storage setup.', true);
+      recordImportedFile(importFileInfo, rows.length, _fp);
       clearPreview();
+      csvFileObj = null;
       $('csv-file').value=''; $('pdf-file').value='';
       $('csv-name').textContent=''; $('pdf-name').textContent='';
       $('csv-mapping').hidden = true;
@@ -4840,7 +4938,8 @@ function buildPreviewFromCsv(){
   importFileInfo = csvFileInfo ? Object.assign({}, csvFileInfo, {
     bank:'CSV',
     ym: _mths.length===1 ? _mths[0] : null,
-    period: _mths.length>1 ? fmtMonthPretty(_mths[0])+' – '+fmtMonthPretty(_mths[_mths.length-1]) : null
+    period: _mths.length>1 ? fmtMonthPretty(_mths[0])+' – '+fmtMonthPretty(_mths[_mths.length-1]) : null,
+    file: csvFileObj || null
   }) : null;
   markDuplicates(out);
   var pn = $('preview-notices');
@@ -5197,7 +5296,7 @@ async function handlePdfFile(file){
     var bank = detectBank(headerText);
     var stmtInfo = detectStatementInfo(headerText);
     var year = stmtInfo ? stmtInfo.year : null;
-    pendingPdf = {lines:allLines, bank:bank, fileInfo:fileInfo, stmtMonth: stmtInfo ? stmtInfo.month : null};
+    pendingPdf = {lines:allLines, bank:bank, fileInfo:fileInfo, stmtMonth: stmtInfo ? stmtInfo.month : null, file:file};
     var found = el('div',{class:'notice blue'},
       'Detected: '+(bank?bank.name:'unknown bank (using generic parser)')+
       (year ? ' · '+stmtPeriodLabel(year, stmtInfo.month) : '')+
@@ -5228,7 +5327,8 @@ function finishPdfParse(pending, year, stmtMonth){
   var _pdfYm = (year && stmtMonth) ? year+'-'+String(stmtMonth).padStart(2,'0') : null;
   importFileInfo = pending.fileInfo
     ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, ym:_pdfYm,
-        period: _pdfYm ? null : (stmtPeriodLabel(year, stmtMonth)||null)})
+        period: _pdfYm ? null : (stmtPeriodLabel(year, stmtMonth)||null),
+        file: pending.file || null})
     : null;
   markDuplicates(rows);
   var pn = $('preview-notices');

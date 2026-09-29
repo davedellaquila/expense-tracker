@@ -46,6 +46,31 @@ service cloud.firestore {
 
 Each anonymous user can only read/write their own `users/{uid}` subtree.
 
+## Firebase Storage (keeps original statement files)
+
+The import log can keep the original PDF/CSV so statements can be reopened
+later from the log. This needs Firebase Storage enabled once:
+
+1. **Build → Storage → Get started** → Start in **production mode** → pick
+   the same region as Firestore → Done.
+2. **Storage → Rules** → replace with the rules below → Publish.
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+Each file is stored under `users/{uid}/statements/` in the user's own silo.
+Until Storage is enabled, imports still work — transactions are saved and the
+log is recorded, just without the original file attached (the log entry gets
+no View button).
+
 ## Notes
 
 - The `apiKey` in the web config is a public identifier, not a secret — it is
