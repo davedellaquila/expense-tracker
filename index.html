@@ -668,7 +668,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       <div class="card" id="dash-bills-card" style="cursor:pointer">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div><b>Bills</b> <span class="muted" id="dash-bills-sub"></span></div>
-          <div id="dash-bills-vals" style="font-weight:800"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="dash-bills-vals" style="font-weight:800"></div>
+            <button class="linkbtn" id="dash-bill-add" type="button" style="flex:none">+ Add bill</button>
+          </div>
         </div>
       </div>
       <div id="dash-charts"></div>
@@ -2727,6 +2730,8 @@ function renderDashboard(){
     if(sub) sub.textContent = '';
     var card = $('dash-bills-card');
     if(card) card.onclick = function(){ showScreen('bills'); };
+    var dashBillAdd = $('dash-bill-add');
+    if(dashBillAdd) dashBillAdd.onclick = function(e){ e.stopPropagation(); openBillForm(null); };
   })();
 
   // Tapping a stat tile opens its transactions for this period on the
