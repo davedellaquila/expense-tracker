@@ -4622,6 +4622,7 @@ function renderBudgets(){
     list.appendChild(wrap);
   });
   restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
+  botRecalc(); // refresh calculated values from current transactions; keeps edits/locks
 }
 
 /* ================= budget bot ================= */
@@ -4709,8 +4710,7 @@ function isPaycheckIncome(t){
   var h = ((t.merchant||'')+' '+(t.description||'')).toLowerCase();
   return /payroll|direct\s*deposit|paycheck|\bsalary\b/.test(h);
 }
-function botPropose(){
-  var ym = $('bud-month').value || monthLocal();
+function botCompute(ym){
   var prior = [monthAdd(ym,-1), monthAdd(ym,-2), monthAdd(ym,-3)];
   var sums = {}, lasts = {};
   prior.forEach(function(m, idx){
@@ -4744,9 +4744,46 @@ function botPropose(){
   // average and last month stay on as reference only.
   var rows = Object.keys(ytdSums).filter(function(c){ return ytdSums[c]>0; }).map(function(c){
     var ytdAvg = ytdSums[c]/ytdMonths;
-    return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false};
+    return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false, touched:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  botProposal = {v:2, month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths};
+  return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths};
+}
+/* Refresh a proposal's calculated values from current transactions, keeping the
+   user's edits and locks: rows they typed (or accepted from a suggestion) keep
+   their amounts; untouched rows follow the fresh YTD average. New categories
+   appear; user-added rows with no YTD spend are kept as-is. */
+function botRecalc(){
+  if(!botProposal) return;
+  var ym = $('bud-month').value || monthLocal();
+  if(botProposal.month!==ym) return;
+  var fresh = botCompute(ym);
+  var oldByCat = {};
+  botProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
+  var freshCats = {};
+  var merged = fresh.rows.map(function(fr){
+    freshCats[fr.category] = true;
+    var old = oldByCat[fr.category];
+    if(old){
+      return {category:fr.category, avg:fr.avg, last:fr.last,
+        amount: old.touched ? old.amount : fr.amount,
+        locked: !!old.locked, touched: !!old.touched};
+    }
+    return fr;
+  });
+  botProposal.rows.forEach(function(r){
+    if(!freshCats[r.category]) merged.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
+  });
+  botProposal.rows = merged;
+  botProposal.avgIncome = fresh.avgIncome;
+  botProposal.ytdSums = fresh.ytdSums;
+  botProposal.ytdIncSums = fresh.ytdIncSums;
+  botProposal.ytdMonths = fresh.ytdMonths;
+  botRenderTable();
+}
+function botPropose(){
+  var ym = $('bud-month').value || monthLocal();
+  var c = botCompute(ym);
+  botProposal = {v:2, month:ym, rows:c.rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -4782,7 +4819,7 @@ function botRenderTable(){
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
     inp.disabled = r.locked;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
     var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — bot may suggest trims':'Lock — bot will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
     lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); });
@@ -4804,7 +4841,7 @@ function botRenderTable(){
     var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
-      botProposal.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false});
+      botProposal.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false, touched:false});
       botProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
       botRenderTable(); botRenderGoalInputs();
     });
@@ -4852,7 +4889,7 @@ function botRenderGoalInputs(){
 }
 function botApplySuggestion(s, btn){
   var r = botProposal.rows.filter(function(x){ return x.category===s.category; })[0];
-  if(r) r.amount = s.to;
+  if(r){ r.amount = s.to; r.touched = true; }
   botRenderTable();
   if(btn){ btn.disabled = true; btn.textContent = 'Applied'; }
 }
