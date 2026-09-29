@@ -834,6 +834,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="rep-weekchart"></div></div>
       <div class="card"><h2>Largest expenses</h2><div id="rep-top"></div></div>
       <div class="card"><h2>Income by category</h2><div id="rep-inc"></div></div>
+      <div class="card"><h2>Transaction Size Bands</h2><p class="chart-sub">Count of expenses by amount range</p><div id="rep-sizebands"></div></div>
+      <div class="card"><h2>Owner Split</h2><p class="chart-sub">Spend by who entered the transaction</p><div id="rep-ownersplit"></div></div>
+      <div class="card"><h2>Card Split</h2><p class="chart-sub">Spend by bank / payment method</p><div id="rep-cardsplit"></div></div>
+      <div class="card"><h2>Category Volume</h2><p class="chart-sub">Transaction count by category — tap a bar to drill in</p><div id="rep-catvol"></div></div>
+      <div class="card"><h2>Average Ticket</h2><p class="chart-sub">Average expense amount by category — tap a bar to drill in</p><div id="rep-avgticket"></div></div>
+      <div class="card"><h2>Category Spend Trend</h2><p class="chart-sub">Monthly spend stacked by top categories — tap a segment to drill in</p><div id="rep-cattrend"></div></div>
+      <div class="card"><h2>Owner vs Category</h2><p class="chart-sub">Top categories compared by owner — tap a bar to drill in</p><div id="rep-ownercat"></div></div>
+      <div class="card"><h2>Spend Pareto</h2><p class="chart-sub">Cumulative share of spend by category (80/20) — tap a bar to drill in</p><div id="rep-pareto"></div></div>
+      <div class="card"><h2>Category × Month Heatmap</h2><p class="chart-sub">Spend intensity by category and month — tap a cell to drill in</p><div id="rep-heatmap"></div></div>
       <div class="card"><p class="muted" style="margin:0">Internal account movements (brokerage, savings, line-of-credit, transfers) are grouped as “Transfers” for display only — your sheet categories are unchanged.</p></div>
     </section>
 
@@ -6682,6 +6691,190 @@ function repWeekday(el, days, onBar){
     })(wn[wi]);
   }
 }
+/* Vertical bars (generic): value above, label below. fmtFn formats the value text. */
+function repVBars(el, items, color, emptyMsg, fmtFn, onBar){
+  if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
+  var W=640, H=260, pad={top:28, right:12, bottom:46, left:12};
+  var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
+  var max=Math.max.apply(null, items.map(function(i){ return i.value; }).concat([1]));
+  var step=plotW/items.length, barW=Math.min(56, step*0.6), svg='';
+  items.forEach(function(it, i){
+    var cx=pad.left+(i+0.5)*step, bh=Math.max(2,(it.value/max)*plotH);
+    var x=Math.round(cx-barW/2), y=Math.round(pad.top+plotH-bh);
+    var lbl = it.name.length>14 ? it.name.slice(0,13)+'…' : it.name;
+    svg += '<rect x="'+x+'" y="'+y+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+esc(fmtFn(it.value))+'</title></rect>'+
+      '<text x="'+Math.round(cx)+'" y="'+Math.round(y-8)+'" text-anchor="middle" font-size="12" font-weight="600" class="cx-text">'+esc(fmtFn(it.value))+'</text>'+
+      '<text x="'+Math.round(cx)+'" y="'+(H-12)+'" text-anchor="middle" font-size="12" class="cx-mut"><title>'+esc(it.name)+'</title>'+esc(lbl)+'</text>';
+  });
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var vn = el.querySelectorAll('[data-bar]');
+    for(var vi=0; vi<vn.length; vi++)(function(n){
+      n.addEventListener('click', function(){ onBar(items[parseInt(n.getAttribute('data-bar'),10)]); });
+    })(vn[vi]);
+  }
+}
+/* Horizontal bars with count (not money) values. */
+function repHBarsCount(el, items, color, emptyMsg, onBar){
+  if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
+  var W=720, labelW=200, rowH=36, top=6, bot=6;
+  var H = top + items.length*rowH + bot, max = items[0].value || 1, svg='';
+  items.forEach(function(it, i){
+    var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*(W-labelW-110));
+    var nm = it.name.length>26 ? it.name.slice(0,25)+'…' : it.name;
+    var vc = it.value + (it.value===1?' txn':' txns');
+    svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" class="cx-track"/>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+esc(vc)+'</title></rect>'+
+      '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+esc(vc)+'</text></g>';
+  });
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var hn = el.querySelectorAll('[data-bar]');
+    for(var hi=0; hi<hn.length; hi++)(function(n){
+      n.addEventListener('click', function(){ onBar(items[parseInt(n.getAttribute('data-bar'),10)]); });
+    })(hn[hi]);
+  }
+}
+/* Stacked vertical bars: series=[{name,color,values:[per bucket]}], labels=bucket labels.
+   onSeg(seriesIdx, bucketIdx) on tap. */
+function repStackedVBars(el, series, labels, onSeg){
+  var n = labels.length;
+  if(!series.length || !n){ emptyInto(el,'📊','Nothing here yet.'); return; }
+  var W=760, H=300, pad={top:38, right:12, bottom:46, left:60};
+  var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
+  var max=1, bi, si;
+  for(bi=0; bi<n; bi++){ var s=0; for(si=0; si<series.length; si++) s += series[si].values[bi]||0; if(s>max) max=s; }
+  var step=plotW/n, barW=Math.min(52, step*0.58), svg='';
+  var lx=pad.left;
+  series.forEach(function(sr){
+    svg += '<rect x="'+lx+'" y="8" width="12" height="12" rx="3" fill="'+sr.color+'"/><text x="'+(lx+16)+'" y="18" font-size="12" class="cx-mut">'+esc(sr.name.length>18?sr.name.slice(0,17)+'…':sr.name)+'<title>'+esc(sr.name)+'</title></text>';
+    lx += 20 + Math.min(18, sr.name.length)*7 + 14;
+  });
+  for(bi=0; bi<n; bi++){
+    var x=pad.left+bi*step+(step-barW)/2, yCur=pad.top+plotH;
+    for(si=0; si<series.length; si++){
+      var v=series[si].values[bi]||0, h=(v/max)*plotH;
+      if(h>0.5){
+        yCur -= h;
+        svg += '<rect x="'+Math.round(x)+'" y="'+Math.round(yCur)+'" width="'+Math.round(barW)+'" height="'+Math.round(h)+'" fill="'+series[si].color+'" opacity="0.92"'+(onSeg?' class="rep-click" data-seg="'+si+':'+bi+'"':'')+'><title>'+esc(series[si].name)+' · '+esc(labels[bi])+': '+money(v)+'</title></rect>';
+      }
+    }
+    var cx=pad.left+(bi+0.5)*step;
+    svg += '<text x="'+Math.round(cx)+'" y="'+(H-12)+'" text-anchor="middle" font-size="12" class="cx-mut">'+esc(labels[bi])+'</text>';
+  }
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onSeg){
+    var sn = el.querySelectorAll('[data-seg]');
+    for(var qi=0; qi<sn.length; qi++)(function(nd){
+      nd.addEventListener('click', function(){
+        var p=nd.getAttribute('data-seg').split(':');
+        onSeg(parseInt(p[0],10), parseInt(p[1],10));
+      });
+    })(sn[qi]);
+  }
+}
+/* Grouped vertical bars: series=[{name,color,values:[per label]}], labels=x labels.
+   onBar(seriesIdx, labelIdx) on tap. */
+function repGroupedVBars(el, series, labels, onBar){
+  var n = labels.length;
+  if(!series.length || !n){ emptyInto(el,'📊','Nothing here yet.'); return; }
+  var W=680, H=300, pad={top:38, right:12, bottom:46, left:60};
+  var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
+  var max=1, li, si;
+  for(si=0; si<series.length; si++) for(li=0; li<n; li++) max=Math.max(max, series[si].values[li]||0);
+  var step=plotW/n, groupW=step*0.8, slotW=groupW/series.length, svg='';
+  var lx=pad.left;
+  series.forEach(function(sr){
+    svg += '<rect x="'+lx+'" y="8" width="12" height="12" rx="3" fill="'+sr.color+'"/><text x="'+(lx+16)+'" y="18" font-size="12" class="cx-mut">'+esc(sr.name)+'</text>';
+    lx += 20 + sr.name.length*7 + 14;
+  });
+  for(li=0; li<n; li++){
+    for(si=0; si<series.length; si++){
+      var v=series[si].values[li]||0, h=Math.max(2,(v/max)*plotH);
+      var bw=slotW*0.86, x=pad.left+li*step+(step-groupW)/2+si*slotW+(slotW-bw)/2, y=pad.top+plotH-h;
+      svg += '<rect x="'+Math.round(x)+'" y="'+Math.round(y)+'" width="'+Math.round(bw)+'" height="'+Math.round(h)+'" rx="5" fill="'+series[si].color+'" opacity="0.9"'+(onBar?' class="rep-click" data-gb="'+si+':'+li+'"':'')+'><title>'+esc(series[si].name)+' · '+esc(labels[li])+': '+money(v)+'</title></rect>';
+    }
+    var cx=pad.left+(li+0.5)*step, lab=labels[li];
+    if(lab.length>12) lab=lab.slice(0,11)+'…';
+    svg += '<text x="'+Math.round(cx)+'" y="'+(H-12)+'" text-anchor="middle" font-size="12" class="cx-mut"><title>'+esc(labels[li])+'</title>'+esc(lab)+'</text>';
+  }
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var gn = el.querySelectorAll('[data-gb]');
+    for(var gi=0; gi<gn.length; gi++)(function(nd){
+      nd.addEventListener('click', function(){
+        var p=nd.getAttribute('data-gb').split(':');
+        onBar(parseInt(p[0],10), parseInt(p[1],10));
+      });
+    })(gn[gi]);
+  }
+}
+/* Pareto: descending bars + cumulative-share line + 80% guide. items sorted desc. */
+function repPareto(el, items, onBar){
+  var total = items.reduce(function(s,i){ return s+i.value; }, 0);
+  if(!items.length || !total){ emptyInto(el,'📊','Nothing here yet.'); return; }
+  var W=760, H=320, pad={top:30, right:16, bottom:92, left:60};
+  var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
+  var max=items[0].value||1, step=plotW/items.length, barW=Math.min(44, step*0.6), svg='';
+  var cum=0, pts=[];
+  items.forEach(function(it, i){
+    cum += it.value;
+    pts.push({x:pad.left+(i+0.5)*step, y:pad.top+plotH-(cum/total)*plotH, pct:cum/total});
+  });
+  var y80=pad.top+plotH-0.8*plotH;
+  items.forEach(function(it, i){
+    var h=Math.max(2,(it.value/max)*plotH), x=pad.left+i*step+(step-barW)/2, y=pad.top+plotH-h;
+    var cx=pad.left+(i+0.5)*step, lab=it.name.length>12?it.name.slice(0,11)+'…':it.name;
+    svg += '<rect x="'+Math.round(x)+'" y="'+Math.round(y)+'" width="'+Math.round(barW)+'" height="'+Math.round(h)+'" rx="5" fill="'+REP_TEAL+'" opacity="0.85"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></rect>'+
+      '<text x="'+Math.round(cx)+'" y="'+(pad.top+plotH+16)+'" text-anchor="end" font-size="11" class="cx-mut" transform="rotate(-45 '+Math.round(cx)+' '+(pad.top+plotH+16)+')"><title>'+esc(it.name)+'</title>'+esc(lab)+'</text>';
+  });
+  svg += '<line x1="'+pad.left+'" x2="'+(W-pad.right)+'" y1="'+Math.round(y80)+'" y2="'+Math.round(y80)+'" stroke="#f6c85f" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>'+
+    '<text x="'+(W-pad.right)+'" y="'+Math.round(y80-6)+'" text-anchor="end" font-size="12" fill="#f6c85f">80%</text>'+
+    '<polyline points="'+pts.map(function(p){ return Math.round(p.x)+','+Math.round(p.y); }).join(' ')+'" fill="none" stroke="'+REP_CORAL+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<text x="'+pad.left+'" y="16" font-size="12" class="cx-mut">Bars: category spend</text>'+
+    '<text x="'+(pad.left+190)+'" y="16" font-size="12" fill="'+REP_CORAL+'">Line: cumulative share</text>';
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var pn = el.querySelectorAll('[data-bar]');
+    for(var pi=0; pi<pn.length; pi++)(function(nd){
+      nd.addEventListener('click', function(){ onBar(items[parseInt(nd.getAttribute('data-bar'),10)]); });
+    })(pn[pi]);
+  }
+}
+/* Heatmap: cats rows × months columns, teal intensity by value. onCell(catIdx, monthIdx). */
+function repHeatmap(el, cats, months, matrix, monthKeys, onCell){
+  if(!cats.length || !months.length){ emptyInto(el,'🗺️','Nothing here yet.'); return; }
+  var max=1, ri, ci;
+  for(ri=0; ri<cats.length; ri++) for(ci=0; ci<months.length; ci++) max=Math.max(max, matrix[ri][ci]||0);
+  var W=760, labelW=150, pad={top:24, right:14, bottom:36, left:labelW};
+  var gridW=W-pad.left-pad.right, cellW=gridW/months.length;
+  var cellH=38, H=pad.top+cats.length*cellH+pad.bottom, svg='';
+  for(ri=0; ri<cats.length; ri++){
+    var ry=pad.top+ri*cellH, cnm=cats[ri].length>20?cats[ri].slice(0,19)+'…':cats[ri];
+    svg += '<text x="'+(labelW-10)+'" y="'+Math.round(ry+cellH/2+4)+'" text-anchor="end" font-size="12" class="cx-text"><title>'+esc(cats[ri])+'</title>'+esc(cnm)+'</text>';
+    for(ci=0; ci<months.length; ci++){
+      var v=matrix[ri][ci]||0, inten=v/max, cx=pad.left+ci*cellW;
+      var op = v>0 ? (0.12+0.88*inten) : 0;
+      svg += '<rect x="'+Math.round(cx+2)+'" y="'+Math.round(ry+3)+'" width="'+Math.round(cellW-4)+'" height="'+(cellH-6)+'" rx="6" class="cx-track"/>'+
+        (v>0 ? '<rect x="'+Math.round(cx+2)+'" y="'+Math.round(ry+3)+'" width="'+Math.round(cellW-4)+'" height="'+(cellH-6)+'" rx="6" fill="'+REP_TEAL+'" opacity="'+op.toFixed(2)+'"'+(onCell?' class="rep-click" data-cell="'+ri+':'+ci+'"':'')+'><title>'+esc(cats[ri])+' · '+esc(months[ci])+': '+money(v)+'</title></rect>' : '');
+    }
+  }
+  for(ci=0; ci<months.length; ci++){
+    var lx=pad.left+(ci+0.5)*cellW;
+    svg += '<text x="'+Math.round(lx)+'" y="'+(H-10)+'" text-anchor="middle" font-size="11" class="cx-mut">'+esc(months[ci])+'</text>';
+  }
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onCell){
+    var hn2 = el.querySelectorAll('[data-cell]');
+    for(var hi2=0; hi2<hn2.length; hi2++)(function(nd){
+      nd.addEventListener('click', function(){
+        var p=nd.getAttribute('data-cell').split(':');
+        onCell(parseInt(p[0],10), parseInt(p[1],10));
+      });
+    })(hn2[hi2]);
+  }
+}
 function wireReports(){
   ['rep-preset','rep-acct'].forEach(function(id){ $(id).addEventListener('change', renderReports); });
   $('rep-preset').addEventListener('change', function(){
@@ -6825,6 +7018,118 @@ function renderReports(){
     ics.forEach(function(c){ ih2 += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td></tr>'; });
     ic2.innerHTML = ih2 + '</table></div>';
   }
+
+  // --- transaction size bands (count of expenses by amount range) ---
+  var BANDS = [['Under $25',25],['$25–$99',100],['$100–$249',250],['$250–$499',500],['$500–$999',1000],['$1,000+',Infinity]];
+  var bandCounts = BANDS.map(function(){ return 0; });
+  rows.forEach(function(t){
+    if(t.txn_type!=='expense') return;
+    var a = num(t.amount), bi2 = 0;
+    while(bi2<BANDS.length-1 && a>=BANDS[bi2][1]) bi2++;
+    bandCounts[bi2]++;
+  });
+  repVBars($('rep-sizebands'), BANDS.map(function(b,i){ return {name:b[0], value:bandCounts[i]}; }),
+    REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); });
+
+  // --- owner split (by entered_by) ---
+  var byOwner = {};
+  rows.forEach(function(t){
+    if(t.txn_type!=='expense') return;
+    var o = String(t.entered_by||'').trim() || 'Unknown';
+    byOwner[o] = (byOwner[o]||0) + num(t.amount);
+  });
+  repDonut($('rep-ownersplit'), Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; })
+    .map(function(o){ return {name:o, value:byOwner[o]}; }), null, 'No expenses in this period.');
+
+  // --- card split (by normalized bank) ---
+  var byBank = {};
+  rows.forEach(function(t){
+    if(t.txn_type!=='expense') return;
+    var b = txnBank(t);
+    byBank[b] = (byBank[b]||0) + num(t.amount);
+  });
+  repDonut($('rep-cardsplit'), Object.keys(byBank).sort(function(a,b){ return byBank[b]-byBank[a]; })
+    .map(function(b){ return {name:b, value:byBank[b]}; }), null, 'No expenses in this period.');
+
+  // --- category volume (count by category, horizontal bars) ---
+  var volCats = Object.keys(byCatN).sort(function(a,b){ return byCatN[b]-byCatN[a]; }).slice(0,12);
+  repHBarsCount($('rep-catvol'), volCats.map(function(c){ return {name:c, value:byCatN[c]}; }),
+    '#f6c85f', 'No expenses in this period.', function(it){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
+        label: it.name + ' · Expenses · ' + rangeLabel});
+    });
+
+  // --- average ticket (avg amount by category) ---
+  var avgCats = Object.keys(byCat).sort(function(a,b){ return (byCat[b]/byCatN[b])-(byCat[a]/byCatN[a]); }).slice(0,12);
+  repHBars($('rep-avgticket'), avgCats.map(function(c){ return {name:c, value:byCat[c]/byCatN[c]}; }),
+    '#a78bfa', 'No expenses in this period.', function(it){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
+        label: it.name + ' · Expenses · ' + rangeLabel});
+    });
+
+  // --- category spend trend (monthly stacked by top categories) ---
+  var trendCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,6);
+  var trendMonths = Object.keys(byMonth).sort();
+  var trendLabels = trendMonths.map(function(m){ return m.slice(5)==='01' ? '’'+m.slice(2,4) : m.slice(5); });
+  var trendSeries = trendCats.map(function(c, ci){
+    var vals = trendMonths.map(function(m){
+      var s=0;
+      rows.forEach(function(t){
+        if(t.txn_type==='expense' && repDisplayCat(t)===c && String(t.date||'').slice(0,7)===m) s += num(t.amount);
+      });
+      return s;
+    });
+    return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values:vals};
+  });
+  repStackedVBars($('rep-cattrend'), trendSeries, trendLabels, function(si, mi){
+    drillToTransactions({singleMonth:trendMonths[mi], type:'expense', bp:bpVal, dispCats:[trendCats[si]],
+      label: trendCats[si] + ' · ' + fmtMonthPretty(trendMonths[mi])});
+  });
+
+  // --- owner vs category (grouped bars: top 5 categories × owners) ---
+  var ocCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,5);
+  var ocOwners = Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; }).slice(0,4);
+  var ocSeries = ocOwners.map(function(o, oi){
+    var vals = ocCats.map(function(c){
+      var s=0;
+      rows.forEach(function(t){
+        var oo = String(t.entered_by||'').trim() || 'Unknown';
+        if(t.txn_type==='expense' && oo===o && repDisplayCat(t)===c) s += num(t.amount);
+      });
+      return s;
+    });
+    return {name:o, color:REP_PALETTE[oi%REP_PALETTE.length], values:vals};
+  });
+  repGroupedVBars($('rep-ownercat'), ocSeries, ocCats, function(si, li){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[ocCats[li]],
+      label: ocCats[li] + ' · ' + ocOwners[si] + ' · ' + rangeLabel});
+  });
+
+  // --- spend pareto (cumulative share by category) ---
+  var paretoItems = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; })
+    .map(function(c){ return {name:c, value:byCat[c]}; });
+  repPareto($('rep-pareto'), paretoItems, function(it){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
+      label: it.name + ' · Expenses · ' + rangeLabel});
+  });
+
+  // --- category × month heatmap ---
+  var hmCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,8);
+  var hmMonths = Object.keys(byMonth).sort();
+  var hmLabels = hmMonths.map(function(m){ return m.slice(5)==='01' ? '’'+m.slice(2,4) : m.slice(5); });
+  var hmMatrix = hmCats.map(function(c){
+    return hmMonths.map(function(m){
+      var s=0;
+      rows.forEach(function(t){
+        if(t.txn_type==='expense' && repDisplayCat(t)===c && String(t.date||'').slice(0,7)===m) s += num(t.amount);
+      });
+      return s;
+    });
+  });
+  repHeatmap($('rep-heatmap'), hmCats, hmLabels, hmMatrix, hmMonths, function(ri, ci){
+    drillToTransactions({singleMonth:hmMonths[ci], type:'expense', bp:bpVal, dispCats:[hmCats[ri]],
+      label: hmCats[ri] + ' · ' + fmtMonthPretty(hmMonths[ci])});
+  });
 }
 function statHtml(label, value, cls, sub){
   return '<div class="stat"><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
