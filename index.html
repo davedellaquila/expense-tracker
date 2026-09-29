@@ -213,6 +213,8 @@ input[type=month]{min-width:0;}
 /* edit/add transaction form: fields size to their contents instead of full width */
 .sheet.fitfields input[type=text],.sheet.fitfields input[type=number],.sheet.fitfields input[type=date],
 .sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
+/* ...except fields marked fullw, which always span the form width */
+.sheet.fitfields input.fullw,.sheet.fitfields select.fullw,.sheet.fitfields textarea.fullw{width:100%;}
 /* clear (×) button inside search boxes */
 .clearbtn{position:absolute; right:8px; top:50%; transform:translateY(-50%);
   width:22px; height:22px; border:none; border-radius:50%; padding:0;
@@ -4148,12 +4150,10 @@ function openTxnForm(t){
       return input;
     }
     var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal()}));
-    var inMerch = field('Merchant', el('input',{type:'text',placeholder:'e.g. Costco',autocomplete:'off'}));
+    var inMerch = field('Merchant', el('input',{type:'text',placeholder:'e.g. Costco',autocomplete:'off',class:'fullw'}));
     if(t&&t.merchant) inMerch.value=t.merchant;
-    fitFieldToContent(inMerch);
-    var inDesc = field('Description', el('input',{type:'text',placeholder:'Optional detail',autocomplete:'off'}));
+    var inDesc = field('Description', el('input',{type:'text',placeholder:'Optional detail',autocomplete:'off',class:'fullw'}));
     if(t&&t.description) inDesc.value=t.description;
-    fitFieldToContent(inDesc);
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
     var inCat = field('Category', el('select'));
@@ -4162,7 +4162,7 @@ function openTxnForm(t){
     fitFieldToContent(inNewCat);
     function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; if(inCat.value==='__new__') inNewCat.focus(); }
     var inTax = field('Tax category', el('select'));
-    var inPay = field('Payment method', el('select'));
+    var inPay = field('Payment method', el('select',{class:'fullw'}));
     PAYMENT_METHODS.forEach(function(p){
       var o=el('option',{value:p},p);
       if(t&&t.payment_method===p) o.selected=true;
@@ -4199,9 +4199,8 @@ function openTxnForm(t){
       if(!found) inBank.appendChild(el('option',{value:cur},cur));
       inBank.value = cur;
     });
-    var inNotes = field('Notes', el('textarea',{placeholder:'Optional'}));
+    var inNotes = field('Notes', el('textarea',{placeholder:'Optional',class:'fullw'}));
     if(t&&t.notes) inNotes.value=t.notes;
-    fitFieldToContent(inNotes, 20);
 
     function refreshCats(){
       var prev = inCat.value;
