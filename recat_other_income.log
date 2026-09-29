@@ -1,0 +1,8 @@
+10:44:31 Other Income category default tax_category=''
+10:44:34 fetched 976 transaction rows
+10:44:34 47 expense-typed Other Income rows to recategorize
+10:45:04 progress 10/47
+10:45:09 progress 20/47
+10:45:26 progress 30/47
+10:45:42 progress 40/47
+10:45:53 done: 47 ok, 0 failed, $68624.08 moved

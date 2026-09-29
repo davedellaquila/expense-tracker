@@ -1,0 +1,115 @@
+2026-09-27 02:05:44 fetched 895 rows
+2026-09-27 02:05:44 plan: 342 expense rows to tag
+2026-09-27 02:05:44   Wells Fargo Card 7524: 193
+2026-09-27 02:05:44   Wells Fargo Card 1090: 83
+2026-09-27 02:05:44   Wells Fargo: 35
+2026-09-27 02:05:44   Capital One: 5
+2026-09-27 02:05:44   Wells Fargo xxxxxx7356: 4
+2026-09-27 02:05:44   Wells Fargo xxxxxx9374: 4
+2026-09-27 02:05:44   Wells Fargo Card 2963: 3
+2026-09-27 02:05:44   Wells Fargo Xxxxxx7356: 2
+2026-09-27 02:05:44   Wells Fargo Xxxxxx0184: 2
+2026-09-27 02:05:44   Wells Fargo Xxxxxx9374: 2
+2026-09-27 02:05:44   Wells Fargo xxxxxx9598: 2
+2026-09-27 02:05:44   Wells Fargo xxxxxx4175: 2
+2026-09-27 02:05:44   Wells Fargo Xxxxxx6003: 1
+2026-09-27 02:05:44   Wells Fargo Xxxxxx6956: 1
+2026-09-27 02:05:44   Wells Fargo Xxxxxxxxxxxx4711: 1
+2026-09-27 02:05:44   Wells Fargo xxxxxx6956: 1
+2026-09-27 02:05:44   Wells Fargo xxxxxx3906: 1
+2026-09-27 02:05:44   sample: Wells Fargo Card 2963        Purchase authorized on 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:05:44   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Z7Yzwpp Busines
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:05:44   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Zfxfmvl Busines
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx6003       Online Transfer to Dell'Aquila D Platinum Savings Xxxxxx6003
+2026-09-27 02:05:44   sample: Wells Fargo                  Online Transfer Ref #Ib0Zgl86C5 to Businessline Line of
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx6956       Online Transfer to Bmo Bank NA Chk Xxxxxx6956 D. Dell'Aquila
+2026-09-27 02:05:44   sample: Wells Fargo                  Online Transfer to Dell'Aquila D Ref #Ib0Zkqvzdp Checking Fe
+2026-09-27 02:05:44   sample: Wells Fargo                  Online Transfer to Dellaquila.Com Ref #Ib0Zl2979T Business C
+2026-09-27 02:05:44   sample: Wells Fargo Xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:05:44   sample: Wells Fargo Card 2963        Purchase Authorized On 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:05:44 dry run only; rerun with --apply to write
+2026-09-27 02:12:26 fetched 895 rows
+2026-09-27 02:12:26 plan: 437 expense rows to tag
+2026-09-27 02:12:26   Wells Fargo Card 7524: 193
+2026-09-27 02:12:26   Wells Fargo Card 1090: 96
+2026-09-27 02:12:26   Capital One: 85
+2026-09-27 02:12:26   Wells Fargo: 37
+2026-09-27 02:12:26   Wells Fargo xxxxxx7356: 6
+2026-09-27 02:12:26   Wells Fargo xxxxxx9374: 6
+2026-09-27 02:12:26   Wells Fargo Card 2963: 3
+2026-09-27 02:12:26   Wells Fargo xxxxxx0184: 2
+2026-09-27 02:12:26   Wells Fargo xxxxxx6956: 2
+2026-09-27 02:12:26   Wells Fargo xxxxxx9598: 2
+2026-09-27 02:12:26   Wells Fargo xxxxxx4175: 2
+2026-09-27 02:12:26   Wells Fargo xxxxxx6003: 1
+2026-09-27 02:12:26   Wells Fargo xxxxxxxxxxxx4711: 1
+2026-09-27 02:12:26   Wells Fargo xxxxxx3906: 1
+2026-09-27 02:12:26   sample: Wells Fargo Card 2963        Purchase authorized on 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:12:26   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Z7Yzwpp Busines
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:12:26   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Zfxfmvl Busines
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx6003       Online Transfer to Dell'Aquila D Platinum Savings Xxxxxx6003
+2026-09-27 02:12:26   sample: Wells Fargo                  Online Transfer Ref #Ib0Zgl86C5 to Businessline Line of
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx6956       Online Transfer to Bmo Bank NA Chk Xxxxxx6956 D. Dell'Aquila
+2026-09-27 02:12:26   sample: Wells Fargo                  Online Transfer to Dell'Aquila D Ref #Ib0Zkqvzdp Checking Fe
+2026-09-27 02:12:26   sample: Wells Fargo                  Online Transfer to Dellaquila.Com Ref #Ib0Zl2979T Business C
+2026-09-27 02:12:26   sample: Wells Fargo xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:12:26   sample: Wells Fargo Card 2963        Purchase Authorized On 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:12:49 progress 50/437
+2026-09-27 02:13:10 progress 100/437
+2026-09-27 02:13:31 progress 150/437
+2026-09-27 02:13:52 progress 200/437
+2026-09-27 02:14:13 progress 250/437
+2026-09-27 02:14:33 progress 300/437
+2026-09-27 02:14:53 progress 350/437
+2026-09-27 02:16:41 progress 400/437
+2026-09-27 02:21:10 done: 437 ok, 0 failed
+2026-09-27 02:24:30 fetched 895 rows
+2026-09-27 02:24:30 plan: 438 expense rows to tag
+2026-09-27 02:24:30   Wells Fargo Card 7524: 193
+2026-09-27 02:24:30   Wells Fargo Card 1090: 96
+2026-09-27 02:24:30   Capital One: 86
+2026-09-27 02:24:30   Wells Fargo: 37
+2026-09-27 02:24:30   Wells Fargo xxxxxx7356: 6
+2026-09-27 02:24:30   Wells Fargo xxxxxx9374: 6
+2026-09-27 02:24:30   Wells Fargo Card 2963: 3
+2026-09-27 02:24:30   Wells Fargo xxxxxx0184: 2
+2026-09-27 02:24:30   Wells Fargo xxxxxx6956: 2
+2026-09-27 02:24:30   Wells Fargo xxxxxx9598: 2
+2026-09-27 02:24:30   Wells Fargo xxxxxx4175: 2
+2026-09-27 02:24:30   Wells Fargo xxxxxx6003: 1
+2026-09-27 02:24:30   Wells Fargo xxxxxxxxxxxx4711: 1
+2026-09-27 02:24:30   Wells Fargo xxxxxx3906: 1
+2026-09-27 02:24:30   sample: Wells Fargo Card 2963        Purchase authorized on 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:24:30   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Z7Yzwpp Busines
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx9374       Online Transfer to Dellaquila.Com Business Checking Xxxxxx93
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx0184       Recurring Transfer to Dell'Aquila D Everyday Checking Ref #O
+2026-09-27 02:24:30   sample: Wells Fargo                  Recurring Transfer to Dellaquila.Com Ref #Op0Zfxfmvl Busines
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx6003       Online Transfer to Dell'Aquila D Platinum Savings Xxxxxx6003
+2026-09-27 02:24:30   sample: Wells Fargo                  Online Transfer Ref #Ib0Zgl86C5 to Businessline Line of
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx6956       Online Transfer to Bmo Bank NA Chk Xxxxxx6956 D. Dell'Aquila
+2026-09-27 02:24:30   sample: Wells Fargo                  Online Transfer to Dell'Aquila D Ref #Ib0Zkqvzdp Checking Fe
+2026-09-27 02:24:30   sample: Wells Fargo                  Online Transfer to Dellaquila.Com Ref #Ib0Zl2979T Business C
+2026-09-27 02:24:30   sample: Wells Fargo xxxxxx7356       Online Transfer to Dell'Aquila D Checking Xxxxxx7356 Ref #Ib
+2026-09-27 02:24:30   sample: Wells Fargo Card 2963        Purchase Authorized On 08/30 Sq *Pine Grove - A Pine Grove C
+2026-09-27 02:26:56 progress 50/438
+2026-09-27 02:27:16 progress 100/438
+2026-09-27 02:28:39 progress 150/438
+2026-09-27 02:30:02 progress 200/438
+2026-09-27 02:31:26 progress 250/438
+2026-09-27 02:32:52 progress 300/438
+2026-09-27 02:34:17 progress 350/438
+2026-09-27 02:35:45 progress 400/438
+2026-09-27 02:36:52 done: 438 ok, 0 failed

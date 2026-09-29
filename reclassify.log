@@ -1,0 +1,20 @@
+00:40:48 fetched 324 rows
+00:40:48 244 rows need reclassification
+00:41:18 progress 25/244
+00:41:49 progress 50/244
+00:42:18 progress 75/244
+00:42:49 progress 100/244
+00:43:17 progress 125/244
+00:43:48 progress 150/244
+00:44:17 progress 175/244
+00:44:45 progress 200/244
+00:45:13 progress 225/244
+00:45:35 done: 244 ok, 0 failed
+2026-09-27 02:01:35 flip-278: fetched 895 rows, 278 ids to process
+2026-09-27 02:01:35 flip-278: 278 to flip, 0 skipped
+2026-09-27 02:03:58 flip-278 progress 50/278
+2026-09-27 02:05:27 flip-278 progress 100/278
+2026-09-27 02:08:44 flip-278 progress 150/278
+2026-09-27 02:10:03 flip-278 progress 200/278
+2026-09-27 02:11:24 flip-278 progress 250/278
+2026-09-27 02:12:09 flip-278 done: 278 ok, 0 failed

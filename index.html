@@ -3372,10 +3372,26 @@ var STMT_HEADER_RE = /\s+[A-Z][A-Z.'\- ]{0,40}#\d{3,}\s*:.*$/;
 var STMT_PURCH_AUTH_RE = /^purchase\s+authorized\s+on\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b\s*/i;
 var STMT_DISCLOSURE_RE = /\s*(important information you should know|if your account has a negative balance|in case of errors or questions about your electronic transfers|all rights reserved).*$/i;
 var STMT_DATE_RE = /\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{2,4}\s*$/i;
+/* Apple Card statement boilerplate that glues onto merchants, e.g.
+   "APPLE.COM/BILL ONE APPLE PARK WAY CUPERTINO 95014 CA USA Apple Card is
+   issued by Goldman Sachs Bank USA, Salt Lake City Branch. Statement Apple
+   Card Customer ... Aug 1 — Aug 31, 2026 Apple Card Monthly Installments
+   Dates Description Daily Cash Amounts". */
+var STMT_APPLE_BOILER_RE = /\s*(statement\s+)?apple card (is issued by|customer|monthly installments).*$/i;
+var STMT_APPLE_ADDR_RE = /\s*one apple park way.*$/i;
+var STMT_APPLE_COLS_RE = /\s*dates\s+description\s+daily cash\s+amounts.*$/i;
+var _MON_ABBR = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+var STMT_PERIOD_RANGE_RE = new RegExp('(?:^\\s*|\\s+)'+_MON_ABBR+'\\s+\\d{1,2}\\s*[—–-]\\s*(?:'+_MON_ABBR+'\\s+)?\\d{1,2},?\\s+\\d{2,4}\\s*$','i');
+var STMT_TRAILING_STATEMENT_RE = /\s+statement\s*$/i;
 function scrubStatementJunk(s){
   var t = String(s==null?'':s);
   t = t.replace(STMT_PURCH_AUTH_RE,'');
   t = t.replace(STMT_HEADER_RE,'');
+  t = t.replace(STMT_APPLE_BOILER_RE,'');
+  t = t.replace(STMT_APPLE_ADDR_RE,'');
+  t = t.replace(STMT_APPLE_COLS_RE,'');
+  t = t.replace(STMT_PERIOD_RANGE_RE,'');
+  t = t.replace(STMT_TRAILING_STATEMENT_RE,'');
   t = t.replace(STMT_DISCLOSURE_RE,'');
   t = t.replace(STMT_DATE_RE,'');
   return t.trim();
@@ -5243,6 +5259,11 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
     // are neither transactions nor real section flips — drop them before they
     // glue onto the previous row's description or flip the income/expense section.
     if(/^[A-Z][A-Z.'\- ]{0,40}#\d{3,}\s*:/.test(line)) return;
+    // Apple Card statement boilerplate (issuer line, customer block, section
+    // headers, HQ address, statement period) — never transaction text. Without
+    // this it glues onto the previous row's description via the
+    // wrapped-continuation branch below.
+    if(/\bone apple park way\b|goldman sachs|apple card (is issued by|customer|monthly installments)|^dates\s+description\s+daily cash\s+amounts|^\s*statement\s*$/i.test(line) || STMT_PERIOD_RANGE_RE.test(line)) return;
     if(setSection(line)) return;
     if(SKIP_LINE.test(line)) return;
     if(lastTxn && line.length>3 && !/^\d/.test(line) && !SKIP_LINE.test(line) && line.length<90){
