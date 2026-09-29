@@ -218,6 +218,13 @@ input[type=month]{min-width:0;}
 .clearbtn[hidden]{display:none;}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue-soft); border-color:var(--blue);}
 textarea{resize:vertical; min-height:64px;}
+/* sign-in status card (Settings -> Sync across devices) */
+.authcard{display:flex; gap:10px; align-items:flex-start; background:var(--card);
+  border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin:10px 0;}
+.authdot{width:10px; height:10px; border-radius:50%; margin-top:5px; flex:none; background:var(--muted);}
+.authcard.signed .authdot{background:var(--accent);}
+.authcard.anon .authdot{background:var(--warn);}
+.authtitle{font-weight:700; font-size:15px;}
 .seg{display:flex; background:var(--seg-bg); border-radius:12px; padding:3px; gap:3px;}
 .seg button{flex:1; border:none; background:transparent; padding:9px 4px; border-radius:9px;
   font-size:14.5px; font-weight:600; color:var(--muted); cursor:pointer;}
@@ -831,10 +838,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
           <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
         </div>
         <div id="set-firebase-box" hidden>
-          <p class="muted" id="set-firebase-status">Checking Firebase connection…</p>
+          <div class="authcard" id="set-auth-card">
+            <span class="authdot"></span>
+            <div style="flex:1;min-width:0">
+              <div class="authtitle" id="set-auth-title">Checking Firebase connection…</div>
+              <div class="muted" id="set-auth-desc" style="font-size:13px;margin-top:3px"></div>
+            </div>
+          </div>
           <div id="set-auth-box">
             <label class="f">Sync across devices</label>
-            <p class="muted" id="set-auth-desc"></p>
             <div id="set-auth-form" hidden>
               <label class="f" for="set-auth-email">Email</label>
               <input type="email" id="set-auth-email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com">
@@ -1989,29 +2001,38 @@ async function syncStoreSettings(){
   var steps = $('set-steps-card');
   if(steps) steps.hidden = k!=='sheets';
   if(k==='firebase'){
-    var st = $('set-firebase-status');
-    st.textContent = 'Checking Firebase connection…';
+    var card = $('set-auth-card'), title = $('set-auth-title'), desc = $('set-auth-desc');
+    card.className = 'authcard';
+    title.textContent = 'Checking Firebase connection…';
+    desc.textContent = '';
     $('set-auth-form').hidden = true;
     $('set-auth-out-row').hidden = true;
-    $('set-auth-desc').textContent = '';
     try{
       var fs = getStore();
       await fs.ping();
       var ast = await firebaseAuthState();
       if(!ast.signedIn){
-        st.textContent = 'Connected to Firebase.';
-        $('set-auth-desc').textContent = 'Not signed in.';
+        card.classList.add('anon');
+        title.textContent = 'Not signed in';
+        desc.textContent = 'Sign in below to sync your data across devices.';
+        $('set-auth-form').hidden = false;
       }else if(ast.isAnonymous){
-        st.textContent = 'Connected to Firebase (private copy on this browser).';
-        $('set-auth-desc').textContent = 'This browser has its own private data. Link an account below to sync it across your devices — everything carries over. Two people sharing one login share the data.';
+        card.classList.add('anon');
+        title.textContent = 'Not signed in — private copy on this browser';
+        desc.textContent = 'This browser has its own separate data. Link an account below to sync it across your devices — everything carries over. Two people sharing one login share the data.';
         $('set-auth-form').hidden = false;
       }else{
-        st.textContent = 'Connected to Firebase.';
-        $('set-auth-desc').textContent = 'Signed in as '+(ast.email||ast.uid)+' — data syncs across devices signed in to this account.';
+        card.classList.add('signed');
+        var prov = ast.providers||[];
+        var method = prov.indexOf('google.com')>=0 ? 'Google' : (prov.indexOf('password')>=0 ? 'email' : 'account');
+        title.textContent = 'Signed in as '+(ast.email||ast.uid);
+        desc.textContent = 'Signed in with '+method+' — your data syncs across every device signed in to this account.';
         $('set-auth-out-row').hidden = false;
       }
     }catch(e){
-      st.textContent = 'Could not reach Firebase: '+e.message;
+      card.classList.add('anon');
+      title.textContent = 'Could not reach Firebase';
+      desc.textContent = e.message;
     }
   }
   /* Migration: offer a one-tap copy from every other backend that holds data. */
