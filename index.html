@@ -210,6 +210,8 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
 }
 /* month pickers have a wide intrinsic minimum; let them shrink inside flex/grid columns */
 input[type=month]{min-width:0;}
+/* date pickers too — keeps them inside their grid column on the edit form */
+.fgrid input[type=date]{min-width:0;}
 /* edit/add transaction form: fields size to their contents instead of full width */
 .sheet.fitfields input[type=text],.sheet.fitfields input[type=number],.sheet.fitfields input[type=date],
 .sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
@@ -4171,7 +4173,7 @@ function openTxnForm(t){
       fg.appendChild(wrap);
       return input;
     }
-    var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal(),class:'fullw'}));
+    var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal()}));
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal',class:'fullw'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
     var inMerch = field('Merchant', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'e.g. Costco',autocomplete:'off',spellcheck:'false',class:'fullw'})), true);
