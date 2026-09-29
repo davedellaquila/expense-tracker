@@ -382,9 +382,12 @@ textarea{resize:vertical; min-height:64px;}
 
 /* ---------- iPhone layout refinements (≤560px) ---------- */
 @media (max-width:560px){
-  /* tab bar: 8 tabs fit without crowding */
-  .tabbar button{font-size:9.5px; gap:2px; padding:4px 0 6px;}
-  .tabbar button svg{width:20px; height:20px;}
+  /* tab bar: 50% bigger icons/text; scroll sideways to reach every tab */
+  :root{--tabbar-h:96px;}
+  .tabbar{overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+  .tabbar::-webkit-scrollbar{display:none;}
+  .tabbar button{flex:none; min-width:72px; font-size:16px; gap:4px; padding:8px 0 10px;}
+  .tabbar button svg{width:33px; height:33px;}
   /* home stat tiles: stay 3-across, compact */
   .stat{padding:8px 6px;}
   .stat .label{font-size:10.5px;}
