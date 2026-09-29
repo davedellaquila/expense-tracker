@@ -3368,22 +3368,32 @@ function openScrubber(){
     found.length+' transaction'+(found.length===1?'':'s')+' with statement junk stuck to the name. Uncheck any to skip.'));
   var checks = [];
   found.forEach(function(f){
-    var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer'});
+    var wrap = el('div',{style:'padding:8px 0;border-bottom:1px solid var(--border)'});
+    var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;cursor:pointer'});
     var cb = el('input',{type:'checkbox',style:'margin-top:3px;flex:none'}); cb.checked = true;
     lab.appendChild(cb);
     var tx = el('div',{style:'min-width:0;font-size:13px;flex:1'});
     tx.appendChild(el('div',{class:'muted',style:'font-size:12px'}, (f.date||'????-??-??')+' · '+money(num(f.amount))));
-    function changeRow(tag, from, to){
-      tx.appendChild(el('div',{style:'word-break:break-word;color:var(--muted);text-decoration:line-through;font-size:12px'}, tag+from));
-      var toEl = el('div',{style:'word-break:break-word;font-size:12px'});
-      toEl.appendChild(el('b',null,tag+to));
-      tx.appendChild(toEl);
-    }
-    if(f.toM!=null) changeRow('Merchant: ', f.fromM, f.toM);
-    if(f.toD!=null && (f.toD!==f.toM || f.fromD!==f.fromM)) changeRow('Description: ', f.fromD, f.toD);
+    if(f.toM!=null) tx.appendChild(el('div',{style:'word-break:break-word;color:var(--muted);text-decoration:line-through;font-size:12px'}, 'Merchant: '+f.fromM));
+    if(f.toD!=null && (f.toD!==f.toM || f.fromD!==f.fromM)) tx.appendChild(el('div',{style:'word-break:break-word;color:var(--muted);text-decoration:line-through;font-size:12px'}, 'Description: '+f.fromD));
     lab.appendChild(tx);
-    box.appendChild(lab);
-    checks.push({f:f, cb:cb});
+    wrap.appendChild(lab);
+    // Editable suggestion fields live outside the label so tapping them on
+    // iOS can't toggle the checkbox.
+    function editRow(tag, to){
+      var erow = el('div',{style:'display:flex;gap:6px;align-items:center;margin:4px 0 4px 28px'});
+      erow.appendChild(el('span',{class:'muted',style:'font-size:12px;flex:none'},'→ '+tag));
+      var inp = el('input',{type:'text',value:to,autocapitalize:'off',autocomplete:'off',spellcheck:'false',style:'flex:1;min-width:0;font-size:16px'});
+      erow.appendChild(inp);
+      wrap.appendChild(erow);
+      return inp;
+    }
+    var inM = f.toM!=null ? editRow('Merchant:', f.toM) : null;
+    var inD = (f.toD!=null && (f.toD!==f.toM || f.fromD!==f.fromM)) ? editRow('Description:', f.toD) : null;
+    // Description change suppressed as identical to merchant's: one edit drives both.
+    var mirrorD = (f.toD!=null && inD==null);
+    box.appendChild(wrap);
+    checks.push({f:f, cb:cb, inM:inM, inD:inD, mirrorD:mirrorD});
   });
   var row = el('div',{class:'btnrow',style:'margin-top:10px'});
   var apply = el('button',{class:'btn',type:'button'},'Apply');
@@ -3395,8 +3405,20 @@ function openScrubber(){
   checks.forEach(function(c){ c.cb.addEventListener('change', updateLabel); });
   updateLabel();
   apply.onclick = async function(){
-    var sel = checks.filter(function(c){ return c.cb.checked; }).map(function(c){ return c.f; });
-    if(!sel.length) return;
+    // Read the (possibly hand-edited) suggestion fields. A field edited back
+    // to its original text — or cleared — is left untouched.
+    var sel = [];
+    checks.forEach(function(c){
+      if(!c.cb.checked) return;
+      var f = c.f;
+      var mVal = c.inM ? c.inM.value.trim() : '';
+      var dVal = c.inD ? c.inD.value.trim() : '';
+      var toM = (mVal && mVal!==String(f.fromM).trim()) ? mVal : null;
+      var toD = (dVal && dVal!==String(f.fromD).trim()) ? dVal : null;
+      if(c.mirrorD && toM) toD = toM; // same junk in both: the one edit fixes both
+      if(toM || toD) sel.push({id:f.id, toM:toM, toD:toD});
+    });
+    if(!sel.length){ toast('Nothing to scrub — every suggestion matches the original.'); return; }
     if(sel.length>50){
       var okc = await confirmDialog('Update '+sel.length+' transactions? This may take a minute or two.', 'Proceed');
       if(!okc) return;
