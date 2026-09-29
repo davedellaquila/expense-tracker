@@ -1624,8 +1624,15 @@ function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(
 
 /* ================= navigation ================= */
 var SCREENS = ['dashboard','transactions','import','budgets','tax','reports','settings'];
+function lastScreen(){
+  try{
+    var s = localStorage.getItem('expTrackerScreen');
+    return SCREENS.indexOf(s)>=0 ? s : null;
+  }catch(e){ return null; }
+}
 function showScreen(name){
   state.screen = name;
+  if(SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
   SCREENS.forEach(function(s){
     $('screen-'+s).hidden = (s!==name);
   });
@@ -1705,12 +1712,12 @@ async function enterApp(){
   var instant = loadDashCache(); // render home page instantly from cache if available
   try{
     await loadAll();
-    showScreen('dashboard');
+    showScreen(lastScreen()||'dashboard');
     maybeResumeBulkJob();
   }catch(err){
     if(instant){
       toast('Could not refresh data — showing your last saved view.', true);
-      showScreen('dashboard');
+      showScreen(lastScreen()||'dashboard');
     }else{
       toast('Could not load data: '+err.message, true);
       showScreen('settings');
