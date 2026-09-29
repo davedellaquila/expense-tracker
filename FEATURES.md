@@ -11,6 +11,10 @@ it's where ideas wait until Dave says "build it."
   and syncing to more than one storage system at the same time (not just picking
   one of This device / Google Sheets / Firebase). Build data connectors for
   Supabase, Airtable, and other popular database systems.
+- **User documentation** (2026-09-29, Dave): write end-user docs for the app —
+  how to import statements, categorize, use filters and drill-through, read the
+  reports, manage budgets and bills — so anyone (e.g. Nancy) can learn it
+  without a walkthrough.
 
 ## Completed features
 
