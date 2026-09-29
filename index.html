@@ -393,6 +393,8 @@ textarea{resize:vertical; min-height:64px;}
   /* tables: hide Txns / Avg-mo / %-of-budget columns on phones
      (th carry data-scol; td cells get matching data-scol in JS) */
   .ptable [data-scol="txns"], .ptable [data-scol="avg"], .ptable [data-scol="pct"]{display:none;}
+  /* category mix table: drop the 640px min-width so it fits the phone screen */
+  .ptable.mix{min-width:0;}
   /* transactions filters: keep 2 columns on phones too (Dave's call) */
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
@@ -451,10 +453,10 @@ textarea{resize:vertical; min-height:64px;}
 .drop input{display:none;}
 .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
 .ptablewrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px; margin:10px 0;}
-table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:640px;}
-.ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:12px; position:sticky; top:0;}
+table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:640px;}
+.ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:13px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
-.ptable input,.ptable select{font-size:13.5px; padding:6px 8px;}
+.ptable input,.ptable select{font-size:14.5px; padding:6px 8px;}
 .ptable tr.skip td{opacity:.45;}
 .notice{background:var(--warn-soft); border:1px solid #ecd9ac; color:#6d4f14;
   border-radius:12px; padding:10px 14px; font-size:14px; margin-bottom:12px;}
@@ -1161,7 +1163,7 @@ function catMixTable(byCat, byCatN, total, opts){
   var avgCol = !!opts.periodMonths;
   var months = opts.periodMonths || 1;
   var ncol = avgCol ? 5 : 4;
-  var h = '<div class="ptablewrap"><table class="ptable"><tr>'+
+  var h = '<div class="ptablewrap"><table class="ptable mix"><tr>'+
     '<th data-scol="name" data-slabel="Category">Category</th>'+
     '<th data-scol="txns" data-slabel="Txns" style="text-align:right">Txns</th>'+
     '<th data-scol="share" data-slabel="Share" style="text-align:right">Share</th>'+
@@ -1169,7 +1171,7 @@ function catMixTable(byCat, byCatN, total, opts){
     (avgCol?'<th data-scol="avg" data-slabel="Avg / mo" style="text-align:right">Avg / mo</th>':'')+'</tr>';
   function section(catsArr, byC, byN, tot, color, dtype, label){
     if(!catsArr.length || !(tot>0)) return;
-    h += '<tr data-secthead><td colspan="'+ncol+'" class="muted" style="font-size:12px;font-weight:600;padding-top:10px">'+label+'</td></tr>';
+    h += '<tr data-secthead><td colspan="'+ncol+'" class="muted" style="font-size:13px;font-weight:600;padding-top:10px">'+label+'</td></tr>';
     catsArr.forEach(function(c){
       var share = byC[c]/tot*100;
       var avgCell = '', avgAttr = '';
