@@ -44,6 +44,7 @@
 .cx-text{ fill:var(--text); }
 .cx-mut{ fill:var(--muted); }
 .cx-faint{ fill:var(--muted); opacity:.75; }
+.cx-neg{ fill:var(--danger); }
 .cx-track{ fill:var(--track); }
 .cx-grid{ stroke:var(--border); }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -789,6 +790,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
       </div>
       <div class="card"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div><div id="rep-cattable"></div></div>
+      <div class="card"><h2>Budget vs Actual</h2><p class="chart-sub">Budgeted vs spent by category for the selected period</p><div id="rep-budgetchart"></div><div id="rep-budgettable"></div></div>
       <div class="card"><h2>Monthly Trend</h2><p class="chart-sub">Spend and cumulative total by month</p><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
       <div class="card"><h2>Top Merchants</h2><p class="chart-sub">Largest merchants by spend</p><div id="rep-merchchart"></div></div>
       <div class="card"><h2>Weekday Pattern</h2><p class="chart-sub">Spend by day of week</p><div id="rep-weekchart"></div></div>
@@ -5617,6 +5619,44 @@ function repHBars(el, items, color, emptyMsg, onBar){
     })(hn[hi]);
   }
 }
+/* Budget vs Actual: paired horizontal bars per category — Budget (teal) above
+   Actual (green when under budget, red when over). Tapping a bar drills into
+   the category's transactions, like the other report charts. */
+function repBudgetActual(el, items, onBar){
+  if(!items.length){ emptyInto(el,'🎯','No budgets set for this period. Add some under Budget.'); return; }
+  var W=720, labelW=168, rowH=54, top=32, bot=8;
+  var H = top + items.length*rowH + bot;
+  var max = 1;
+  items.forEach(function(it){ max = Math.max(max, it.budget, it.actual); });
+  var plotW = W-labelW-150;
+  var svg = '<g font-size="12">'+
+    '<rect x="'+labelW+'" y="6" width="12" height="12" rx="3" fill="'+REP_TEAL+'"/>'+
+    '<text x="'+(labelW+18)+'" y="16" class="cx-text">Budget</text>'+
+    '<rect x="'+(labelW+96)+'" y="6" width="12" height="12" rx="3" fill="'+REP_CORAL+'"/>'+
+    '<text x="'+(labelW+114)+'" y="16" class="cx-text">Actual</text></g>';
+  items.forEach(function(it, i){
+    var y = top + i*rowH;
+    var bw = Math.max(2, (it.budget/max)*plotW), aw = Math.max(2, (it.actual/max)*plotW);
+    var nm = it.name.length>22 ? it.name.slice(0,21)+'…' : it.name;
+    var over = it.actual > it.budget, v = it.actual - it.budget;
+    var cls = onBar ? ' class="rep-click" data-bar="'+i+'"' : '';
+    svg += '<g>'+
+      '<text x="0" y="'+(y+24)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+plotW+'" height="42" rx="8" class="cx-track"/>'+
+      '<rect x="'+labelW+'" y="'+(y+5)+'" width="'+Math.round(bw)+'" height="14" rx="7" fill="'+REP_TEAL+'" opacity="0.9"'+cls+'><title>'+esc(it.name)+' budget: '+money(it.budget)+'</title></rect>'+
+      '<rect x="'+labelW+'" y="'+(y+23)+'" width="'+Math.round(aw)+'" height="14" rx="7"'+(over?' style="fill:var(--danger)"':' fill="'+REP_GREEN+'"')+' opacity="0.9"'+cls+'><title>'+esc(it.name)+' actual: '+money(it.actual)+'</title></rect>'+
+      '<text x="'+(W-4)+'" y="'+(y+17)+'" text-anchor="end" font-size="12" class="cx-text">'+money(it.actual)+'</text>'+
+      '<text x="'+(W-4)+'" y="'+(y+35)+'" text-anchor="end" font-size="12" class="'+(over?'cx-neg':'cx-faint')+'">'+(v>0?'+':'')+money(v)+' vs budget</text>'+
+      '</g>';
+  });
+  el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
+  if(onBar){
+    var hn = el.querySelectorAll('[data-bar]');
+    for(var hi=0; hi<hn.length; hi++)(function(n){
+      n.addEventListener('click', function(){ onBar(items[parseInt(n.getAttribute('data-bar'),10)]); });
+    })(hn[hi]);
+  }
+}
 /* Monthly bars with cumulative line, gridlines and axis labels. */
 function repTrend(el, months, onBar){
   if(!months.length){ emptyInto(el,'📈','No transactions in this period.'); return; }
@@ -5723,6 +5763,42 @@ function renderReports(){
   // Monthly average is per active month: total / months the category actually had spending.
   $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {byCatM:byCatM,
     footnote:'Avg / mo is averaged over the months each category had spending, not the full period.'});
+
+  // --- budget vs actual: paired bars + variance table, follows the report period ---
+  var bMap = budgetsForRange(from, to);
+  var bCats = Object.keys(bMap).sort(function(a,b){ return bMap[b]-bMap[a]; });
+  var bSpend = {};
+  rows.forEach(function(t){
+    if(t.txn_type!=='expense') return;
+    var bc = t.category || 'Uncategorized';
+    if(bMap[bc]!=null) bSpend[bc] = (bSpend[bc]||0)+num(t.amount);
+  });
+  var bItems = bCats.map(function(c){ return {name:c, budget:bMap[c], actual:bSpend[c]||0}; });
+  repBudgetActual($('rep-budgetchart'), bItems, function(it){
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
+      label: it.name + ' · Budget vs Actual · ' + rangeLabel});
+  });
+  var btbl = $('rep-budgettable');
+  if(!bCats.length){ btbl.innerHTML = ''; }
+  else{
+    var totB = 0, totA = 0, bh = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Actual</th><th style="text-align:right">Variance</th><th style="text-align:right">% of budget</th></tr>';
+    bItems.forEach(function(it){
+      totB += it.budget; totA += it.actual;
+      var v = it.actual - it.budget;
+      bh += '<tr><td>'+esc(it.name)+'</td><td style="text-align:right">'+money(it.budget)+'</td>'+
+        '<td style="text-align:right">'+money(it.actual)+'</td>'+
+        '<td style="text-align:right" class="'+(v>0?'neg':'')+'">'+(v>0?'+':'')+money(v)+'</td>'+
+        '<td style="text-align:right">'+(it.budget>0 ? Math.round(it.actual/it.budget*100)+'%' : '—')+'</td></tr>';
+    });
+    var tv = totA - totB;
+    bh += '<tr><td><b>Total</b></td><td style="text-align:right"><b>'+money(totB)+'</b></td>'+
+      '<td style="text-align:right"><b>'+money(totA)+'</b></td>'+
+      '<td style="text-align:right" class="'+(tv>0?'neg':'')+'"><b>'+(tv>0?'+':'')+money(tv)+'</b></td>'+
+      '<td style="text-align:right"><b>'+(totB>0 ? Math.round(totA/totB*100)+'%' : '—')+'</b></td></tr>';
+    bh += '</table></div>';
+    if(acct!=='all') bh += '<p class="muted" style="font-size:12px;margin:6px 0 0">Budgets aren\'t split by account — actuals above reflect the '+esc(acct)+' filter.</p>';
+    btbl.innerHTML = bh;
+  }
 
   // --- monthly trend: bars + cumulative line ---
   var mc = $('rep-monthchart');
