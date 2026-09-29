@@ -1,0 +1,8 @@
+*.log
+__pycache__/
+build_report.py
+fix_pm_quicksilver.log
+flip_278.py
+recat_other_income.py
+reclassify.py
+tag_payment_methods.log
