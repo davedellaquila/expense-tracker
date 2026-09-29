@@ -398,6 +398,8 @@ textarea{resize:vertical; min-height:64px;}
   /* category mix donuts: stack the three vertically, one per row */
   .donut-trio{grid-template-columns:1fr;}
   /* transactions filters: keep 2 columns on phones too (Dave's call) */
+  /* hide the All quick-reset chips on phones (each menu still offers All first) */
+  .filters .allchip{display:none;}
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
   /* budget proposal rows: roomier grid, 44px lock/delete tap targets
@@ -641,46 +643,45 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
           <div class="full">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
-              <div style="min-width:0">
-                <label class="f" style="margin-top:0" for="f-q">Search</label>
-                <div style="position:relative">
-                  <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0;padding-right:34px">
-                  <button class="clearbtn" id="f-q-clear" type="button" aria-label="Clear search" hidden>×</button>
-                </div>
+            <div style="min-width:0">
+              <label class="f" style="margin-top:0" for="f-q">Search</label>
+              <div style="position:relative">
+                <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0;padding-right:34px">
+                <button class="clearbtn" id="f-q-clear" type="button" aria-label="Clear search" hidden>×</button>
               </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:8px">
               <div style="min-width:0">
                 <label class="f" style="margin-top:0" for="f-sort">Sort</label>
-                <div style="display:flex;align-items:center;gap:6px;min-width:0">
-                  <select id="f-sort" aria-label="Sort transactions" style="flex:1;min-width:0;font-size:14px;padding:9px 6px">
+                <select id="f-sort" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
                     <option value="date-desc" selected>Newest</option>
                     <option value="date-asc">Oldest</option>
                     <option value="amount-desc">Amount ↓</option>
                     <option value="amount-asc">Amount ↑</option>
                     <option value="merchant-asc">Merchant A–Z</option>
                     <option value="merchant-desc">Merchant Z–A</option>
-                  </select>
-                  <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
-                  <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
-                  <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
-                </div>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
+                <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
+                <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
               </div>
             </div></div>
         </div>
       </div>
       <div class="searchstick" id="searchstick" hidden>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">
-          <div style="min-width:0">
-            <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
-            <div style="position:relative">
-              <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0;padding-right:34px">
-              <button class="clearbtn" id="f-q-clear-stick" type="button" aria-label="Clear search" hidden>×</button>
-            </div>
+        <div style="min-width:0">
+          <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
+          <div style="position:relative">
+            <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0;padding-right:34px">
+            <button class="clearbtn" id="f-q-clear-stick" type="button" aria-label="Clear search" hidden>×</button>
           </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:8px">
           <div style="min-width:0">
             <label class="f" style="margin-top:0" for="f-sort-stick">Sort</label>
-            <div style="display:flex;align-items:center;gap:6px;min-width:0">
-              <select id="f-sort-stick" aria-label="Sort transactions" style="flex:1;min-width:0;font-size:14px;padding:9px 6px">
+            <select id="f-sort-stick" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
                 <option value="date-desc">Newest</option>
                 <option value="date-asc">Oldest</option>
                 <option value="amount-desc">Amount ↓</option>
@@ -688,10 +689,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
                 <option value="merchant-asc">Merchant A–Z</option>
                 <option value="merchant-desc">Merchant Z–A</option>
               </select>
-              <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
-              <button class="linkbtn" id="f-tidy-stick" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
-              <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
-            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;min-width:0">
+            <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
+            <button class="linkbtn" id="f-tidy-stick" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
+            <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none">Reset</button>
           </div>
         </div>
       </div>
