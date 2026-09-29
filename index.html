@@ -4918,6 +4918,7 @@ function restoreBotDraft(ym){
     if(!raw) return;
     var d = JSON.parse(raw);
     if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
+    d.rows = botFilterRemoved(BOT_REMOVED_LS, ym, d.rows);
     botProposal = d;
     botRenderTable();
     botRenderGoalInputs();
@@ -4925,6 +4926,34 @@ function restoreBotDraft(ym){
     $('bot-save-row').hidden = false;
     $('bot-save-month').textContent = fmtMonthPretty(ym);
   }catch(e){}
+}
+
+/* Removed-category memory: categories deleted from a bot proposal stay deleted
+   for that budget month — recalc, re-propose, and draft restore all filter them
+   out. Re-adding a category via Add category un-remembers it. Stored per month
+   in localStorage, like the drafts. */
+var BOT_REMOVED_LS = 'expTrackerBotRemoved:';
+var INC_BOT_REMOVED_LS = 'expTrackerIncBotRemoved:';
+function botRemovedGet(prefix, ym){
+  try{
+    var d = JSON.parse(localStorage.getItem(prefix+ym)||'[]');
+    return Array.isArray(d) ? d : [];
+  }catch(e){ return []; }
+}
+function botRememberRemoved(prefix, ym, cat){
+  var list = botRemovedGet(prefix, ym);
+  if(list.indexOf(cat)<0){
+    list.push(cat);
+    try{ localStorage.setItem(prefix+ym, JSON.stringify(list)); }catch(e){}
+  }
+}
+function botForgetRemoved(prefix, ym, cat){
+  try{ localStorage.setItem(prefix+ym, JSON.stringify(botRemovedGet(prefix, ym).filter(function(c){ return c!==cat; }))); }catch(e){}
+}
+function botFilterRemoved(prefix, ym, rows){
+  var list = botRemovedGet(prefix, ym);
+  if(!list.length) return rows;
+  return rows.filter(function(r){ return list.indexOf(r.category)<0; });
 }
 
 function botNiceRound(avg){
@@ -5031,10 +5060,11 @@ function botRecalc(){
   var ym = $('bud-month').value || monthLocal();
   if(botProposal.month!==ym) return;
   var fresh = botCompute(ym);
+  var freshRows = botFilterRemoved(BOT_REMOVED_LS, botProposal.month, fresh.rows);
   var oldByCat = {};
   botProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
   var freshCats = {};
-  var merged = fresh.rows.map(function(fr){
+  var merged = freshRows.map(function(fr){
     freshCats[fr.category] = true;
     var old = oldByCat[fr.category];
     if(old){
@@ -5057,7 +5087,7 @@ function botRecalc(){
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = botCompute(ym);
-  botProposal = {v:2, month:ym, rows:c.rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths};
+  botProposal = {v:2, month:ym, rows:botFilterRemoved(BOT_REMOVED_LS, ym, c.rows), avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -5096,12 +5126,13 @@ function botRenderTable(){
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
     var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — bot may suggest trims':'Lock — bot will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
-    lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); });
+    lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
     line.appendChild(lock);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
+      botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
       botProposal.rows = botProposal.rows.filter(function(x){ return x!==r; });
-      botRenderTable(); botRenderGoalInputs();
+      botRenderTable(); botRenderGoalInputs(); persistBotDraft();
     });
     line.appendChild(del);
     host.appendChild(line);
@@ -5115,9 +5146,10 @@ function botRenderTable(){
     var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
+      botForgetRemoved(BOT_REMOVED_LS, botProposal.month, sel.value);
       botProposal.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false, touched:false});
       botProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
-      botRenderTable(); botRenderGoalInputs();
+      botRenderTable(); botRenderGoalInputs(); persistBotDraft();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
     host.appendChild(addRow);
@@ -5134,6 +5166,9 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
       'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
   }
+  var nRemoved = botRemovedGet(BOT_REMOVED_LS, botProposal.month).length;
+  if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
+    nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this proposal — re-add above to bring one back.'));
   persistBotDraft();
   updateFloatTotals();
 }
@@ -5299,6 +5334,7 @@ function incBotRestore(ym){
     if(!raw) return;
     var d = JSON.parse(raw);
     if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
+    d.rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, d.rows);
     incBotProposal = d;
     incBotRenderTable();
     $('ibot-save-row').hidden = false;
@@ -5314,10 +5350,11 @@ function incBotRecalc(){
   var ym = $('bud-month').value || monthLocal();
   if(incBotProposal.month!==ym) return;
   var fresh = incBotCompute(ym);
+  var freshRows = botFilterRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, fresh.rows);
   var oldByCat = {};
   incBotProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
   var freshCats = {};
-  var merged = fresh.rows.map(function(fr){
+  var merged = freshRows.map(function(fr){
     freshCats[fr.category] = true;
     var old = oldByCat[fr.category];
     if(old){
@@ -5337,7 +5374,7 @@ function incBotRecalc(){
 function incBotPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = incBotCompute(ym);
-  incBotProposal = {v:2, month:ym, rows:c.rows, months:c.months};
+  incBotProposal = {v:2, month:ym, rows:botFilterRemoved(INC_BOT_REMOVED_LS, ym, c.rows), months:c.months};
   incBotRenderTable();
   $('ibot-save-row').hidden = false;
   $('ibot-save-month').textContent = fmtMonthPretty(ym);
@@ -5380,6 +5417,7 @@ function incBotRenderTable(){
     line.appendChild(lock);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
+      botRememberRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, r.category);
       incBotProposal.rows = incBotProposal.rows.filter(function(x){ return x!==r; });
       incBotRenderTable(); incBotPersist();
     });
@@ -5395,6 +5433,7 @@ function incBotRenderTable(){
     var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
+      botForgetRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, sel.value);
       incBotProposal.rows.push({category:sel.value, ytd:0, amount:0, locked:false, touched:false});
       incBotProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
       incBotRenderTable(); incBotPersist();
@@ -5407,6 +5446,9 @@ function incBotRenderTable(){
   tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
   host.appendChild(tot);
   host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},'Total of locked rows only.'));
+  var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, incBotProposal.month).length;
+  if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
+    nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
   incBotPersist();
   updateFloatTotals();
 }
