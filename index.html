@@ -709,11 +709,24 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       <div class="searchstick" id="searchstick" hidden>
-        <div style="min-width:0">
-          <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
-          <div style="position:relative">
-            <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0;padding-right:34px">
-            <button class="clearbtn" id="f-q-clear-stick" type="button" aria-label="Clear search" hidden>×</button>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div style="flex:1;min-width:0">
+            <label class="f" style="margin-top:0" for="f-q-stick">Search</label>
+            <div style="position:relative">
+              <input type="text" id="f-q-stick" placeholder="🔍 Search transactions…" autocomplete="off" aria-label="Search transactions" style="min-width:0;margin:0;padding-right:34px">
+              <button class="clearbtn" id="f-q-clear-stick" type="button" aria-label="Clear search" hidden>×</button>
+            </div>
+          </div>
+          <div style="flex:none;width:132px">
+            <label class="f" style="margin-top:0" for="f-sort-stick">Sort</label>
+            <select id="f-sort-stick" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
+              <option value="date-desc" selected>Newest</option>
+              <option value="date-asc">Oldest</option>
+              <option value="amount-desc">Amount ↓</option>
+              <option value="amount-asc">Amount ↑</option>
+              <option value="merchant-asc">Merchant A–Z</option>
+              <option value="merchant-desc">Merchant Z–A</option>
+            </select>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
@@ -3213,6 +3226,17 @@ function wireTransactions(){
     fsort.value = txnSortPick();
     fsort.addEventListener('change', function(){
       try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
+      var fs2 = $('f-sort-stick'); if(fs2) fs2.value = this.value;
+      renderTransactions();
+    });
+  }
+  // sort menu in the floating sticky bar: mirrors f-sort, two-way synced
+  var fsortStick = $('f-sort-stick');
+  if(fsortStick){
+    fsortStick.value = txnSortPick();
+    fsortStick.addEventListener('change', function(){
+      try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
+      if(fsort) fsort.value = this.value;
       renderTransactions();
     });
   }
@@ -3233,9 +3257,12 @@ function wireTransactions(){
       var r = entries[0].boundingClientRect;
       var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='transactions';
       stick.hidden = !offTop;
-      if(offTop && document.activeElement!==stickInput && stickInput.value!==origInput.value){
-        stickInput.value = origInput.value;
-        syncSearchClear();
+      if(offTop){
+        if(document.activeElement!==stickInput && stickInput.value!==origInput.value){
+          stickInput.value = origInput.value;
+          syncSearchClear();
+        }
+        var fss = $('f-sort-stick'); if(fss) fss.value = txnSortPick();
       }
     }, {threshold:0}).observe(origInput);
   }
@@ -4657,6 +4684,8 @@ function openBulkUpdate(ids){
     var sBank = noChangeSelect();
     allBanks().forEach(function(b){ sBank.appendChild(el('option',{value:b},b)); });
     changeRow('Bank', sBank);
+    var inMerch = el('input',{type:'text',placeholder:'New merchant name — leave blank for no change',autocomplete:'off',spellcheck:'false'});
+    changeRow('Merchant name', inMerch);
     var sTax = noChangeSelect();
     sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
     TAX_GROUPS.forEach(function(g){
@@ -4679,7 +4708,7 @@ function openBulkUpdate(ids){
     row.appendChild(cancel); row.appendChild(apply);
     sh.appendChild(row);
     apply.onclick = async function(){
-      if(!(sCat.value||sType.value||sBp.value||sPay.value||sBank.value||sTax.value||sNotes.value)){
+      if(!(sCat.value||sType.value||sBp.value||sPay.value||sBank.value||inMerch.value.trim()||sTax.value||sNotes.value)){
         toast('Choose at least one field to update.', true); return;
       }
       if(sNotes.value==='__set__' && !inNotes.value.trim()){ toast('Type the notes text first.', true); return; }
@@ -4693,6 +4722,7 @@ function openBulkUpdate(ids){
       if(sBp.value) overrides.business_personal = sBp.value;
       if(sPay.value) overrides.payment_method = sPay.value;
       if(sBank.value) overrides.payment_method = sBank.value; // Bank wins over Payment method
+      if(inMerch.value.trim()) overrides.merchant = inMerch.value.trim();
       if(sTax.value) overrides.tax_category = sTax.value==='__empty__' ? '' : sTax.value;
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
@@ -4797,7 +4827,22 @@ function openTxnForm(t){
     }
     bExp.onclick=function(){curType='expense';paintSeg();};
     bInc.onclick=function(){curType='income';paintSeg();};
-    bTrf.onclick=function(){curType='transfer';paintSeg();};
+    bTrf.onclick=function(){
+      curType='transfer'; paintSeg();
+      // Transfer type implies the Transfer category: select it, adding the
+      // option if the category list doesn't offer one yet. Changing away
+      // from Transfer leaves the category untouched.
+      var hasT=false;
+      for(var i=0;i<inCat.options.length;i++){ if(inCat.options[i].value==='Transfer'){ hasT=true; break; } }
+      if(!hasT) inCat.appendChild(el('option',{value:'Transfer'},'Transfer'));
+      if(inCat.value!=='Transfer'){
+        inCat.value='Transfer';
+        var ev=null;
+        try{ ev=new Event('change',{bubbles:true}); }
+        catch(e){ ev=document.createEvent('HTMLEvents'); ev.initEvent('change',true,false); }
+        inCat.dispatchEvent(ev); // keeps tax-category suggestion in step, like a manual pick
+      }
+    };
     bPer.onclick=function(){curBp='Personal';paintSeg();refreshCats();};
     bBiz.onclick=function(){curBp='Business';paintSeg();refreshCats();};
     paintSeg();
