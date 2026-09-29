@@ -300,6 +300,20 @@ textarea{resize:vertical; min-height:64px;}
 }
 .fab:active{transform:scale(.94);}
 
+/* ---------- floating bot totals (Budget tab) ---------- */
+#float-totals{
+  position:fixed; left:14px; right:14px; z-index:30;
+  bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px);
+  display:flex; flex-direction:column; gap:6px; align-items:center;
+  pointer-events:none;
+}
+#float-totals[hidden]{display:none;}
+#float-totals > div{
+  background:var(--card); border:1px solid var(--border); border-radius:99px;
+  padding:8px 16px; font-size:13.5px; box-shadow:0 4px 16px rgba(0,0,0,.22);
+  max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#screen-budgets.has-floattotals{padding-bottom:88px;}
 /* ---------- tab bar ---------- */
 .tabbar{
   position:fixed; left:0; right:0; bottom:0; z-index:40;
@@ -862,6 +876,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
     </section>
   </main>
 
+  <div id="float-totals" hidden>
+    <div id="float-totals-exp" hidden></div>
+    <div id="float-totals-inc" hidden></div>
+  </div>
   <nav class="tabbar" id="tabbar">
     <button data-screen="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
     <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
@@ -1659,6 +1677,7 @@ function showScreen(name){
     else if(name==='reports') renderReports();
     else if(name==='settings') syncStoreSettings();
   }
+  updateFloatTotals();
   window.scrollTo(0,0);
 }
 function updateUserChip(){
@@ -4948,6 +4967,7 @@ function botRenderTable(){
       'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
   }
   persistBotDraft();
+  updateFloatTotals();
 }
 function botPctText(){
   if(!botProposal) return '';
@@ -4960,6 +4980,7 @@ function botRenderTotal(){
   if(t) t.textContent = money(botProposalTotal());
   var p = $('bot-pct');
   if(p) p.textContent = botPctText();
+  updateFloatTotals();
 }
 function botRenderGoalInputs(){
   var host = $('bot-goal-inputs'); host.innerHTML = '';
@@ -5073,6 +5094,7 @@ function botReset(){
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
   $('bot-save-row').hidden = true;
+  updateFloatTotals();
 }
 
 /* ================= income bot =================
@@ -5217,10 +5239,12 @@ function incBotRenderTable(){
   tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
   host.appendChild(tot);
   incBotPersist();
+  updateFloatTotals();
 }
 function incBotRenderTotal(){
   var t = $('ibot-total');
   if(t) t.textContent = money(incBotTotal());
+  updateFloatTotals();
 }
 async function incBotSave(){
   var ym = $('bud-month').value || monthLocal();
@@ -5245,6 +5269,34 @@ function incBotReset(){
   incBotProposal = null;
   $('ibot-table').innerHTML = '';
   $('ibot-save-row').hidden = true;
+  updateFloatTotals();
+}
+/* Floating total pills pinned above the tab bar while a bot proposal is
+   active on the Budget tab. pointer-events:none so they never block taps. */
+function updateFloatTotals(){
+  var wrap = $('float-totals');
+  if(!wrap) return;
+  var onBudget = state.screen==='budgets';
+  var expRows = (botProposal && botProposal.rows) || [];
+  var incRows = (incBotProposal && incBotProposal.rows) || [];
+  var expOn = onBudget && expRows.length>0, incOn = onBudget && incRows.length>0;
+  var e = $('float-totals-exp'), ic = $('float-totals-inc');
+  e.hidden = !expOn; ic.hidden = !incOn;
+  if(expOn){
+    e.innerHTML = '';
+    e.appendChild(document.createTextNode('Proposed total '));
+    var b = el('b'); b.textContent = money(botProposalTotal()); e.appendChild(b);
+    var pct = botPctText();
+    if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; e.appendChild(s); }
+  }
+  if(incOn){
+    ic.innerHTML = '';
+    ic.appendChild(document.createTextNode('Expected income '));
+    var b2 = el('b'); b2.textContent = money(incBotTotal())+'/mo'; ic.appendChild(b2);
+  }
+  wrap.hidden = !(expOn||incOn);
+  var scr = $('screen-budgets');
+  if(scr) scr.classList.toggle('has-floattotals', !!(expOn||incOn));
 }
 
 /* ================= tax ================= */
