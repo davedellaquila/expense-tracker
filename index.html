@@ -4805,15 +4805,27 @@ function botRenderTable(){
   tot.appendChild(el('span',null,'Proposed total'));
   tot.appendChild(el('span',{id:'bot-total'},money(botProposalTotal())));
   host.appendChild(tot);
+  var sub = el('div',{class:'muted',style:'display:flex;justify-content:space-between;margin-top:2px;font-size:12px'});
+  sub.appendChild(el('span',null,'Paycheck '+money(Math.round(botProposal.avgIncome||0))+'/mo'));
+  sub.appendChild(el('span',{id:'bot-pct'},botPctText()));
+  host.appendChild(sub);
   if(botProposal.avgIncome > 0){
     host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
       'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
   }
   persistBotDraft();
 }
+function botPctText(){
+  if(!botProposal) return '';
+  var inc = num(botProposal.avgIncome), t = botProposalTotal();
+  if(!(inc>0)) return '';
+  return Math.round(t/inc*100)+'% of income';
+}
 function botRenderTotal(){
   var t = $('bot-total');
   if(t) t.textContent = money(botProposalTotal());
+  var p = $('bot-pct');
+  if(p) p.textContent = botPctText();
 }
 function botRenderGoalInputs(){
   var host = $('bot-goal-inputs'); host.innerHTML = '';
