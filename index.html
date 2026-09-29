@@ -72,7 +72,19 @@ body{
   background:var(--blue-soft); border:1px solid #c3d4f5; color:#1e3f8f;
   border-radius:12px; padding:9px 12px; font-size:13.5px; margin-bottom:10px; }
 [data-theme="dark"] .drillchip{ border-color:#31497a; color:#a9c3f5; }
-.drillx{ border:0; background:none; font-size:19px; line-height:1; cursor:pointer; color:inherit; padding:2px 6px; }
+.drillx{ border:0; background:none; font-size:19px; line-height:1; cursor:pointer; color:inherit; padding:8px 12px; }
+/* ---- drag-to-reorder chart cards (Home + Reports) ----
+   Only the grip handle starts a drag (Pointer Events, so touch works);
+   chart bodies stay tappable for drill-through. */
+.card-grip{ display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px; margin:-8px 4px -8px -6px; cursor:grab;
+  touch-action:none; -webkit-user-select:none; user-select:none;
+  color:var(--muted); font-size:20px; line-height:1; flex:0 0 auto; }
+.card-grip:active{ cursor:grabbing; color:var(--text); }
+.card-drop-ph{ border:2px dashed var(--accent); border-radius:var(--radius);
+  margin:0 0 12px; background:rgba(127,127,127,.08); }
+.card-dragging{ position:fixed !important; z-index:70; pointer-events:none;
+  opacity:.95; box-shadow:0 14px 34px rgba(0,0,0,.35); margin:0 !important; }
 .rep-svg text{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
 .donut-legend{ margin-top:4px; }
 .dl-row{ display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid var(--border); font-size:15.5px; }
@@ -1161,12 +1173,6 @@ function weekdayIdx(dateStr){
   if(p.length<3) return -1;
   var d = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
   return isNaN(d.getTime()) ? -1 : (d.getDay()+6)%7;
-}
-/* Chip label for an aggregated "Other" donut slice: name the categories inside it. */
-function otherDrillLabel(names){
-  var shown = names.slice(0,2).join(', ');
-  if(names.length>2) shown += ' +'+(names.length-2)+' more';
-  return 'Other: ' + shown;
 }
 /* Months in a yyyy-MM range, inclusive (for per-month averages). */
 function monthsInRange(from, to){
@@ -2588,14 +2594,14 @@ function renderDashboard(){
   // Tapping a stat tile opens its transactions for this period on the
   // Transactions page. Net = income + expenses (transfers excluded).
   function tileDrill(extra){
-    var o = {bp:bpVal};
+    var o = {bp:bpVal, carryCats:dashCatSel};
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
   }
-  $('tile-income').onclick = function(){ tileDrill({type:'income', label:'Income · '+rangeLabel}); };
-  $('tile-expenses').onclick = function(){ tileDrill({type:'expense', label:'Expenses · '+rangeLabel}); };
-  $('tile-net').onclick = function(){ tileDrill({type:'', noXfer:true, label:'Net · '+rangeLabel}); };
+  $('tile-income').onclick = function(){ tileDrill({type:'income'}); };
+  $('tile-expenses').onclick = function(){ tileDrill({type:'expense'}); };
+  $('tile-net').onclick = function(){ tileDrill({type:'', noXfer:true}); };
 
   // best charts: category mix donut, top merchants, weekday pattern
   var byMerch = {}, byDay = [0,0,0,0,0,0,0]; // Mon..Sun
@@ -2660,6 +2666,103 @@ function repHiddenCharts(){
 function saveRepHiddenCharts(l){
   try{ localStorage.setItem(REP_CHART_LIST_KEY, JSON.stringify(l)); }catch(e){}
 }
+var REP_ORDER_KEY = 'expenseTracker.repChartOrder';
+/* Ordered list of visible Reports chart cards. Removing a chart drops it from
+   the order; re-adding appends it at the bottom; dragging rewrites the order. */
+function repChartOrder(){
+  try{
+    var l = JSON.parse(localStorage.getItem(REP_ORDER_KEY)||'null');
+    if(Array.isArray(l) && l.length) return l.filter(function(k){ return !!REP_CHARTS[k]; });
+  }catch(e){}
+  return Object.keys(REP_CHARTS);
+}
+function saveRepChartOrder(l){
+  try{ localStorage.setItem(REP_ORDER_KEY, JSON.stringify(l)); }catch(e){}
+}
+/* Apply the saved card order inside #screen-reports. Charts missing from the
+   saved order (e.g. brand-new keys) go last, just above the Add-chart card. */
+function applyRepChartOrder(){
+  var sec = $('screen-reports');
+  if(!sec) return;
+  var addSel = $('rep-add-chart');
+  var endRef = addSel ? addSel.closest('.card') : null;
+  var order = repChartOrder(), seen = {};
+  order.forEach(function(k){
+    var card = sec.querySelector('[data-repchart="'+k+'"]');
+    if(card){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+  Array.prototype.forEach.call(sec.querySelectorAll('[data-repchart]'), function(card){
+    var k = card.getAttribute('data-repchart');
+    if(!seen[k]){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+}
+/* ---- drag-to-reorder chart cards (Home + Reports) ----
+   Pointer Events (not HTML5 drag-and-drop) so touch dragging works on iPhone.
+   Only the .card-grip handle starts a drag -- never the card body, so taps for
+   chart drill-through and drags never fight. The grip has touch-action:none so
+   dragging it doesn't scroll the page. While dragging, the card floats as a
+   ghost and a dashed placeholder marks the drop position.
+   opts: {container, cardSel, keyAttr, saveOrder, endRef} */
+function wireCardReorder(opts){
+  var cont = opts.container;
+  if(!cont || cont.dataset.reorderWired) return;
+  cont.dataset.reorderWired = '1';
+  cont.addEventListener('pointerdown', function(e){
+    var grip = e.target && e.target.closest ? e.target.closest('.card-grip') : null;
+    if(!grip || !cont.contains(grip)) return;
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    var card = grip.closest(opts.cardSel);
+    if(!card) return;
+    e.preventDefault();
+    var pid = e.pointerId, startX = e.clientX, startY = e.clientY, active = false, ph = null;
+    var rect = card.getBoundingClientRect();
+    function move(ev){
+      var dx = ev.clientX-startX, dy = ev.clientY-startY;
+      if(!active){
+        if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+        active = true;
+        ph = document.createElement('div');
+        ph.className = 'card-drop-ph';
+        ph.style.height = rect.height+'px';
+        card.parentNode.insertBefore(ph, card);
+        card.classList.add('card-dragging');
+        card.style.width = rect.width+'px';
+        card.style.left = rect.left+'px';
+        card.style.top = rect.top+'px';
+        try{ grip.setPointerCapture(pid); }catch(err){}
+      }
+      card.style.left = (rect.left+dx)+'px';
+      card.style.top = (rect.top+dy)+'px';
+      var placed = null;
+      var list = cont.querySelectorAll(opts.cardSel);
+      for(var i=0;i<list.length;i++){
+        if(list[i]===card) continue;
+        var r = list[i].getBoundingClientRect();
+        if(ev.clientY < r.top + r.height/2){ placed = list[i]; break; }
+      }
+      if(placed) placed.parentNode.insertBefore(ph, placed);
+      else if(opts.endRef) opts.endRef.parentNode.insertBefore(ph, opts.endRef);
+      else card.parentNode.appendChild(ph);
+    }
+    function end(){
+      cont.removeEventListener('pointermove', move);
+      cont.removeEventListener('pointerup', end);
+      cont.removeEventListener('pointercancel', end);
+      if(!active) return;
+      ph.parentNode.insertBefore(card, ph);
+      ph.parentNode.removeChild(ph);
+      card.classList.remove('card-dragging');
+      card.style.width=''; card.style.left=''; card.style.top='';
+      var order = Array.prototype.map.call(cont.querySelectorAll(opts.cardSel), function(n){
+        return n.getAttribute(opts.keyAttr);
+      }).filter(function(k){ return !!k; });
+      opts.saveOrder(order);
+    }
+    cont.addEventListener('pointermove', move);
+    cont.addEventListener('pointerup', end);
+    cont.addEventListener('pointercancel', end);
+  });
+}
 function wireRepChartCards(){
   var hidden = repHiddenCharts();
   document.querySelectorAll('#screen-reports [data-repchart]').forEach(function(card){
@@ -2671,11 +2774,13 @@ function wireRepChartCards(){
         var head = el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:8px'});
         h2.parentNode.insertBefore(head, h2);
         head.appendChild(h2);
+        head.insertBefore(el('span',{class:'card-grip no-print',title:'Drag to reorder '+(REP_CHARTS[key]||key)},'\u283f'), h2);
         h2.style.margin = '0';
         var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+(REP_CHARTS[key]||key)+' from reports page'},'\u00D7');
         rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
         rm.addEventListener('click', function(){
           saveRepHiddenCharts(repHiddenCharts().concat([key]));
+          saveRepChartOrder(repChartOrder().filter(function(k){ return k!==key; }));
           wireRepChartCards();
         });
         head.appendChild(rm);
@@ -2689,7 +2794,11 @@ function wireRepChartCards(){
       addSel.dataset.repWired = '1';
       addSel.addEventListener('change', function(){
         if(!addSel.value) return;
-        saveRepHiddenCharts(repHiddenCharts().filter(function(x){ return x!==addSel.value; }));
+        var k = addSel.value;
+        saveRepHiddenCharts(repHiddenCharts().filter(function(x){ return x!==k; }));
+        var ord = repChartOrder().filter(function(x){ return x!==k; });
+        ord.push(k); // re-added charts go to the bottom
+        saveRepChartOrder(ord);
         wireRepChartCards();
       });
     }
@@ -2701,12 +2810,21 @@ function wireRepChartCards(){
     });
     addSel.value = '';
   }
+  applyRepChartOrder();
+  var _addSel = $('rep-add-chart');
+  wireCardReorder({container:$('screen-reports'), cardSel:'[data-repchart]', keyAttr:'data-repchart',
+    endRef: _addSel ? _addSel.closest('.card') : null,
+    saveOrder:function(order){
+      var hidden = repHiddenCharts();
+      saveRepChartOrder(order.filter(function(k){ return hidden.indexOf(k)<0; }));
+    }});
 }
 
 /* ---- home page chart picker ----
    One chart viewport; the menu chooses which chart renders. The pick persists. */
 var dashData = null;
-var DASH_CHART_LIST_KEY = 'expenseTracker.dashCharts';
+var DASH_CHART_LIST_KEY = 'expenseTracker.dashCharts'; // legacy key: read once for migration
+var HOME_ORDER_KEY = 'expenseTracker.homeChartOrder';
 var DASH_CHARTS = {
   catmix:   {title:'Category Mix',           sub:'Share of total spend'},
   catmixtable:{title:'Category Mix table',   sub:'Income and expenses by category'},
@@ -2725,15 +2843,21 @@ var DASH_CHARTS = {
   heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'}
 };
 var DASH_CHART_DEFAULTS = ['catmix','catmixtable','merch','week','trend','budget'];
+/* Ordered list of visible Home chart cards. Re-adding a chart appends it at
+   the bottom; dragging rewrites the order. Migrates once from the legacy key. */
 function dashChartList(){
   try{
-    var l = JSON.parse(localStorage.getItem(DASH_CHART_LIST_KEY) || 'null');
+    var l = JSON.parse(localStorage.getItem(HOME_ORDER_KEY) || 'null');
     if(Array.isArray(l) && l.length) return l.filter(function(k){ return !!DASH_CHARTS[k]; });
+  }catch(e){}
+  try{
+    var old = JSON.parse(localStorage.getItem(DASH_CHART_LIST_KEY) || 'null');
+    if(Array.isArray(old) && old.length) return old.filter(function(k){ return !!DASH_CHARTS[k]; });
   }catch(e){}
   return DASH_CHART_DEFAULTS.slice();
 }
 function saveDashChartList(l){
-  try{ localStorage.setItem(DASH_CHART_LIST_KEY, JSON.stringify(l)); }catch(e){}
+  try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(l)); }catch(e){}
 }
 /* Home page: a customizable stack of chart cards. Each card has a remove
    button; the "Add chart" menu underneath offers whatever isn't shown yet.
@@ -2756,7 +2880,7 @@ function renderDashCharts(){
   if(!d) return;
   var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel;
   function dashDrill(extra){
-    var o = {type:'expense', bp:bpVal};
+    var o = {type:'expense', bp:bpVal, carryCats:dashCatSel};
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
@@ -2766,7 +2890,9 @@ function renderDashCharts(){
     var meta = DASH_CHARTS[pick];
     if(!meta) return;
     var card = el('div',{class:'card'});
+    card.setAttribute('data-dashchart', pick);
     var head = el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:8px'});
+    head.appendChild(el('span',{class:'card-grip no-print',title:'Drag to reorder '+meta.title},'\u283f'));
     head.appendChild(el('h2',{style:'margin:0'}, meta.title));
     var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+meta.title+' from home page'},'\u00D7');
     rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
@@ -2782,6 +2908,8 @@ function renderDashCharts(){
     wrap.appendChild(card);
     renderDashChartBody(pick, body, ctx);
   });
+  wireCardReorder({container:wrap, cardSel:'[data-dashchart]', keyAttr:'data-dashchart',
+    saveOrder:saveDashChartList});
 }
 function renderDashChartBody(pick, box, c){
   var d = c.d, dashDrill = c.drill, rangeLabel = c.rangeLabel,
@@ -2796,17 +2924,14 @@ function renderDashChartBody(pick, box, c){
     var catsE = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; });
     var catsX = Object.keys(d.byCatXfer).sort(function(a,b){ return d.byCatXfer[b]-d.byCatXfer[a]; });
     repDonut(box.querySelector('[data-dd="inc"]'), catsI.map(function(c){ return {name:c, value:d.byCatInc[c]}; }), function(it){
-      dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Income \u00B7 ' + rangeLabel});
+      dashDrill({type:'income', dispCats: (it.names && it.names.length ? it.names : [it.name])});
     }, 'No income in this period.');
     repDonut(box.querySelector('[data-dd="exp"]'), catsE.map(function(c){ return {name:c, value:d.byCatExp[c]}; }), function(it){
-      dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name]),
-        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      dashDrill({type:'expense', dispCats: (it.names && it.names.length ? it.names : [it.name])});
     }, 'No expenses in this period.');
     repDonut(box.querySelector('[data-dd="xfer"]'), catsX.map(function(c){ return {name:c, value:d.byCatXfer[c]}; }), function(it){
       var raws = (it.names && it.names.length ? it.names : [it.name]);
-      dashDrill({type:'', xferOnly:true, rawCats: raws,
-        label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Transfers \u00B7 ' + rangeLabel});
+      dashDrill({type:'', xferOnly:true, rawCats: raws});
     }, 'No transfers in this period.');
     // Tapping a donut's title or center total drills to every transaction of
     // that type in the period (slices/legend rows still drill per category).
@@ -2819,9 +2944,9 @@ function renderDashChartBody(pick, box, c){
       var cx = wrap.querySelector('.cx-text');
       if(cx){ cx.classList.add('rep-click'); cx.addEventListener('click', fire); }
     }
-    donutAllDrill('inc', {type:'income', label:'Income · '+rangeLabel});
-    donutAllDrill('exp', {type:'expense', label:'Expenses · '+rangeLabel});
-    donutAllDrill('xfer', {type:'', xferOnly:true, label:'Transfers · '+rangeLabel});
+    donutAllDrill('inc', {type:'income'});
+    donutAllDrill('exp', {type:'expense'});
+    donutAllDrill('xfer', {type:'', xferOnly:true});
   } else if(pick==='catmixtable'){
     var tE = 0, tI = 0, kk;
     for(kk in d.byCatExp) tE += d.byCatExp[kk];
@@ -2832,7 +2957,7 @@ function renderDashChartBody(pick, box, c){
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-catrow'), ct = n.getAttribute('data-cattype')||'expense';
-        dashDrill({type:ct, dispCats:[c], label: c + ' \u00B7 ' + (ct==='income'?'Income':'Expenses') + ' \u00B7 ' + rangeLabel});
+        dashDrill({type:ct, dispCats:[c]});
       });
     })(catRows[ri]);
     wireCatMixSorting(box);
@@ -2843,7 +2968,7 @@ function renderDashChartBody(pick, box, c){
     });
   } else if(pick==='week'){
     repWeekday(box, d.byDay, function(i){
-      dashDrill({weekday:i, label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
+      dashDrill({weekday:i});
     });
   } else if(pick==='trend'){
     var months = Object.keys(d.byMonth).sort();
@@ -2887,14 +3012,14 @@ function renderDashChartBody(pick, box, c){
     var volCats = Object.keys(d.byCatNExp).sort(function(a,b){ return d.byCatNExp[b]-d.byCatNExp[a]; }).slice(0,12);
     repHBarsCount(box, volCats.map(function(c){ return {name:c, value:d.byCatNExp[c]}; }),
       '#f6c85f', 'No expenses in this period.', function(it){
-        dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+        dashDrill({dispCats:[it.name]});
       });
   } else if(pick==='avgticket'){
     var avgCats = Object.keys(d.byCatExp).sort(function(a,b){
       return (d.byCatExp[b]/d.byCatNExp[b])-(d.byCatExp[a]/d.byCatNExp[a]); }).slice(0,12);
     repHBars(box, avgCats.map(function(c){ return {name:c, value:d.byCatExp[c]/d.byCatNExp[c]}; }),
       '#a78bfa', 'No expenses in this period.', function(it){
-        dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+        dashDrill({dispCats:[it.name]});
       });
   } else if(pick==='cattrend'){
     var trendCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,6);
@@ -2912,7 +3037,7 @@ function renderDashChartBody(pick, box, c){
     });
     repStackedVBars(box, trendSeries, trendLabels, function(si, mi){
       dashDrill({singleMonth:trendMonths[mi], dispCats:[trendCats[si]],
-        label: trendCats[si] + ' \u00B7 ' + fmtMonthPretty(trendMonths[mi])});
+});
     });
   } else if(pick==='ownercat'){
     var ocCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,5);
@@ -2935,13 +3060,13 @@ function renderDashChartBody(pick, box, c){
       return {name:o, color:REP_PALETTE[oi%REP_PALETTE.length], values:vals};
     });
     repGroupedVBars(box, ocSeries, ocCats, function(si, li){
-      dashDrill({dispCats:[ocCats[li]], label: ocCats[li] + ' \u00B7 ' + ocOwners[si] + ' \u00B7 ' + rangeLabel});
+      dashDrill({dispCats:[ocCats[li]], owners:[ocOwners[si]]});
     });
   } else if(pick==='pareto'){
     var paretoItems = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; })
       .map(function(c){ return {name:c, value:d.byCatExp[c]}; });
     repPareto(box, paretoItems, function(it){
-      dashDrill({dispCats:[it.name], label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+      dashDrill({dispCats:[it.name]});
     });
   } else if(pick==='heatmap'){
     var hmCats = Object.keys(d.byCatExp).sort(function(a,b){ return d.byCatExp[b]-d.byCatExp[a]; }).slice(0,8);
@@ -2958,7 +3083,7 @@ function renderDashChartBody(pick, box, c){
     });
     repHeatmap(box, hmCats, hmLabels, hmMatrix, hmMonths, function(ri, ci){
       dashDrill({singleMonth:hmMonths[ci], dispCats:[hmCats[ri]],
-        label: hmCats[ri] + ' \u00B7 ' + fmtMonthPretty(hmMonths[ci])});
+});
     });
   }
 }
@@ -3052,10 +3177,9 @@ function syncAllChips(){
 }
 function wireTransactions(){
   ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-bank','f-tax'].forEach(function(id){
-    // a manual filter edit replaces any chart drill-down: the visible
-    // filters are always the single source of truth (search composes)
+    // Manual filter edits compose with an active drill pill (the pill is
+    // dismissed only via its own \u00d7); search composes too.
     $(id).addEventListener('change', function(){
-      txnDrill = null;
       if(id==='f-from'){
         // keep the range valid: To can never be before From
         var f = $('f-from'), t = $('f-to');
@@ -3363,12 +3487,29 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(cat && t.category!==cat) return false;
   if(bk && txnBank(t)!==bk) return false;
   if(tx && (t.tax_category||'Uncategorized')!==tx) return false;
-  if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
-  if(txnDrill && txnDrill.xferOnly && !txnIsTransfer(t)) return false;
-  if(txnDrill && txnDrill.noXfer && txnIsTransfer(t)) return false;
-  if(txnDrill && txnDrill.rawCats && txnDrill.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
-  if(txnDrill && txnDrill.weekday!=null){
-    if(weekdayIdx(t.date)!==txnDrill.weekday) return false;
+  // Drill context (chart drill-through pill): applies as an additional filter on
+  // top of the native controls. Never nulls out the native filters.
+  if(txnDrill){
+    var dd = txnDrill;
+    if(dd.type && t.txn_type!==dd.type) return false;
+    if(dd.bp && t.business_personal!==dd.bp) return false;
+    if(dd.taxCat && (t.tax_category||'Uncategorized')!==dd.taxCat) return false;
+    if(dd.dispCats && dd.dispCats.length){
+      var ddc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
+      if(dd.dispCats.indexOf(ddc)===-1) return false;
+    }
+    if(dd.rawCats && dd.rawCats.length && dd.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
+    if(dd.xferOnly && !txnIsTransfer(t)) return false;
+    if(dd.noXfer && txnIsTransfer(t)) return false;
+    if(dd.weekday!=null && weekdayIdx(t.date)!==dd.weekday) return false;
+    if(dd.owners && dd.owners.length && dd.owners.indexOf(txnOwner(t))===-1) return false;
+    if(dd.banks && dd.banks.length && dd.banks.indexOf(txnBank(t))===-1) return false;
+    if(dd.minAmt!=null && num(t.amount)<dd.minAmt) return false;
+    if(dd.maxAmt!=null && num(t.amount)>=dd.maxAmt) return false;
+    if(dd.q){
+      var dhay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
+      if(dhay.indexOf(dd.q)===-1) return false;
+    }
   }
   if(q){
     var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
@@ -3382,12 +3523,38 @@ function renderDrillChip(){
   var td = $('txn-drill');
   td.innerHTML = '';
   if(!txnDrill) return;
+  // Temporary, dismissible drill pill. The \u00D7 clears ONLY the drill context;
+  // the native filters are independent and keep their values.
   var chip = el('div',{class:'drillchip'});
-  chip.appendChild(el('span',null,'📊 '+txnDrill.label));
-  var x = el('button',{class:'drillx',type:'button','aria-label':'Clear report filter'},'\u00D7');
-  x.addEventListener('click', resetTxnFilters);
+  chip.appendChild(el('span',null,'📊 '+drillPillLabel(txnDrill)));
+  var x = el('button',{class:'drillx',type:'button','aria-label':'Clear drill filter'},'\u00D7');
+  x.addEventListener('click', function(){ txnDrill = null; renderTransactions(); });
   chip.appendChild(x);
   td.appendChild(chip);
+}
+/* Normalized "who entered it" value, matching the Owner Split chart. */
+function txnOwner(t){ return String(t.entered_by||'').trim() || 'Unknown'; }
+/* Pill label for a drill context, e.g. "Showing: Auto expense + 2 more \u00B7 Expenses \u00B7 Sep 2026". */
+function drillPillLabel(d){
+  function plusMore(arr){ return arr.length===1 ? arr[0] : arr[0]+' + '+(arr.length-1)+' more'; }
+  var what = [];
+  var cats = (d.dispCats && d.dispCats.length) ? d.dispCats
+           : (d.rawCats && d.rawCats.length) ? d.rawCats : null;
+  if(cats) what.push(plusMore(cats));
+  if(d.owners && d.owners.length) what.push(plusMore(d.owners));
+  if(d.banks && d.banks.length) what.push(plusMore(d.banks));
+  if(d.band) what.push(d.band);
+  if(d.q) what.push('\u201C'+d.q+'\u201D');
+  if(d.weekday!=null && WD_NAMES[d.weekday]) what.push(WD_NAMES[d.weekday]+'s');
+  if(d.taxCat) what.push(d.taxCat);
+  if(d.type==='income') what.push('Income');
+  else if(d.type==='expense') what.push('Expenses');
+  else if(d.xferOnly) what.push('Transfers');
+  else if(d.noXfer) what.push('Net');
+  if(d.bp) what.push(d.bp);
+  var when = null;
+  if(d.from && d.to) when = d.from===d.to ? fmtMonthPretty(d.from) : fmtMonthPretty(d.from)+'\u2013'+fmtMonthPretty(d.to);
+  return 'Showing: ' + (what.length ? what.join(' \u00B7 ') : 'Transactions') + (when ? ' \u00B7 ' + when : '');
 }
 /* The Transactions period filter is sticky: it survives the Reset button,
    drill dismissal, and app restarts. Manual edits save it; chart drills set
@@ -3410,8 +3577,8 @@ function restoreTxnPeriod(){
     return true;
   }catch(e){ return false; }
 }
-/* Reset transaction filters, but keep the remembered period
-   (also used by the drill chip's ×). */
+/* Reset transaction filters, but keep the remembered period.
+   (The drill pill's × now clears only the drill context, not the filters.) */
 function resetTxnFilters(){
   if(!restoreTxnPeriod()){ // nothing remembered yet: fall back to this month
     $('f-preset').value = 'month';
@@ -3428,58 +3595,33 @@ function resetTxnFilters(){
   txnDrill = null; // also clear any chart drill selection
   renderTransactions();
 }
-/* Set the Category filter even when its dropdown hasn't been built yet
-   (e.g. drilling straight from Home on first visit): make sure the option
-   exists before selecting it, otherwise the assignment silently fails. */
-function setCatFilter(name){
-  var fcat = $('f-cat');
-  if(name){
-    var has = false;
-    for(var i=0;i<fcat.options.length;i++) if(fcat.options[i].value===name){ has = true; break; }
-    if(!has) fcat.appendChild(el('option',{value:name},name));
-  }
-  fcat.value = name || '';
-}
-/* Same ensure-the-option-exists treatment for the Tax category filter,
-   used by Tax page drills. */
-function setTaxFilter(name){
-  var ftax = $('f-tax');
-  if(name){
-    var has = false;
-    for(var i=0;i<ftax.options.length;i++) if(ftax.options[i].value===name){ has = true; break; }
-    if(!has) ftax.appendChild(el('option',{value:name},name));
-  }
-  ftax.value = name || '';
-}
-/* Jump to the Transactions screen showing exactly the drilled selection.
-   The visible filters are set to match what was clicked (period, type,
-   account, category, search) so the selection is transparent and editable. */
+/* Chart drill-through: set ONLY the temporary pill context and jump to the
+   Transactions screen. Native filter controls are never rewritten by a drill;
+   they stay independent and combine with the pill as additional filters.
+   o.carryCats (the source page's active chip selection) is intersected with
+   the tapped element's own categories so an active filter is never dropped.
+   Transfers are exempt from chip filtering, so xferOnly drills never carry
+   categories. */
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
-  var ranged = !!(o.from || o.to);
-  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer)
-    ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
-       dispCats:o.dispCats||null, label:o.label||'Report selection',
-       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, rawCats:o.rawCats||null}
-    : null;
-  if(from && to){
-    $('f-preset').value = 'custom';
-    $('f-from').value = from; $('f-to').value = to;
-    $('f-custom').style.display = 'flex';
-  }
-  $('f-type').value = o.type || '';
-  $('f-bp').value = o.bp || '';
-  // single-category drill: show it in the Category filter (multi-category
-  // "Other" slices and display-only names like Transfers stay on the chip)
-  var cats = allCategories();
-  setCatFilter((o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
-    ? o.dispCats[0] : '');
-  $('f-bank').value = ''; // drills don't target banks: never leave a stale bank filter on
-  // tax-category drills (Tax page) show it in the visible Tax category filter
-  // so the selection is transparent; other drills clear any stale tax filter
-  setTaxFilter(o.taxCat || '');
-  $('f-q').value = o.q || '';
-  var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
+  var carry = (!o.xferOnly && o.carryCats && o.carryCats.length) ? o.carryCats : null;
+  var dc = (o.dispCats && o.dispCats.length) ? o.dispCats.slice() : null;
+  var effCats = null;
+  if(carry && dc) effCats = dc.filter(function(c){ return carry.indexOf(c)>=0; });
+  else if(carry) effCats = carry.slice();
+  else if(dc) effCats = dc;
+  txnDrill = {
+    from: from, to: to,
+    type: o.type || '', bp: o.bp || '', taxCat: o.taxCat || null,
+    dispCats: effCats, rawCats: o.rawCats || null,
+    weekday: (o.weekday==null ? null : o.weekday),
+    owners: o.owners || null, banks: o.banks || null,
+    band: o.band || null,
+    minAmt: (o.minAmt==null ? null : o.minAmt),
+    maxAmt: (o.maxAmt==null ? null : o.maxAmt),
+    q: o.q ? String(o.q).trim().toLowerCase() : null,
+    xferOnly: !!o.xferOnly, noXfer: !!o.noXfer
+  };
   showScreen('transactions');
 }
 /* show/hide the × clear buttons in the two search boxes */
@@ -6598,7 +6740,7 @@ function botPropose(){
    that category. The period is left alone — whatever the Transactions page's
    Period menu is currently set to stays in effect. */
 function botDrillCategory(cat, type){
-  drillToTransactions({type:type, dispCats:[cat], label:cat});
+  drillToTransactions({type:type, dispCats:[cat]});
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
@@ -8224,6 +8366,14 @@ function renderReports(){
   });
   top.sort(function(a,b){ return num(b.amount)-num(a.amount); });
   var net = inc-exp;
+  // Multi-category chip selection (Reports only): every chart below renders one
+  // series per selected category, never a combined total. byCat keys are already
+  // limited to the selection because rows were pre-filtered above.
+  var multiCat = repCatSel.length > 1;
+  var mselExp = multiCat
+    ? Object.keys(byCat).filter(function(c){ return repCatSel.indexOf(c)>=0; })
+        .sort(function(a,b){ return byCat[b]-byCat[a]; })
+    : [];
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   $('rep-title').textContent = 'Expense report';
   $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
@@ -8237,9 +8387,8 @@ function renderReports(){
   var cc = $('rep-catchart');
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
   repDonut(cc, cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal,
-      dispCats: (it.names && it.names.length ? it.names : [it.name]),
-      label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+      dispCats: (it.names && it.names.length ? it.names : [it.name])});
   });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
@@ -8251,6 +8400,7 @@ function renderReports(){
   // --- budget vs actual: paired bars + variance table, follows the report period ---
   var bMap = budgetsForRange(from, to);
   var bCats = Object.keys(bMap).sort(function(a,b){ return bMap[b]-bMap[a]; });
+  if(repCatSel.length) bCats = bCats.filter(function(c){ return repCatSel.indexOf(c)>=0; });
   var bSpend = {};
   rows.forEach(function(t){
     if(t.txn_type!=='expense') return;
@@ -8259,8 +8409,7 @@ function renderReports(){
   });
   var bItems = bCats.map(function(c){ return {name:c, budget:bMap[c], actual:bSpend[c]||0}; });
   repBudgetActual($('rep-budgetchart'), bItems, function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
-      label: it.name + ' · Budget vs Actual · ' + rangeLabel});
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
   });
   var btbl = $('rep-budgettable');
   if(!bCats.length){ btbl.innerHTML = ''; }
@@ -8286,40 +8435,74 @@ function renderReports(){
     for(var bi=0; bi<bRows.length; bi++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-bcat');
-        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[c],
-          label: c + ' · Budget vs Actual · ' + rangeLabel});
+        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
       });
     })(bRows[bi]);
   }
 
-  // --- monthly trend: bars + cumulative line ---
+  // --- monthly trend: one series per selected category when multi-selecting ---
   var mc = $('rep-monthchart');
   var months = Object.keys(byMonth).sort();
-  repTrend(mc, months.map(function(m){
-    return {key:m, label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: byMonth[m].exp};
-  }), function(it){
-    drillToTransactions({singleMonth: it.key, type:'expense', bp:bpVal});
-  });
+  if(multiCat && mselExp.length){
+    var mLabels = months.map(function(m){ return m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5); });
+    repGroupedVBars(mc, mselExp.map(function(c, ci){
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values: months.map(function(m){
+        var s=0;
+        rows.forEach(function(t){
+          if(t.txn_type==='expense' && repDisplayCat(t)===c && String(t.date||'').slice(0,7)===m) s += num(t.amount);
+        });
+        return s;
+      })};
+    }), mLabels, function(si, mi){
+      drillToTransactions({singleMonth:months[mi], type:'expense', bp:bpVal,
+        carryCats:repCatSel, dispCats:[mselExp[si]]});
+    });
+  } else {
+    repTrend(mc, months.map(function(m){
+      return {key:m, label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: byMonth[m].exp};
+    }), function(it){
+      drillToTransactions({singleMonth: it.key, type:'expense', bp:bpVal, carryCats:repCatSel});
+    });
+  }
   var mt = $('rep-monthtable');
   var mh = '<div class="ptablewrap"><table class="ptable"><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr>';
   months.forEach(function(m){
     var b = byMonth[m], n = b.inc-b.exp;
-    mh += '<tr><td>'+fmtMonthPretty(m)+'</td><td style="text-align:right">'+money(b.inc)+'</td><td style="text-align:right">'+money(b.exp)+'</td><td style="text-align:right; color:'+(n>=0?'var(--accent)':'var(--danger)')+'">'+money(n)+'</td></tr>';
+    mh += '<tr class="rep-click" data-mmonth="'+m+'"><td>'+fmtMonthPretty(m)+'</td><td style="text-align:right">'+money(b.inc)+'</td><td style="text-align:right">'+money(b.exp)+'</td><td style="text-align:right; color:'+(n>=0?'var(--accent)':'var(--danger)')+'">'+money(n)+'</td></tr>';
   });
   mt.innerHTML = mh + '</table></div>';
+  var mtRows = mt.querySelectorAll('[data-mmonth]');
+  for(var mri=0; mri<mtRows.length; mri++)(function(n){
+    n.addEventListener('click', function(){
+      drillToTransactions({singleMonth:n.getAttribute('data-mmonth'), type:'expense', bp:bpVal, carryCats:repCatSel});
+    });
+  })(mtRows[mri]);
 
   // --- top merchants (horizontal bars) ---
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,10);
   repHBars($('rep-merchchart'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, q: it.name,
-      label: it.name + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, q: it.name});
   });
 
-  // --- weekday pattern ---
-  repWeekday($('rep-weekchart'), byDay, function(i){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, weekday:i,
-      label: WD_NAMES[i]+'s \u00B7 Expenses \u00B7 '+rangeLabel});
-  });
+  // --- weekday pattern: grouped per selected category when multi-selecting ---
+  if(multiCat && mselExp.length){
+    repGroupedVBars($('rep-weekchart'), mselExp.map(function(c, ci){
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values: byDay.map(function(_, wi){
+        var s=0;
+        rows.forEach(function(t){
+          if(t.txn_type==='expense' && repDisplayCat(t)===c && weekdayIdx(t.date)===wi) s += num(t.amount);
+        });
+        return s;
+      })};
+    }), WD_NAMES.map(function(w){ return w.slice(0,3); }), function(si, wi){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal,
+        carryCats:repCatSel, dispCats:[mselExp[si]], weekday:wi});
+    });
+  } else {
+    repWeekday($('rep-weekchart'), byDay, function(i){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, weekday:i});
+    });
+  }
 
   // --- largest expenses ---
   var tp = $('rep-top');
@@ -8327,9 +8510,16 @@ function renderReports(){
   else{
     var th = '<div class="ptablewrap"><table class="ptable"><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>';
     top.slice(0,10).forEach(function(t){
-      th += '<tr><td>'+esc(t.date||'')+'</td><td>'+esc(t.description||'')+'</td><td>'+esc(repDisplayCat(t))+'</td><td style="text-align:right">'+money(num(t.amount))+'</td></tr>';
+      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td>'+esc(t.date||'')+'</td><td>'+esc(t.description||'')+'</td><td>'+esc(repDisplayCat(t))+'</td><td style="text-align:right">'+money(num(t.amount))+'</td></tr>';
     });
     tp.innerHTML = th + '</table></div>';
+    var tpRows = tp.querySelectorAll('[data-tid]');
+    for(var tri=0; tri<tpRows.length; tri++)(function(n){
+      n.addEventListener('click', function(){
+        var t = txnById(n.getAttribute('data-tid'));
+        if(t) openTxnForm(t);
+      });
+    })(tpRows[tri]);
   }
   // --- income by category ---
   var ic2 = $('rep-inc');
@@ -8337,8 +8527,15 @@ function renderReports(){
   if(!ics.length){ ic2.innerHTML = '<p class="muted">No income in this period.</p>'; }
   else{
     var ih2 = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th></tr>';
-    ics.forEach(function(c){ ih2 += '<tr><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td></tr>'; });
+    ics.forEach(function(c){ ih2 += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td></tr>'; });
     ic2.innerHTML = ih2 + '</table></div>';
+    var icRows = ic2.querySelectorAll('[data-icat]');
+    for(var ici=0; ici<icRows.length; ici++)(function(n){
+      n.addEventListener('click', function(){
+        var c = n.getAttribute('data-icat');
+        drillToTransactions({from:from, to:to, type:'income', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
+      });
+    })(icRows[ici]);
   }
 
   // --- transaction size bands (count of expenses by amount range) ---
@@ -8350,47 +8547,110 @@ function renderReports(){
     while(bi2<BANDS.length-1 && a>=BANDS[bi2][1]) bi2++;
     bandCounts[bi2]++;
   });
-  repVBars($('rep-sizebands'), BANDS.map(function(b,i){ return {name:b[0], value:bandCounts[i]}; }),
-    REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); });
+  if(multiCat && mselExp.length){
+    repGroupedVBars($('rep-sizebands'), mselExp.map(function(c, ci){
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values: BANDS.map(function(b, bi){
+        var n=0;
+        rows.forEach(function(t){
+          if(t.txn_type!=='expense' || repDisplayCat(t)!==c) return;
+          var a=num(t.amount), k=0;
+          while(k<BANDS.length-1 && a>=BANDS[k][1]) k++;
+          if(k===bi) n++;
+        });
+        return n;
+      })};
+    }), BANDS.map(function(b){ return b[0]; }), function(si, bi){
+      var lo = bi===0 ? 0 : BANDS[bi-1][1], hi = BANDS[bi][1];
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        dispCats:[mselExp[si]], band:BANDS[bi][0], minAmt:lo, maxAmt:hi});
+    });
+  } else {
+    repVBars($('rep-sizebands'), BANDS.map(function(b,i){ return {name:b[0], value:bandCounts[i]}; }),
+      REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); },
+      function(it){
+        var bi=0;
+        while(bi<BANDS.length && BANDS[bi][0]!==it.name) bi++;
+        var lo = bi===0 ? 0 : BANDS[bi-1][1], hi = BANDS[bi][1];
+        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+          band:it.name, minAmt:lo, maxAmt:hi});
+      });
+  }
 
-  // --- owner split (by entered_by) ---
+  // --- owner split (by entered_by): grouped per category when multi-selecting ---
   var byOwner = {};
   rows.forEach(function(t){
     if(t.txn_type!=='expense') return;
-    var o = String(t.entered_by||'').trim() || 'Unknown';
+    var o = txnOwner(t);
     byOwner[o] = (byOwner[o]||0) + num(t.amount);
   });
-  repDonut($('rep-ownersplit'), Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; })
-    .map(function(o){ return {name:o, value:byOwner[o]}; }), null, 'No expenses in this period.');
+  var ownerKeys = Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; });
+  if(multiCat && mselExp.length){
+    repGroupedVBars($('rep-ownersplit'), mselExp.map(function(c, ci){
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values: ownerKeys.map(function(o){
+        var s=0;
+        rows.forEach(function(t){
+          if(t.txn_type==='expense' && txnOwner(t)===o && repDisplayCat(t)===c) s += num(t.amount);
+        });
+        return s;
+      })};
+    }), ownerKeys, function(si, li){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        dispCats:[mselExp[si]], owners:[ownerKeys[li]]});
+    });
+  } else {
+    repDonut($('rep-ownersplit'), ownerKeys.map(function(o){ return {name:o, value:byOwner[o]}; }),
+      function(it){
+        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+          owners:(it.names && it.names.length ? it.names : [it.name])});
+      }, 'No expenses in this period.');
+  }
 
-  // --- card split (by normalized bank) ---
+  // --- card split (by normalized bank): grouped per category when multi-selecting ---
   var byBank = {};
   rows.forEach(function(t){
     if(t.txn_type!=='expense') return;
     var b = txnBank(t);
     byBank[b] = (byBank[b]||0) + num(t.amount);
   });
-  repDonut($('rep-cardsplit'), Object.keys(byBank).sort(function(a,b){ return byBank[b]-byBank[a]; })
-    .map(function(b){ return {name:b, value:byBank[b]}; }), null, 'No expenses in this period.');
+  var bankKeys = Object.keys(byBank).sort(function(a,b){ return byBank[b]-byBank[a]; });
+  if(multiCat && mselExp.length){
+    repGroupedVBars($('rep-cardsplit'), mselExp.map(function(c, ci){
+      return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values: bankKeys.map(function(b){
+        var s=0;
+        rows.forEach(function(t){
+          if(t.txn_type==='expense' && txnBank(t)===b && repDisplayCat(t)===c) s += num(t.amount);
+        });
+        return s;
+      })};
+    }), bankKeys, function(si, li){
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        dispCats:[mselExp[si]], banks:[bankKeys[li]]});
+    });
+  } else {
+    repDonut($('rep-cardsplit'), bankKeys.map(function(b){ return {name:b, value:byBank[b]}; }),
+      function(it){
+        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+          banks:(it.names && it.names.length ? it.names : [it.name])});
+      }, 'No expenses in this period.');
+  }
 
   // --- category volume (count by category, horizontal bars) ---
   var volCats = Object.keys(byCatN).sort(function(a,b){ return byCatN[b]-byCatN[a]; }).slice(0,12);
   repHBarsCount($('rep-catvol'), volCats.map(function(c){ return {name:c, value:byCatN[c]}; }),
     '#f6c85f', 'No expenses in this period.', function(it){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
-        label: it.name + ' · Expenses · ' + rangeLabel});
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
     });
 
   // --- average ticket (avg amount by category) ---
   var avgCats = Object.keys(byCat).sort(function(a,b){ return (byCat[b]/byCatN[b])-(byCat[a]/byCatN[a]); }).slice(0,12);
   repHBars($('rep-avgticket'), avgCats.map(function(c){ return {name:c, value:byCat[c]/byCatN[c]}; }),
     '#a78bfa', 'No expenses in this period.', function(it){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
-        label: it.name + ' · Expenses · ' + rangeLabel});
+      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
     });
 
   // --- category spend trend (monthly stacked by top categories) ---
-  var trendCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,6);
+  var trendCats = multiCat ? mselExp.slice()
+    : Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,6);
   var trendMonths = Object.keys(byMonth).sort();
   var trendLabels = trendMonths.map(function(m){ return m.slice(5)==='01' ? '’'+m.slice(2,4) : m.slice(5); });
   var trendSeries = trendCats.map(function(c, ci){
@@ -8404,12 +8664,12 @@ function renderReports(){
     return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values:vals};
   });
   repStackedVBars($('rep-cattrend'), trendSeries, trendLabels, function(si, mi){
-    drillToTransactions({singleMonth:trendMonths[mi], type:'expense', bp:bpVal, dispCats:[trendCats[si]],
-      label: trendCats[si] + ' · ' + fmtMonthPretty(trendMonths[mi])});
+    drillToTransactions({singleMonth:trendMonths[mi], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[trendCats[si]]});
   });
 
   // --- owner vs category (grouped bars: top 5 categories × owners) ---
-  var ocCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,5);
+  var ocCats = multiCat ? mselExp.slice()
+    : Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,5);
   var ocOwners = Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; }).slice(0,4);
   var ocSeries = ocOwners.map(function(o, oi){
     var vals = ocCats.map(function(c){
@@ -8423,20 +8683,20 @@ function renderReports(){
     return {name:o, color:REP_PALETTE[oi%REP_PALETTE.length], values:vals};
   });
   repGroupedVBars($('rep-ownercat'), ocSeries, ocCats, function(si, li){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[ocCats[li]],
-      label: ocCats[li] + ' · ' + ocOwners[si] + ' · ' + rangeLabel});
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+      dispCats:[ocCats[li]], owners:[ocOwners[si]]});
   });
 
   // --- spend pareto (cumulative share by category) ---
   var paretoItems = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; })
     .map(function(c){ return {name:c, value:byCat[c]}; });
   repPareto($('rep-pareto'), paretoItems, function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, dispCats:[it.name],
-      label: it.name + ' · Expenses · ' + rangeLabel});
+    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
   });
 
   // --- category × month heatmap ---
-  var hmCats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,8);
+  var hmCats = multiCat ? mselExp.slice()
+    : Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }).slice(0,8);
   var hmMonths = Object.keys(byMonth).sort();
   var hmLabels = hmMonths.map(function(m){ return m.slice(5)==='01' ? '’'+m.slice(2,4) : m.slice(5); });
   var hmMatrix = hmCats.map(function(c){
@@ -8449,8 +8709,7 @@ function renderReports(){
     });
   });
   repHeatmap($('rep-heatmap'), hmCats, hmLabels, hmMatrix, hmMonths, function(ri, ci){
-    drillToTransactions({singleMonth:hmMonths[ci], type:'expense', bp:bpVal, dispCats:[hmCats[ri]],
-      label: hmCats[ri] + ' · ' + fmtMonthPretty(hmMonths[ci])});
+    drillToTransactions({singleMonth:hmMonths[ci], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[hmCats[ri]]});
   });
   wireRepChartCards();
 }
@@ -8475,8 +8734,7 @@ function renderTaxGroup(node, rows, drillBase){
     r.appendChild(el('b',null,money(groups[k].total)));
     // Tapping a row opens its transactions for the tax year.
     r.addEventListener('click', function(){
-      drillToTransactions({from:drillBase.from, to:drillBase.to, type:'expense', bp:drillBase.bp,
-        taxCat:k, label:k+' · '+drillBase.scope});
+      drillToTransactions({from:drillBase.from, to:drillBase.to, type:'expense', bp:drillBase.bp, taxCat:k});
     });
     node.appendChild(r);
   });
