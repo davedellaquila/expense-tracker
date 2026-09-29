@@ -215,6 +215,12 @@ input[type=month]{min-width:0;}
 .sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
 /* ...except fields marked fullw, which always span the form width */
 .sheet.fitfields input.fullw,.sheet.fitfields select.fullw,.sheet.fitfields textarea.fullw{width:100%;}
+/* edit/add transaction form: single column on phones, 2 columns on iPad and wider */
+.fgrid{display:grid; grid-template-columns:1fr; gap:0 14px;}
+@media (min-width:700px){
+  .fgrid{grid-template-columns:1fr 1fr;}
+  .fgrid .span2{grid-column:1 / -1;}
+}
 /* auto-growing textareas start at their row count and expand with content */
 textarea.autogrow{min-height:0; resize:none; overflow:hidden;}
 /* clear (×) button inside search boxes */
@@ -4157,21 +4163,24 @@ function openTxnForm(t){
     sh.appendChild(el('label',{class:'f'},'Type')); sh.appendChild(typeSeg);
     sh.appendChild(el('label',{class:'f'},'Account')); sh.appendChild(bpSeg);
 
-    function field(labelText, input){
-      sh.appendChild(el('label',{class:'f'},labelText));
-      sh.appendChild(input);
+    var fg = el('div',{class:'fgrid'}); sh.appendChild(fg);
+    function field(labelText, input, span2){
+      var wrap = el('div',{class: span2 ? 'span2' : ''});
+      wrap.appendChild(el('label',{class:'f'},labelText));
+      wrap.appendChild(input);
+      fg.appendChild(wrap);
       return input;
     }
     var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal(),class:'fullw'}));
-    var inMerch = field('Merchant', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'e.g. Costco',autocomplete:'off',spellcheck:'false',class:'fullw'})));
-    if(t&&t.merchant){ inMerch.value=t.merchant; }
-    var inDesc = field('Description', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'Optional detail',autocomplete:'off',spellcheck:'false',class:'fullw'})));
-    if(t&&t.description){ inDesc.value=t.description; }
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal',class:'fullw'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
+    var inMerch = field('Merchant', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'e.g. Costco',autocomplete:'off',spellcheck:'false',class:'fullw'})), true);
+    if(t&&t.merchant){ inMerch.value=t.merchant; }
+    var inDesc = field('Description', autoGrowTextarea(el('textarea',{rows:'1',placeholder:'Optional detail',autocomplete:'off',spellcheck:'false',class:'fullw'})), true);
+    if(t&&t.description){ inDesc.value=t.description; }
     var inCat = field('Category', el('select',{class:'fullw'}));
     var inNewCat = el('input',{type:'text',placeholder:'New category name',autocomplete:'off',style:'display:none;margin-top:8px'});
-    sh.appendChild(inNewCat);
+    inCat.parentNode.appendChild(inNewCat);
     fitFieldToContent(inNewCat);
     function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; if(inCat.value==='__new__') inNewCat.focus(); }
     var inTax = field('Tax category', el('select',{class:'fullw'}));
@@ -4212,7 +4221,7 @@ function openTxnForm(t){
       if(!found) inBank.appendChild(el('option',{value:cur},cur));
       inBank.value = cur;
     });
-    var inNotes = field('Notes', autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',class:'fullw'})));
+    var inNotes = field('Notes', autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',class:'fullw'})), true);
     if(t&&t.notes){ inNotes.value=t.notes; }
 
     function refreshCats(){
