@@ -681,7 +681,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div class="card">
         <h2>Budget Bot</h2>
-        <p class="muted">Studies your last 3 months of spending and drafts a monthly budget. Edit any number, lock categories you don't want touched, then set a financial goal and let the bot suggest the trims.</p>
+        <p class="muted">Studies your spending so far this year and drafts a monthly budget. Edit any number, lock categories you don't want touched, then set a financial goal and let the bot suggest the trims.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="bot-propose" type="button">Propose my budget</button>
         </div>
@@ -4691,46 +4691,49 @@ function botProposalTotal(){
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var prior = [monthAdd(ym,-1), monthAdd(ym,-2), monthAdd(ym,-3)];
-  var sums = {}, lasts = {}, income = 0;
+  var sums = {}, lasts = {};
   prior.forEach(function(m, idx){
     txnsForMonth(m).forEach(function(t){
       if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
-      if(t.txn_type==='income'){ income += num(t.amount); return; }
+      if(t.txn_type==='income') return;
       var c = t.category || 'Uncategorized';
       sums[c] = (sums[c]||0) + num(t.amount);
       if(idx===0) lasts[c] = (lasts[c]||0) + num(t.amount);
     });
   });
-  var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
-    var avg = sums[c]/3;
-    return {category:c, avg:avg, last:lasts[c]||0, amount:botNiceRound(avg), locked:false};
-  }).sort(function(a,b){ return b.amount-a.amount; });
-  // YTD average per category: Jan 1 of the budget year through the selected month,
-  // divided by the calendar months elapsed (transfers excluded, like the 3-mo avg).
+  // Year-to-date totals: Jan 1 of the budget year through the selected month,
+  // divided by the calendar months elapsed. Transfers excluded throughout.
   var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
-  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {};
+  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncome = 0;
   state.transactions.forEach(function(t){
     if(!t.date || t.date<y0 || t.date>=yEnd) return;
     if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
+    if(t.txn_type==='income'){ ytdIncome += num(t.amount); return; }
     if(t.txn_type!=='expense') return;
     var c = t.category || 'Uncategorized';
     ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
   });
-  botProposal = {month:ym, rows:rows, avgIncome:income/3, ytdSums:ytdSums, ytdMonths:ytdMonths};
+  // Draft amounts come from the YTD monthly average (nice-rounded). The 3-month
+  // average and last month stay on as reference only.
+  var rows = Object.keys(ytdSums).filter(function(c){ return ytdSums[c]>0; }).map(function(c){
+    var ytdAvg = ytdSums[c]/ytdMonths;
+    return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false};
+  }).sort(function(a,b){ return b.amount-a.amount; });
+  botProposal = {month:ym, rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdMonths:ytdMonths};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
   $('bot-goal').hidden = false;
   $('bot-save-row').hidden = false;
   $('bot-save-month').textContent = fmtMonthPretty(ym);
-  toast(rows.length ? 'Budget drafted from your last 3 months.' : 'No spending found in the last 3 months.');
+  toast(rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
   if(!botProposal) return;
   var rows = botProposal.rows;
   if(!rows.length){
-    host.appendChild(el('p',{class:'muted'},'No spending in the last 3 months — nothing to base a budget on.'));
+    host.appendChild(el('p',{class:'muted'},'No spending this year — nothing to base a budget on.'));
     return;
   }
   var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
@@ -4744,7 +4747,7 @@ function botRenderTable(){
     var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'});
     var nm = el('div');
     nm.appendChild(el('b',null,r.category));
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))));
     line.appendChild(nm);
     var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
