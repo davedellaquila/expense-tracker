@@ -668,6 +668,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         <div id="pdf-status"></div>
       </div>
 
+      <div class="card" id="import-log-card">
+        <h2>Imported statements</h2>
+        <p class="muted" style="font-size:13px;margin:0 0 6px">Everything you've imported is logged here — check it before pulling new statements from your bank.</p>
+        <div id="import-log"></div>
+      </div>
+
       <div class="card" id="preview-card" hidden>
         <h2>Import preview <span class="muted" id="preview-count"></span></h2>
         <div id="preview-notices"></div>
@@ -4225,8 +4231,43 @@ function getImportedFiles(){
 function recordImportedFile(info, count){
   if(!info || !info.h) return;
   var a = getImportedFiles();
-  a.push({h:info.h, name:info.name, at:new Date().toISOString(), count:count});
+  a.push({h:info.h, name:info.name, bank:info.bank||null, period:info.period||null,
+    at:new Date().toISOString(), count:count});
   try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-50))); }catch(e){}
+  renderImportLog();
+}
+/* Statement period for a CSV import: the month span its rows cover. */
+function importPeriodForRows(rows){
+  var ms = {};
+  (rows||[]).forEach(function(r){ var m = String(r.date||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(m)) ms[m]=1; });
+  var keys = Object.keys(ms).sort();
+  if(!keys.length) return null;
+  return keys.length===1 ? fmtMonthPretty(keys[0]) : fmtMonthPretty(keys[0])+' – '+fmtMonthPretty(keys[keys.length-1]);
+}
+function renderImportLog(){
+  var box = $('import-log');
+  if(!box) return;
+  box.innerHTML='';
+  var a = getImportedFiles().slice().reverse(); // newest first
+  if(!a.length){ box.appendChild(el('p',{class:'muted'},'No imports logged yet.')); return; }
+  a.forEach(function(f){
+    var r = el('div',{class:'rowline'});
+    var left = el('div');
+    left.appendChild(el('b',null,(f.bank||'File')+(f.period?' · '+f.period:'')));
+    left.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.name||'')));
+    var right = el('div',{style:'text-align:right;flex:none'});
+    right.appendChild(el('b',null,String(f.count||0)+' txns'));
+    right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
+    r.appendChild(left); r.appendChild(right);
+    box.appendChild(r);
+  });
+  var clr = el('button',{class:'btn small ghost',type:'button',style:'margin-top:8px'},'Clear history');
+  clr.addEventListener('click', function(){
+    if(!confirm('Forget the list of imported statements? (Your transactions stay untouched.)')) return;
+    try{ localStorage.removeItem('et_imported_files'); }catch(e){}
+    renderImportLog();
+  });
+  box.appendChild(clr);
 }
 function showImportNotices(pn, notices, rows){
   pn.innerHTML='';
@@ -4417,6 +4458,7 @@ function parseDateFlex(s){
   return null;
 }
 function wireImport(){
+  renderImportLog();
   /* --- CSV --- */
   $('csv-pick').addEventListener('click', function(){ $('csv-file').click(); });
   $('csv-file').addEventListener('change', function(){
@@ -4628,7 +4670,7 @@ function buildPreviewFromCsv(){
   var noDate = out.filter(function(r){return !r.date;}).length;
   if(noDate) notices.push(noDate+' row(s) had dates we could not parse — fix them in the preview (YYYY-MM-DD).');
   importRows = out;
-  importFileInfo = csvFileInfo;
+  importFileInfo = csvFileInfo ? Object.assign({}, csvFileInfo, {bank:'CSV', period:importPeriodForRows(out)}) : null;
   markDuplicates(out);
   var pn = $('preview-notices');
   showImportNotices(pn, notices, out);
@@ -5012,7 +5054,9 @@ function finishPdfParse(pending, year, stmtMonth){
   stmtMonth = stmtMonth || pending.stmtMonth || null;
   var rows = parsePdfTransactions(pending.lines, pending.bank, year, stmtMonth);
   pendingPdf = null;
-  importFileInfo = pending.fileInfo || null;
+  importFileInfo = pending.fileInfo
+    ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, period:stmtPeriodLabel(year, stmtMonth)||null})
+    : null;
   markDuplicates(rows);
   var pn = $('preview-notices');
   var notices = [];
