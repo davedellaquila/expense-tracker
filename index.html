@@ -309,11 +309,12 @@ textarea{resize:vertical; min-height:64px;}
 }
 #float-totals[hidden]{display:none;}
 #float-totals > div{
-  background:var(--card); border:1px solid var(--border); border-radius:99px;
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
   padding:8px 16px; font-size:13.5px; box-shadow:0 4px 16px rgba(0,0,0,.22);
   max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  display:flex; flex-direction:column; gap:2px; align-items:center;
 }
-#screen-budgets.has-floattotals{padding-bottom:88px;}
+#screen-budgets.has-floattotals{padding-bottom:76px;}
 /* ---------- tab bar ---------- */
 .tabbar{
   position:fixed; left:0; right:0; bottom:0; z-index:40;
@@ -879,8 +880,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
   </main>
 
   <div id="float-totals" hidden>
-    <div id="float-totals-exp" hidden></div>
-    <div id="float-totals-inc" hidden></div>
+    <div id="float-totals-one"></div>
   </div>
   <nav class="tabbar" id="tabbar">
     <button data-screen="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
@@ -5449,19 +5449,21 @@ function updateFloatTotals(){
   var expRows = (botProposal && botProposal.rows) || [];
   var incRows = (incBotProposal && incBotProposal.rows) || [];
   var expOn = onBudget && expRows.length>0, incOn = onBudget && incRows.length>0;
-  var e = $('float-totals-exp'), ic = $('float-totals-inc');
-  e.hidden = !expOn; ic.hidden = !incOn;
+  var one = $('float-totals-one');
+  one.innerHTML = '';
   if(expOn){
-    e.innerHTML = '';
-    e.appendChild(document.createTextNode('Proposed total '));
-    var b = el('b'); b.textContent = money(botProposalTotal()); e.appendChild(b);
+    var d1 = el('div');
+    d1.appendChild(document.createTextNode('Proposed total '));
+    var b = el('b'); b.textContent = money(botProposalTotal()); d1.appendChild(b);
     var pct = botPctText();
-    if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; e.appendChild(s); }
+    if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; d1.appendChild(s); }
+    one.appendChild(d1);
   }
   if(incOn){
-    ic.innerHTML = '';
-    ic.appendChild(document.createTextNode('Expected income '));
-    var b2 = el('b'); b2.textContent = money(incBotTotal())+'/mo'; ic.appendChild(b2);
+    var d2 = el('div');
+    d2.appendChild(document.createTextNode('Expected income '));
+    var b2 = el('b'); b2.textContent = money(incBotTotal())+'/mo'; d2.appendChild(b2);
+    one.appendChild(d2);
   }
   wrap.hidden = !(expOn||incOn);
   var scr = $('screen-budgets');
