@@ -15,6 +15,8 @@ it's where ideas wait until Dave says "build it."
   how to import statements, categorize, use filters and drill-through, read the
   reports, manage budgets and bills — so anyone (e.g. Nancy) can learn it
   without a walkthrough.
+- **Better app name** (2026-09-29, Dave): think about a better name for the app
+  than "Expense Tracker".
 
 ## Completed features
 
