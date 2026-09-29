@@ -996,24 +996,101 @@ function otherDrillLabel(names){
 /* Category mix data table. opts: {byCatM:{cat:{'yyyy-MM':1}}} adds an Avg / mo column
    (averaged over each category's active months, not the full period);
    {clickable:true} adds drill-down row hooks; {footnote} adds a muted note. */
+/* Category Mix table: Income section (green) then Expenses section (red), each
+   sorted by amount descending. opts.inc = {byCat, byCatN, byCatM, total}.
+   Column headers are clickable — wireCatMixSorting(container) activates
+   sorting within each section (click again to reverse). */
 function catMixTable(byCat, byCatN, total, opts){
   opts = opts || {};
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
-  if(!cats.length || !total) return '';
+  var inc = opts.inc || null;
+  var incCats = inc ? Object.keys(inc.byCat).sort(function(a,b){ return inc.byCat[b]-inc.byCat[a]; }) : [];
+  if((!cats.length || !total) && !incCats.length) return '';
   var avgCol = !!opts.byCatM;
-  var h = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Txns</th><th style="text-align:right">Share</th><th style="text-align:right">Amount</th>'+(avgCol?'<th style="text-align:right">Avg / mo</th>':'')+'</tr>';
-  cats.forEach(function(c){
-    var avgCell = '';
-    if(avgCol){
-      var activeMonths = Object.keys(opts.byCatM[c]||{}).length || 1;
-      avgCell = '<td style="text-align:right">'+money(byCat[c]/activeMonths)+'</td>';
-    }
-    var rowAttr = opts.clickable ? ' class="rep-click" data-catrow="'+esc(c)+'"' : '';
-    h += '<tr'+rowAttr+'><td>'+esc(c)+'</td><td style="text-align:right">'+(byCatN[c]||0)+'</td><td style="text-align:right">'+Math.round(byCat[c]/total*100)+'%</td><td style="text-align:right">'+money(byCat[c])+'</td>'+avgCell+'</tr>';
-  });
+  var ncol = avgCol ? 5 : 4;
+  var h = '<div class="ptablewrap"><table class="ptable"><tr>'+
+    '<th data-scol="name" data-slabel="Category">Category</th>'+
+    '<th data-scol="txns" data-slabel="Txns" style="text-align:right">Txns</th>'+
+    '<th data-scol="share" data-slabel="Share" style="text-align:right">Share</th>'+
+    '<th data-scol="amount" data-slabel="Amount" style="text-align:right">Amount</th>'+
+    (avgCol?'<th data-scol="avg" data-slabel="Avg / mo" style="text-align:right">Avg / mo</th>':'')+'</tr>';
+  function section(catsArr, byC, byN, byM, tot, color, dtype, label){
+    if(!catsArr.length || !(tot>0)) return;
+    h += '<tr data-secthead><td colspan="'+ncol+'" class="muted" style="font-size:12px;font-weight:600;padding-top:10px">'+label+'</td></tr>';
+    catsArr.forEach(function(c){
+      var share = byC[c]/tot*100;
+      var avgCell = '';
+      if(avgCol){
+        var activeMonths = Object.keys((byM||{})[c]||{}).length || 1;
+        var avg = byC[c]/activeMonths;
+        avgCell = '<td data-sv-avg="'+avg.toFixed(2)+'" style="text-align:right">'+money(avg)+'</td>';
+      }
+      var rowAttr = opts.clickable ? ' class="rep-click" data-catrow="'+esc(c)+'" data-cattype="'+dtype+'"' : '';
+      h += '<tr'+rowAttr+' data-srow>'+
+        '<td data-sv-name="'+esc(String(c).toLowerCase())+'" style="color:'+color+'">'+esc(c)+'</td>'+
+        '<td data-sv-txns="'+(byN[c]||0)+'" style="text-align:right">'+(byN[c]||0)+'</td>'+
+        '<td data-sv-share="'+share.toFixed(2)+'" style="text-align:right">'+Math.round(share)+'%</td>'+
+        '<td data-sv-amount="'+byC[c].toFixed(2)+'" style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
+    });
+  }
+  section(incCats, inc?inc.byCat:{}, inc?inc.byCatN:{}, inc?inc.byCatM:{}, inc?inc.total:0, 'var(--accent)', 'income', 'Income');
+  section(cats, byCat, byCatN, opts.byCatM, total, 'var(--danger)', 'expense', 'Expenses');
   h += '</table></div>';
   if(opts.footnote) h += '<p class="muted" style="font-size:12px; margin:6px 0 0">'+esc(opts.footnote)+'</p>';
   return h;
+}
+/* Sort a rendered Category Mix table by column header taps. Each section
+   (Income, Expenses) sorts independently; rows keep their drill handlers
+   because nodes are moved, not recreated. */
+function sortCatMix(tbl, col, dir){
+  var mult = dir==='desc' ? -1 : 1;
+  var heads = tbl.querySelectorAll('[data-secthead]');
+  for(var hi=0; hi<heads.length; hi++){
+    var rows = [], n = heads[hi].nextSibling;
+    while(n){
+      if(n.nodeType===1 && n.hasAttribute('data-secthead')) break;
+      if(n.nodeType===1 && n.hasAttribute('data-srow')) rows.push(n);
+      n = n.nextSibling;
+    }
+    rows.sort(function(a,b){
+      var av = a.getAttribute('data-sv-'+col), bv = b.getAttribute('data-sv-'+col);
+      var cmp;
+      if(col==='name') cmp = String(av||'').localeCompare(String(bv||''));
+      else{
+        var an = parseFloat(av), bn = parseFloat(bv);
+        cmp = (isNaN(an)?0:an) - (isNaN(bn)?0:bn);
+      }
+      return cmp*mult;
+    });
+    var parent = heads[hi].parentNode, after = heads[hi+1] || null;
+    rows.forEach(function(r){ parent.insertBefore(r, after); });
+  }
+}
+function wireCatMixSorting(container){
+  var tbl = container.querySelector('table.ptable');
+  if(!tbl || tbl._sortWired) return;
+  tbl._sortWired = true;
+  tbl._sortCol = 'amount'; tbl._sortDir = 'desc';
+  var ths = tbl.querySelectorAll('tr:first-child th[data-scol]');
+  function paintHeads(){
+    for(var j=0; j<ths.length; j++){
+      var h2 = ths[j], c2 = h2.getAttribute('data-scol');
+      h2.innerHTML = esc(h2.getAttribute('data-slabel')) + (c2===tbl._sortCol ? (tbl._sortDir==='desc'?' ▾':' ▴') : '');
+    }
+  }
+  for(var i=0; i<ths.length; i++)(function(th){
+    th.classList.add('rep-click');
+    th.addEventListener('click', function(){
+      var col = th.getAttribute('data-scol');
+      var dir;
+      if(tbl._sortCol===col) dir = tbl._sortDir==='desc' ? 'asc' : 'desc';
+      else dir = (col==='name') ? 'asc' : 'desc';
+      tbl._sortCol = col; tbl._sortDir = dir;
+      sortCatMix(tbl, col, dir);
+      paintHeads();
+    });
+  })(ths[i]);
+  paintHeads();
 }
 var toastTimer = null;
 function toast(msg, isErr){
@@ -2130,7 +2207,7 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatMExp = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatMExp = {}, byCatNInc = {}, byCatMInc = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -2145,6 +2222,8 @@ function renderDashboard(){
     }
     else if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
       byCatInc[dc] = (byCatInc[dc]||0)+a;
+      byCatNInc[dc] = (byCatNInc[dc]||0)+1;
+      if(m.length>=7) (byCatMInc[dc]||(byCatMInc[dc]={}))[m]=1;
     }
     else if(t.txn_type==='expense'){ exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       byCatExp[dc] = (byCatExp[dc]||0)+a;
@@ -2173,7 +2252,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatMExp:byCatMExp, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatMExp:byCatMExp, byCatNInc:byCatNInc, byCatMInc:byCatMInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashChart();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -2231,15 +2310,18 @@ function renderDashChart(){
         label: (it.names ? otherDrillLabel(it.names) : it.name) + ' \u00B7 Transfers \u00B7 ' + rangeLabel});
     }, 'No transfers in this period.');
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
+    var totI = catsI.reduce(function(sum,c){ return sum+d.byCatInc[c]; }, 0);
     var tblBox = box.querySelector('[data-dd-table]');
-    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {byCatM:d.byCatMExp, clickable:true}));
+    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {byCatM:d.byCatMExp, clickable:true,
+      inc:{byCat:d.byCatInc, byCatN:d.byCatNInc, byCatM:d.byCatMInc, total:totI}}));
     var catRows = tblBox.querySelectorAll('[data-catrow]');
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
-        var c = n.getAttribute('data-catrow');
-        dashDrill({type:'expense', dispCats:[c], label: c + ' \u00B7 Expenses \u00B7 ' + rangeLabel});
+        var c = n.getAttribute('data-catrow'), ct = n.getAttribute('data-cattype')||'expense';
+        dashDrill({type:ct, dispCats:[c], label: c + ' \u00B7 ' + (ct==='income'?'Income':'Expenses') + ' \u00B7 ' + rangeLabel});
       });
     })(catRows[ri]);
+    wireCatMixSorting(tblBox);
   } else if(pick==='merch'){
     var merch = Object.keys(d.byMerch).sort(function(a,b){ return d.byMerch[b]-d.byMerch[a]; }).slice(0,8);
     repHBars(box, merch.map(function(k){ return {name:k, value:d.byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
@@ -5743,12 +5825,12 @@ function renderReports(){
   var bpVal = acct==='all' ? '' : acct;
   var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
   var rows = txnsForRange(from, to, acct);
-  var inc=0, exp=0, byCat={}, byCatN={}, byCatM={}, byInc={}, byMonth={}, byMerch={}, top=[];
+  var inc=0, exp=0, byCat={}, byCatN={}, byCatM={}, byInc={}, byIncN={}, byIncM={}, byMonth={}, byMerch={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
     var a = num(t.amount), m = (t.date||'').slice(0,7);
     if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
-    if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; }
+    if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; byIncN[ic]=(byIncN[ic]||0)+1; (byIncM[ic]||(byIncM[ic]={}))[m]=1; }
     else if(t.txn_type==='expense'){ exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; (byCatM[c]||(byCatM[c]={}))[m]=1; top.push(t);
       var mk=String(t.merchant||t.description||'Unknown').trim()||'Unknown'; byMerch[mk]=(byMerch[mk]||0)+a;
       var wd=weekdayIdx(t.date); if(wd>=0) byDay[wd]+=a;
@@ -5776,7 +5858,9 @@ function renderReports(){
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
   $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {byCatM:byCatM,
-    footnote:'Avg / mo is averaged over the months each category had spending, not the full period.'});
+    inc:{byCat:byInc, byCatN:byIncN, byCatM:byIncM, total:inc},
+    footnote:'Avg / mo is averaged over the months each category had activity, not the full period.'});
+  wireCatMixSorting($('rep-cattable'));
 
   // --- budget vs actual: paired bars + variance table, follows the report period ---
   var bMap = budgetsForRange(from, to);
