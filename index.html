@@ -5053,6 +5053,118 @@ function autoGrowTextarea(ta, maxH){
   return ta;
 }
 
+/* Split a transaction across multiple categories: replaces the original with
+   one part per row, each with its own category and amount. The parts must add
+   up exactly to the original amount (compared in integer cents). */
+function openSplitSheet(t, baseRow, closeEditForm){
+  var totalCents = Math.round(num(baseRow.amount)*100);
+  if(!(totalCents>0)){ toast('Enter an amount greater than zero first.', true); return; }
+  if(String(t.id).indexOf('tmp-')===0){ toast('Still saving — try again in a moment.', true); return; }
+  openSheetStacked(function(sh, close){
+    sh.appendChild(el('h2', null, 'Split transaction'));
+    sh.appendChild(el('p', {class:'muted', style:'font-size:13px;margin:0 0 10px'},
+      'Divide $'+(totalCents/100).toFixed(2)+' across categories. The parts must add up exactly.'));
+    var listBox = el('div');
+    sh.appendChild(listBox);
+    var rows = [];
+    var bpKind = baseRow.business_personal || 'Personal';
+    function cents(v){ return Math.round(num(v)*100); }
+    var remEl = el('p', {class:'muted', style:'font-size:14px;font-weight:600;margin:4px 0 10px'});
+    var bar = el('div', {class:'btnrow'});
+    var cancelBtn = el('button', {class:'btn ghost', type:'button'}, 'Cancel');
+    var saveBtn = el('button', {class:'btn go', type:'button'}, 'Save split');
+    function refresh(){
+      var sum = 0, allOk = true;
+      rows.forEach(function(r){
+        var c = cents(r.amt.value);
+        sum += c;
+        if(!(c>0)) allOk = false;
+      });
+      var rem = totalCents - sum;
+      remEl.textContent = 'Remaining: $'+(rem/100).toFixed(2);
+      remEl.style.color = (rem===0) ? 'var(--green)' : (rem<0 ? 'var(--red)' : '');
+      saveBtn.disabled = !(rem===0 && allOk && rows.length>=2);
+    }
+    function addRow(amount, cat){
+      var rowEl = el('div', {style:'display:flex;gap:8px;margin-bottom:8px;align-items:center'});
+      var amt = el('input', {type:'number', min:'0', step:'0.01', inputmode:'decimal',
+        placeholder:'0.00', value:(amount||''), style:'width:104px;flex:none'});
+      var sel = el('select', {style:'flex:1;min-width:0'});
+      categoryOptionsFor(sel, bpKind, cat||'');
+      var del = el('button', {class:'linkbtn', type:'button', style:'flex:none', 'aria-label':'Remove part'}, '\u00d7');
+      rowEl.appendChild(amt); rowEl.appendChild(sel); rowEl.appendChild(del);
+      var r = {amt:amt, sel:sel, el:rowEl};
+      del.addEventListener('click', function(){
+        if(rows.length<=2){ toast('A split needs at least two parts.', true); return; }
+        rowEl.parentNode.removeChild(rowEl);
+        rows.splice(rows.indexOf(r), 1);
+        refresh();
+      });
+      amt.addEventListener('input', refresh);
+      listBox.appendChild(rowEl);
+      rows.push(r);
+      refresh();
+      return r;
+    }
+    addRow('', baseRow.category||'');
+    addRow('', '');
+    sh.appendChild(remEl);
+    var addBtn = el('button', {class:'btn ghost', type:'button', style:'margin-bottom:12px'}, '+ Add part');
+    addBtn.addEventListener('click', function(){ var r = addRow('', ''); r.amt.focus(); });
+    sh.appendChild(addBtn);
+    cancelBtn.addEventListener('click', close);
+    bar.appendChild(cancelBtn); bar.appendChild(saveBtn);
+    sh.appendChild(bar);
+    saveBtn.addEventListener('click', function(){
+      var parts = rows.map(function(r){ return {cents:cents(r.amt.value), cat:r.sel.value}; });
+      if(parts.length<2){ toast('A split needs at least two parts.', true); return; }
+      for(var i=0;i<parts.length;i++){
+        if(!(parts[i].cents>0)){ toast('Give every part an amount greater than zero.', true); return; }
+      }
+      var sum = parts.reduce(function(a,p){ return a+p.cents; }, 0);
+      if(sum!==totalCents){
+        toast('Parts add up to $'+(sum/100).toFixed(2)+' — they must total $'+(totalCents/100).toFixed(2)+'.', true);
+        return;
+      }
+      var groupId = 'sg'+Date.now().toString(36);
+      var newRows = parts.map(function(p){
+        var r = Object.assign({}, baseRow);
+        r.amount = p.cents/100;
+        r.category = p.cat;
+        r.split_group = groupId;
+        delete r.id;
+        return r;
+      });
+      // Optimistic: swap the original for its parts, then persist.
+      state.transactions = state.transactions.filter(function(x){ return x.id!==t.id; });
+      var tmpIds = newRows.map(function(r){
+        var tmp = 'tmp-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
+        state.transactions.push(Object.assign({id:tmp, created_at:new Date().toISOString()}, r));
+        return tmp;
+      });
+      close();
+      closeEditForm();
+      if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
+      withSaveLock(async function(){
+        try{
+          await getStore().remove('Transactions', t.id);
+          for(var i=0;i<newRows.length;i++){
+            var newId = await getStore().append('Transactions', newRows[i]);
+            var added = state.transactions.find(function(x){ return x.id===tmpIds[i]; });
+            if(added && newId) added.id = String(newId);
+          }
+          if(state.screen==='transactions') renderTransactions();
+          toast('Split into '+newRows.length+' transactions.');
+        }catch(err){
+          try{ await loadAll(); }catch(e2){}
+          if(state.screen==='transactions') renderTransactions();
+          toast('Split failed: '+err.message, true);
+        }
+      });
+    });
+  });
+}
+
 function openTxnForm(t){
   var isEdit = !!t;
   openSheet(function(sh, close){
@@ -5115,11 +5227,56 @@ function openTxnForm(t){
         toast('Filled from scan \u2014 check the fields, then pick a category.');
       });
     }
-    var scanBtn = el('button',{class:'btn ghost', type:'button', style:'margin-bottom:6px'},'\uD83D\uDCF7 Scan receipt');
+    var scanBtn = el('button',{class:'btn ghost', type:'button'},'\uD83D\uDCF7 Scan receipt');
     scanBtn.addEventListener('click', startReceiptScan);
-    sh.appendChild(scanBtn);
+    var scanRow = el('div',{style:'display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap'});
+    scanRow.appendChild(scanBtn);
+    sh.appendChild(scanRow);
     sh.appendChild(scanBox);
     renderScanBox();
+
+    /* Split across categories (edit mode only): divide this transaction's
+       amount into parts, each with its own category. Base values come from
+       the form as it stands, so unsaved edits are respected. */
+    function splitBaseRow(){
+      var typedCat = inCat.value==='__new__' ? inNewCat.value.trim() : inCat.value;
+      var r = {
+        date: inDate.value,
+        merchant: inMerch.value.trim(),
+        description: inDesc.value.trim(),
+        amount: Math.round(num(inAmt.value)*100)/100,
+        txn_type: curType,
+        category: typedCat,
+        tax_category: inTax.value,
+        business_personal: curBp,
+        payment_method: bankTouched ? inBank.value : inPay.value,
+        notes: inNotes.value.trim(),
+        entered_by: state.userName||''
+      };
+      if(!scanPhoto && isEdit){
+        if(t.scanPath) r.scanPath = t.scanPath;
+        if(t.scanDataUrl) r.scanDataUrl = t.scanDataUrl;
+      }
+      return r;
+    }
+    if(isEdit){
+      var splitBtn = el('button',{class:'btn ghost', type:'button'},'Split across categories');
+      splitBtn.addEventListener('click', async function(){
+        var base = splitBaseRow();
+        if(scanPhoto && !base.scanPath && !base.scanDataUrl){
+          // New photo not yet uploaded: upload now so the parts keep it.
+          if(storeKind()==='firebase' && firebaseConfigured()){
+            var rsp = await uploadScanPhoto('receipt', scanPhoto.blob);
+            if(rsp) base.scanPath = rsp;
+            else toast('Receipt photo could not be saved; splitting without it.');
+          }else if(storeKind()==='local'){
+            base.scanDataUrl = scanPhoto.dataUrl;
+          }
+        }
+        openSplitSheet(t, base, close);
+      });
+      scanRow.appendChild(splitBtn);
+    }
 
     var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income'), bTrf=el('button',{type:'button'},'Transfer');
     typeSeg.appendChild(bExp); typeSeg.appendChild(bInc); typeSeg.appendChild(bTrf);
