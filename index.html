@@ -1260,7 +1260,7 @@ function promptName(){
 /* ================= state ================= */
 /* Build stamp: update on every deploy (date + short commit hash). Shown at
    the bottom of Settings so a stale cached copy is instantly recognizable. */
-var BUILD_STAMP = '2026-09-27 20:50 PDT · similar-fix';
+var BUILD_STAMP = '2026-09-29 02:47 PDT · dining-rule';
 var state = {
   apiUrl: null, userName: null,
   transactions: [], budgets: [], categories: [],
@@ -4364,8 +4364,8 @@ var CAT_RULES = [
    cats:['Groceries','Grocery','Food'], conf:'high'},
   {re:/costco/i, cats:['Groceries','Grocery','Shopping','Warehouse'], conf:'medium'},
   {re:/starbucks|peet'?s|dunkin'?|coffee/i, cats:['Dining','Coffee','Restaurants'], conf:'medium'},
-  {re:/mcdonald'?s|chipotle|subway|taco\s*bell|wendy'?s|burger|pizza|sushi|taqueria|\brestaurant\b|\bgrill\b|\bdiner\b|\bcafe\b|bistro|\bpho\b|\bramen\b|doordash|grubhub|uber\s*eats|postmates/i,
-   cats:['Dining','Restaurants','Eating Out'], conf:'medium'},
+  {re:/mcdonald'?s|chipotle|subway|taco\s*bell|wendy'?s|burger|pizza|sushi|taqueria|\brestaurant\b|\bgrill\b|\bdiner\b|\bcafe\b|bistro|\bpho\b|\bramen\b|roadhouse|doordash|grubhub|uber\s*eats|postmates/i,
+   cats:['Dining','Restaurants','Eating Out','Dining Out'], conf:'medium'},
   {re:/pg&?e|pacific\s*gas|socal\s*gas|smud|\belectric\b|\bwater\b|\bsewer\b|garbage|waste\s*management|comcast|xfinity|at&t|verizon|t-mobile|spectrum|\binternet\b/i,
    cats:['Utilities','Utility','Bills'], conf:'medium'},
   {re:/chevron|\bshell\b|exxon|mobil|\barco\b|\b76\b|valero|\bgas\b|\bfuel\b/i, cats:['Gas','Fuel','Auto'], conf:'medium'},
