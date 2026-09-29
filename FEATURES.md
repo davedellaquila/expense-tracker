@@ -17,6 +17,8 @@ it's where ideas wait until Dave says "build it."
   without a walkthrough.
 - **Better app name** (2026-09-29, Dave): think about a better name for the app
   than "Expense Tracker".
+- **Track merchant details** (2026-09-29, Dave): a dedicated place to keep notes
+  and details for each merchant.
 
 ## Completed features
 
