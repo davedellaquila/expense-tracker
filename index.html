@@ -4395,7 +4395,13 @@ function renderImportLog(expandKey){
   });
   Object.keys(groups).sort(function(a,b){ return groups[a].maxAt < groups[b].maxAt ? 1 : -1; }).forEach(function(k){
     var g = groups[k];
-    g.entries.sort(function(a,b){ return (a.f.at||'') < (b.f.at||'') ? 1 : -1; }); // newest first
+    g.entries.sort(function(a,b){ // by statement month, newest first; no-month entries last
+      var ya = importYm(a.f), yb = importYm(b.f);
+      if(ya && yb && ya!==yb) return ya < yb ? 1 : -1;
+      if(ya && !yb) return -1;
+      if(yb && !ya) return 1;
+      return (a.f.at||'') < (b.f.at||'') ? 1 : -1;
+    });
     var yms = g.entries.map(function(w){ return importYm(w.f); }).filter(Boolean).sort();
     var range = yms.length ? fmtMonthPretty(yms[0]) +
       ((yms.length>1 && yms[yms.length-1]!==yms[0]) ? ' – '+fmtMonthPretty(yms[yms.length-1]) : '') : null;
