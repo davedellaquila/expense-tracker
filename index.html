@@ -3381,11 +3381,21 @@ function openScrubber(){
     // Editable suggestion fields live outside the label so tapping them on
     // iOS can't toggle the checkbox.
     function editRow(tag, to){
-      var erow = el('div',{style:'display:flex;gap:6px;align-items:center;margin:4px 0 4px 28px'});
-      erow.appendChild(el('span',{class:'muted',style:'font-size:12px;flex:none'},'→ '+tag));
-      var inp = el('input',{type:'text',value:to,autocapitalize:'off',autocomplete:'off',spellcheck:'false',style:'flex:1;min-width:0;font-size:16px'});
+      var erow = el('div',{style:'display:flex;gap:6px;align-items:flex-start;margin:4px 0 4px 28px'});
+      erow.appendChild(el('span',{class:'muted',style:'font-size:12px;flex:none;margin-top:12px'},'→ '+tag));
+      var inp = el('textarea',{rows:'1',autocapitalize:'off',autocomplete:'off',spellcheck:'false',
+        style:'flex:1;min-width:0;font-size:16px;min-height:0;resize:none;overflow:hidden'});
+      inp.value = to;
+      // Grow to fit the text (capped, then scrolls).
+      function fit(){
+        inp.style.height = 'auto';
+        var h = inp.scrollHeight;
+        if(h>0){ inp.style.height = Math.min(h,160)+'px'; inp.style.overflowY = h>160 ? 'auto' : 'hidden'; }
+      }
+      inp.addEventListener('input', fit);
       erow.appendChild(inp);
       wrap.appendChild(erow);
+      requestAnimationFrame(fit);
       return inp;
     }
     var inM = f.toM!=null ? editRow('Merchant:', f.toM) : null;
