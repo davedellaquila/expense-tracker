@@ -210,6 +210,9 @@ input[type=text],input[type=email],input[type=password],input[type=number],input
 }
 /* month pickers have a wide intrinsic minimum; let them shrink inside flex/grid columns */
 input[type=month]{min-width:0;}
+/* edit/add transaction form: fields size to their contents instead of full width */
+.sheet.fitfields input[type=text],.sheet.fitfields input[type=number],.sheet.fitfields input[type=date],
+.sheet.fitfields select,.sheet.fitfields textarea{width:auto; max-width:100%;}
 /* clear (×) button inside search boxes */
 .clearbtn{position:absolute; right:8px; top:50%; transform:translateY(-50%);
   width:22px; height:22px; border:none; border-radius:50%; padding:0;
@@ -4087,9 +4090,23 @@ function openBulkUpdate(ids){
   });
 }
 
+/* Size a text field / textarea to fit its contents (edit-transaction form):
+   empty fields size to their placeholder, filled ones to their value. */
+function fitFieldToContent(input, min){
+  function fit(){
+    var len = String(input.value || input.placeholder || '').length;
+    var n = Math.max(min || 10, len + 2);
+    if(input.tagName === 'TEXTAREA') input.cols = n; else input.size = n;
+  }
+  input.addEventListener('input', fit);
+  fit();
+  return input;
+}
+
 function openTxnForm(t){
   var isEdit = !!t;
   openSheet(function(sh, close){
+    sh.classList.add('fitfields'); // fields size to their contents
     sh.appendChild(el('h2',null, isEdit?'Edit transaction':'Add transaction'));
 
     var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income'), bTrf=el('button',{type:'button'},'Transfer');
@@ -4119,13 +4136,16 @@ function openTxnForm(t){
     var inDate = field('Date', el('input',{type:'date',value:(t&&parseDateFlex(t.date))||todayLocal()}));
     var inMerch = field('Merchant', el('input',{type:'text',placeholder:'e.g. Costco',autocomplete:'off'}));
     if(t&&t.merchant) inMerch.value=t.merchant;
+    fitFieldToContent(inMerch);
     var inDesc = field('Description', el('input',{type:'text',placeholder:'Optional detail',autocomplete:'off'}));
     if(t&&t.description) inDesc.value=t.description;
+    fitFieldToContent(inDesc);
     var inAmt = field('Amount', el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal'}));
     if(t&&t.amount) inAmt.value=num(t.amount);
     var inCat = field('Category', el('select'));
     var inNewCat = el('input',{type:'text',placeholder:'New category name',autocomplete:'off',style:'display:none;margin-top:8px'});
     sh.appendChild(inNewCat);
+    fitFieldToContent(inNewCat);
     function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; if(inCat.value==='__new__') inNewCat.focus(); }
     var inTax = field('Tax category', el('select'));
     var inPay = field('Payment method', el('select'));
@@ -4140,6 +4160,7 @@ function openTxnForm(t){
     }
     var inNotes = field('Notes', el('textarea',{placeholder:'Optional'}));
     if(t&&t.notes) inNotes.value=t.notes;
+    fitFieldToContent(inNotes, 20);
 
     function refreshCats(){
       var prev = inCat.value;
