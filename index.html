@@ -1063,6 +1063,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             </div>
             <button class="btn ghost" id="set-auth-signout" hidden style="flex:none;width:auto">Sign out</button>
           </div>
+          <div><button class="linkbtn" id="set-firebase-console" type="button">🔥 Open Firebase console</button></div>
           <div id="set-auth-box">
             <label class="f">Sync across devices</label>
             <div id="set-auth-form" hidden>
@@ -2459,6 +2460,9 @@ function wireSettings(){
       await firebaseSignOut();
       await afterAuthChange('Signed out.');
     }catch(err){ toast('Sign out failed: '+err.message, true); }
+  });
+  $('set-firebase-console').addEventListener('click', function(){
+    window.open('https://console.firebase.google.com/project/expense-tracker-510000', '_blank');
   });
   $('set-auth-forgot').addEventListener('click', async function(){
     var email = $('set-auth-email').value.trim();
