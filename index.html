@@ -2083,6 +2083,20 @@ document.addEventListener('DOMContentLoaded', function(){
   applyTheme();
   boot();
 });
+/* Keyboard shortcuts: number keys 1-8 jump straight to tabs (browsers reserve
+   Cmd+1..8 for their own tab switching and never deliver them to the page).
+   Ignored while typing in a field or when a sheet is open. */
+(function(){
+  var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings'];
+  document.addEventListener('keydown', function(e){
+    if(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    if(e.key < '1' || e.key > '8') return;
+    var t = e.target;
+    if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.tagName==='SELECT' || t.isContentEditable)) return;
+    if(document.querySelector('#modal-root .overlay')) return;
+    showScreen(order[+e.key - 1]);
+  });
+})();
 async function boot(){
   updateUserChip();
   var kind = storeKind();
