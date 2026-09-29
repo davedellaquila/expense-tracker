@@ -662,15 +662,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
           </div>
           <div class="full">
-            <div style="min-width:0">
-              <label class="f" style="margin-top:0" for="f-q">Search</label>
-              <div style="position:relative">
-                <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0;padding-right:34px">
-                <button class="clearbtn" id="f-q-clear" type="button" aria-label="Clear search" hidden>×</button>
+            <div style="display:flex;gap:8px;align-items:flex-end">
+              <div style="flex:1;min-width:0">
+                <label class="f" style="margin-top:0" for="f-q">Search</label>
+                <div style="position:relative">
+                  <input type="text" id="f-q" placeholder="Search…" autocomplete="off" style="min-width:0;padding-right:34px">
+                  <button class="clearbtn" id="f-q-clear" type="button" aria-label="Clear search" hidden>×</button>
+                </div>
               </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:8px">
-              <div style="min-width:0">
+              <div style="flex:none;width:132px">
                 <label class="f" style="margin-top:0" for="f-sort">Sort</label>
                 <select id="f-sort" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
                     <option value="date-desc" selected>Newest</option>
@@ -681,11 +681,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
                     <option value="merchant-desc">Merchant Z–A</option>
                 </select>
               </div>
-              <div style="display:flex;align-items:center;gap:6px;min-width:0">
-                <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
-                <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
-                <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
-              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+              <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
+              <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
+              <button class="linkbtn" id="f-reset" type="button" style="flex:none">Reset</button>
             </div></div>
         </div>
       </div>
@@ -3859,18 +3859,26 @@ function openTidyMerchants(){
       found.length+' merchant'+(found.length===1?'':'s')+' can be cleaned up. Uncheck any to skip.'));
     var checks = [];
     found.forEach(function(g){
-      var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer'});
+      var wrap = el('div',{style:'padding:8px 0;border-bottom:1px solid var(--border)'});
+      var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;cursor:pointer'});
       var cb = el('input',{type:'checkbox',style:'margin-top:3px;flex:none'}); cb.checked = true;
       lab.appendChild(cb);
       var tx = el('div',{style:'min-width:0;font-size:13px'});
       tx.appendChild(el('div',{style:'word-break:break-word;color:var(--muted);text-decoration:line-through'},g.from));
-      var to = el('div',{style:'word-break:break-word'});
-      to.appendChild(el('b',null,g.to));
-      to.appendChild(el('span',{class:'muted',style:'font-weight:400'},' · '+g.count+' transaction'+(g.count===1?'':'s')));
-      tx.appendChild(to);
+      tx.appendChild(el('span',{class:'muted',style:'font-size:12px'},g.count+' transaction'+(g.count===1?'':'s')));
       lab.appendChild(tx);
-      sh.appendChild(lab);
-      checks.push({g:g, cb:cb});
+      wrap.appendChild(lab);
+      // Editable suggestion field lives outside the label so tapping it on
+      // iOS can't toggle the checkbox (same pattern as the statement-junk dialog).
+      var erow = el('div',{style:'margin:6px 0 0 28px'});
+      var inp = autoGrowTextarea(el('textarea',{rows:'1',autocapitalize:'off',autocomplete:'off',spellcheck:'false',
+        style:'width:100%;font-size:16px;font-weight:700'}), 160);
+      inp.value = g.to;
+      inp.setAttribute('aria-label','Suggested name for '+g.from);
+      erow.appendChild(inp);
+      wrap.appendChild(erow);
+      sh.appendChild(wrap);
+      checks.push({g:g, cb:cb, inp:inp});
     });
     var row = el('div',{style:'display:flex;gap:8px;margin-top:14px;position:sticky;bottom:0;background:var(--card);padding:10px 0'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
@@ -3884,16 +3892,19 @@ function openTidyMerchants(){
     checks.forEach(function(c){ c.cb.addEventListener('change', updateLabel); });
     updateLabel();
     apply.onclick = async function(){
-      var sel = checks.filter(function(c){ return c.cb.checked; }).map(function(c){ return c.g; });
+      var sel = checks.filter(function(c){ return c.cb.checked; });
       if(!sel.length) return;
-      var total = sel.reduce(function(s,g){ return s+g.count; }, 0);
+      var total = sel.reduce(function(sum,c){ return sum+c.g.count; }, 0);
       if(total>50){
         var okc = await confirmDialog('Update '+total+' transactions? This may take a minute or two.', 'Proceed');
         if(!okc) return;
       }
       close();
       var items = [];
-      sel.forEach(function(g){ g.ids.forEach(function(id){ items.push({id:id, to:g.to}); }); });
+      sel.forEach(function(c){
+        var to = c.inp.value.trim() || c.g.to; // use the edited name (fall back to suggestion if cleared)
+        c.g.ids.forEach(function(id){ items.push({id:id, to:to}); });
+      });
       runBulkJob(buildTidyJob(items), {verb:'Tidied'});
     };
     row.appendChild(cancel); row.appendChild(apply);
