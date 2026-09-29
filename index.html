@@ -704,6 +704,17 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
         </div>
       </div>
       <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
+      <div class="card">
+        <h2>Income Bot</h2>
+        <p class="muted">Studies your income so far this year and drafts monthly targets. Edit any number, lock categories you don't want touched, then save them as the month's income targets.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="ibot-propose" type="button">Propose my income</button>
+        </div>
+        <div id="ibot-table" style="margin-top:12px"></div>
+        <div id="ibot-save-row" hidden style="margin-top:14px">
+          <button class="btn" id="ibot-save" type="button">Save as <span id="ibot-save-month"></span> income targets</button>
+        </div>
+      </div>
       <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
     </section>
 
@@ -4558,11 +4569,13 @@ function finishPdfParse(pending, year, stmtMonth){
 
 /* ================= budgets ================= */
 function wireBudgets(){
-  $('bud-month').addEventListener('change', function(){ botReset(); renderBudgets(); });
+  $('bud-month').addEventListener('change', function(){ botReset(); incBotReset(); renderBudgets(); });
   $('bot-propose').addEventListener('click', botPropose);
   $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
   $('bot-suggest').addEventListener('click', botSuggest);
   $('bot-save').addEventListener('click', botSave);
+  $('ibot-propose').addEventListener('click', incBotPropose);
+  $('ibot-save').addEventListener('click', incBotSave);
 }
 /* Income targets live in the same Budgets store as spending budgets, namespaced
    with this prefix so no backend changes are needed on any of the three stores. */
@@ -4695,6 +4708,8 @@ function renderBudgets(){
   });
   restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
   botRecalc(); // refresh calculated values from current transactions; keeps edits/locks
+  incBotRestore(ym); // same for the income bot
+  incBotRecalc();
 }
 
 /* ================= budget bot ================= */
@@ -4862,7 +4877,7 @@ function botPropose(){
   $('bot-goal').hidden = false;
   $('bot-save-row').hidden = false;
   $('bot-save-month').textContent = fmtMonthPretty(ym);
-  toast(rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
+  toast(c.rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
@@ -5058,6 +5073,178 @@ function botReset(){
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
   $('bot-save-row').hidden = true;
+}
+
+/* ================= income bot =================
+   Mirrors the Budget Bot for income: drafts monthly income targets from
+   year-to-date income, with editable amounts, locks, per-row delete, draft
+   persistence per budget month, and save into namespaced income budgets. */
+var incBotProposal = null; // {v, month, rows:[{category, ytd, amount, locked, touched}], months}
+var INC_BOT_DRAFT_LS = 'expTrackerBotIncomeDraft:';
+function incBotCompute(ym){
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
+  var months = parseInt(ym.slice(5,7),10)||1;
+  var sums = {};
+  state.transactions.forEach(function(t){
+    if(t.txn_type!=='income') return;
+    if(!t.date || t.date<y0 || t.date>=yEnd) return;
+    var c = t.category || 'Uncategorized';
+    sums[c] = (sums[c]||0) + num(t.amount);
+  });
+  var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
+    var avg = sums[c]/months;
+    return {category:c, ytd:sums[c], amount:botNiceRound(avg), locked:false, touched:false};
+  }).sort(function(a,b){ return b.amount-a.amount; });
+  return {rows:rows, months:months};
+}
+function incBotPersist(){
+  try{
+    if(incBotProposal) localStorage.setItem(INC_BOT_DRAFT_LS+incBotProposal.month, JSON.stringify(incBotProposal));
+  }catch(e){}
+}
+function incBotRestore(ym){
+  if(incBotProposal) return;
+  try{
+    var raw = localStorage.getItem(INC_BOT_DRAFT_LS+ym);
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
+    incBotProposal = d;
+    incBotRenderTable();
+    $('ibot-save-row').hidden = false;
+    $('ibot-save-month').textContent = fmtMonthPretty(ym);
+  }catch(e){}
+}
+/* Refresh a proposal's calculated values from current transactions, keeping the
+   user's edits and locks: rows they typed keep their amounts; untouched rows
+   follow the fresh YTD average. New categories appear; user-added rows with no
+   YTD income are kept as-is. */
+function incBotRecalc(){
+  if(!incBotProposal) return;
+  var ym = $('bud-month').value || monthLocal();
+  if(incBotProposal.month!==ym) return;
+  var fresh = incBotCompute(ym);
+  var oldByCat = {};
+  incBotProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
+  var freshCats = {};
+  var merged = fresh.rows.map(function(fr){
+    freshCats[fr.category] = true;
+    var old = oldByCat[fr.category];
+    if(old){
+      return {category:fr.category, ytd:fr.ytd,
+        amount: old.touched ? old.amount : fr.amount,
+        locked: !!old.locked, touched: !!old.touched};
+    }
+    return fr;
+  });
+  incBotProposal.rows.forEach(function(r){
+    if(!freshCats[r.category]) merged.push({category:r.category, ytd:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
+  });
+  incBotProposal.rows = merged;
+  incBotProposal.months = fresh.months;
+  incBotRenderTable();
+}
+function incBotPropose(){
+  var ym = $('bud-month').value || monthLocal();
+  var c = incBotCompute(ym);
+  incBotProposal = {v:2, month:ym, rows:c.rows, months:c.months};
+  incBotRenderTable();
+  $('ibot-save-row').hidden = false;
+  $('ibot-save-month').textContent = fmtMonthPretty(ym);
+  toast(c.rows.length ? 'Income targets drafted from your year-to-date income.' : 'No income this year — nothing to base targets on.');
+}
+function incBotTotal(){
+  if(!incBotProposal) return 0;
+  return incBotProposal.rows.reduce(function(s,r){ return s+num(r.amount); }, 0);
+}
+function incBotRenderTable(){
+  var host = $('ibot-table'); host.innerHTML = '';
+  if(!incBotProposal) return;
+  var rows = incBotProposal.rows;
+  if(!rows.length){
+    host.appendChild(el('p',{class:'muted'},'No income this year — nothing to base targets on.'));
+    return;
+  }
+  var months = incBotProposal.months||1;
+  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  head.appendChild(el('span',null,'Category'));
+  head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+  head.appendChild(el('span',null,'Target'));
+  head.appendChild(el('span'));
+  head.appendChild(el('span'));
+  host.appendChild(head);
+  rows.forEach(function(r){
+    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-soft);border-radius:8px':'')});
+    var nm = el('div');
+    nm.appendChild(el('b',{style:'color:var(--accent)'},r.category));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'YTD '+money(Math.round(r.ytd||0))+' total'));
+    line.appendChild(nm);
+    line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
+    var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
+    inp.value = r.amount;
+    inp.disabled = r.locked;
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; incBotRenderTotal(); incBotPersist(); });
+    line.appendChild(inp);
+    var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — recalculation may change this':'Lock — recalculation will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
+    lock.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
+    line.appendChild(lock);
+    var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    del.addEventListener('click', function(){
+      incBotProposal.rows = incBotProposal.rows.filter(function(x){ return x!==r; });
+      incBotRenderTable(); incBotPersist();
+    });
+    line.appendChild(del);
+    host.appendChild(line);
+  });
+  var have = {};
+  rows.forEach(function(r){ have[r.category] = true; });
+  var sel = el('select',{style:'flex:1'});
+  var addable = false;
+  allCategories().forEach(function(c){ if(!have[c]){ sel.appendChild(el('option',{value:c},c)); addable = true; } });
+  if(addable){
+    var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
+    var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
+    addBtn.addEventListener('click', function(){
+      incBotProposal.rows.push({category:sel.value, ytd:0, amount:0, locked:false, touched:false});
+      incBotProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
+      incBotRenderTable(); incBotPersist();
+    });
+    addRow.appendChild(sel); addRow.appendChild(addBtn);
+    host.appendChild(addRow);
+  }
+  var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
+  tot.appendChild(el('span',null,'Expected total'));
+  tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
+  host.appendChild(tot);
+  incBotPersist();
+}
+function incBotRenderTotal(){
+  var t = $('ibot-total');
+  if(t) t.textContent = money(incBotTotal());
+}
+async function incBotSave(){
+  var ym = $('bud-month').value || monthLocal();
+  var btn = $('ibot-save'); btn.disabled = true;
+  await withSaveLock(async function(){
+  try{
+    var n = 0;
+    for(var i=0;i<incBotProposal.rows.length;i++){
+      var r = incBotProposal.rows[i];
+      if(r.amount>0){
+        await getStore().setBudget(INC_BUDGET_PREFIX+r.category, ym, Math.round(r.amount*100)/100);
+        n++;
+      }
+    }
+    await loadAll(); renderBudgets();
+    toast('Saved '+n+' income targets for '+fmtMonthPretty(ym)+'.');
+  }catch(err){ toast('Save failed: '+err.message, true); }
+  });
+  btn.disabled = false;
+}
+function incBotReset(){
+  incBotProposal = null;
+  $('ibot-table').innerHTML = '';
+  $('ibot-save-row').hidden = true;
 }
 
 /* ================= tax ================= */
