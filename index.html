@@ -5259,7 +5259,7 @@ var BANK_PROFILES = [
   { name:'Citibank',
     detect:[/citibank/i,/\bciti\b/i],
     incomeSections:[/payments?,?\s*credits?\s*and\s*adjustments/i,/\bdeposits?\b/i,/\bcredits?\b/i,/\bpayments?\b/i],
-    expenseSections:[/\bpurchases?\b/i,/\bwithdrawals?\b/i,/\bdebits?\b/i,/\bfees?\b/i,/\bcash\s*advances?\b/i] },
+    expenseSections:[/\bpurchases?\b/i,/\bwithdrawals?\b/i,/\bdebits?\b/i,/\bfees?\b/i,/\binterest\b/i,/\bcash\s*advances?\b/i] },
   { name:'Capital One',
     detect:[/capital\s*one/i],
     incomeSections:[/payments?\s*and\s*credits?/i,/\bcredits?\b/i,/\bpayments?\b/i,/\brefunds?\b/i],
@@ -5463,6 +5463,23 @@ function citiPaymentMethod(lines){
          || joined.match(/x{2,}\s*-?\s*\d{3,4}/i);
   return paymentMethodFromAccount(m ? m[0] : '', 'Citibank');
 }
+/* Citibank statements use a two-column layout: the right column (rewards
+   boilerplate) gets glued onto transaction lines after the amount, and
+   cardholder name headers ("DAVE DELLAQUILA") precede each card's section.
+   Clean a line: drop cardholder headers and "No Activity", cut everything
+   after the first amount, normalize "- $1.00" to "-$1.00". Returns null to
+   skip the line. */
+function citiCleanLine(line, cardholders){
+  var l = String(line||'');
+  var i;
+  for(i=0;i<cardholders.length;i++){
+    if(l===cardholders[i] || l.indexOf(cardholders[i]+' ')===0) return null;
+  }
+  if(/^No Activity\b/i.test(l)) return null;
+  var m = l.match(/-?\s*\$[\d,]+\.\d{2}/);
+  if(m) l = l.slice(0, l.indexOf(m[0]) + m[0].length);
+  return l.replace(/-\s+\$/, '-$').trim() || null;
+}
 /* Account label for a statement (e.g. "Wells Fargo xxxxxx8345"), used to
    sub-group the import log by account under each bank. */
 function stmtAccountLabel(bank, lines){
@@ -5480,6 +5497,16 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
   var done = false; // reached the fine-print disclosures: ignore everything after
   var bankName = bank && bank.name;
   var stmtPayMethod = stmtAccountLabel(bank, lines);
+  // Citibank: collect cardholder names ("NAME Card ending in XXXX") so their
+  // section headers can be dropped, and clean the two-column glue off lines.
+  var citiNames = [];
+  if(bankName==='Citibank'){
+    lines.forEach(function(l){
+      var cm = String(l||'').match(/^([A-Z][A-Z.'\- ]{2,40}) Card ending in \d{3,4}/);
+      if(cm && citiNames.indexOf(cm[1])<0) citiNames.push(cm[1]);
+    });
+    lines = lines.map(function(l){ return citiCleanLine(l, citiNames); }).filter(Boolean);
+  }
   function setSection(line){
     if(!bank) return false;
     // Checking-statement column headers name both sides at once
@@ -5511,6 +5538,7 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
       if(m[3]){ var y2=parseInt(m[3],10); yy = m[3].length===2 ? (y2<50?2000+y2:1900+y2) : y2; explicitYear=true; }
       else if(stmtMonth){ yy = txnYearForMonth(parseInt(m[1],10), stmtMonth, year); }
       desc = m[4].replace(STMT_PURCH_AUTH_RE,'').trim();
+      if(bankName==='Citibank') desc = desc.replace(/^\d{1,2}\/\d{1,2}\s+/,''); // drop sale date from description
       var _pa = pdfPickAmount(m[5], desc, bankName);
       desc = _pa.desc; amtTok = _pa.amtTok; dailyCashAmt = _pa.dailyCash;
     }else{
@@ -5566,8 +5594,11 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
     if(/\bone apple park way\b|goldman sachs|apple card (is issued by|customer|monthly installments)|^dates\s+description\s+daily cash\s+amounts|^\s*statement\s*$/i.test(line) || STMT_PERIOD_RANGE_RE.test(line)) return;
     if(setSection(line)) return;
     if(SKIP_LINE.test(line)) return;
-    if(lastTxn && line.length>3 && !/^\d/.test(line) && !SKIP_LINE.test(line) && line.length<90){
+    if(bankName!=='Citibank' && lastTxn && line.length>3 && !/^\d/.test(line) && !SKIP_LINE.test(line) && line.length<90
+       && !/^-?\s*\$?[\d,]+\.\d{2}$/.test(line)){ // a bare amount is never a description continuation
       // possible wrapped description continuation
+      // (Citibank's two-column layout puts rewards boilerplate on the right —
+      // its transaction descriptions never wrap, so continuation is disabled)
       lastTxn.description += ' ' + line;
     }
   });
