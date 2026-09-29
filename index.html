@@ -4043,6 +4043,11 @@ function openBulkUpdate(ids){
     });
     payOpts.forEach(function(p){ sPay.appendChild(el('option',{value:p},p)); });
     changeRow('Payment method', sPay);
+    // Bank is the normalized bank name (same list as the Transactions Bank filter);
+    // setting it stores the bank as the payment method.
+    var sBank = noChangeSelect();
+    allBanks().forEach(function(b){ sBank.appendChild(el('option',{value:b},b)); });
+    changeRow('Bank', sBank);
     var sTax = noChangeSelect();
     sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
     TAX_GROUPS.forEach(function(g){
@@ -4065,7 +4070,7 @@ function openBulkUpdate(ids){
     row.appendChild(cancel); row.appendChild(apply);
     sh.appendChild(row);
     apply.onclick = async function(){
-      if(!(sCat.value||sType.value||sBp.value||sPay.value||sTax.value||sNotes.value)){
+      if(!(sCat.value||sType.value||sBp.value||sPay.value||sBank.value||sTax.value||sNotes.value)){
         toast('Choose at least one field to update.', true); return;
       }
       if(sNotes.value==='__set__' && !inNotes.value.trim()){ toast('Type the notes text first.', true); return; }
@@ -4078,6 +4083,7 @@ function openBulkUpdate(ids){
       if(sType.value) overrides.txn_type = sType.value;
       if(sBp.value) overrides.business_personal = sBp.value;
       if(sPay.value) overrides.payment_method = sPay.value;
+      if(sBank.value) overrides.payment_method = sBank.value; // Bank wins over Payment method
       if(sTax.value) overrides.tax_category = sTax.value==='__empty__' ? '' : sTax.value;
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
