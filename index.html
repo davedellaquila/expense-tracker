@@ -992,12 +992,15 @@ function otherDrillLabel(names){
   if(names.length>2) shown += ' +'+(names.length-2)+' more';
   return 'Other: ' + shown;
 }
-/* Category list table under a category-mix donut (same columns as Reports). */
-/* Category mix data table. opts: {byCatM:{cat:{'yyyy-MM':1}}} adds an Avg / mo column
-   (averaged over each category's active months, not the full period);
-   {clickable:true} adds drill-down row hooks; {footnote} adds a muted note. */
+/* Months in a yyyy-MM range, inclusive (for per-month averages). */
+function monthsInRange(from, to){
+  var n = 0;
+  for(var m=from; m<=to; m=monthAdd(m,1)) n++;
+  return n || 1;
+}
 /* Category Mix table: Income section (green) then Expenses section (red), each
-   sorted by amount descending. opts.inc = {byCat, byCatN, byCatM, total}.
+   sorted by amount descending. opts.inc = {byCat, byCatN, total}.
+   opts.periodMonths adds an Avg / mo column (total ÷ months in the period).
    Column headers are clickable — wireCatMixSorting(container) activates
    sorting within each section (click again to reverse). */
 function catMixTable(byCat, byCatN, total, opts){
@@ -1006,7 +1009,8 @@ function catMixTable(byCat, byCatN, total, opts){
   var inc = opts.inc || null;
   var incCats = inc ? Object.keys(inc.byCat).sort(function(a,b){ return inc.byCat[b]-inc.byCat[a]; }) : [];
   if((!cats.length || !total) && !incCats.length) return '';
-  var avgCol = !!opts.byCatM;
+  var avgCol = !!opts.periodMonths;
+  var months = opts.periodMonths || 1;
   var ncol = avgCol ? 5 : 4;
   var h = '<div class="ptablewrap"><table class="ptable"><tr>'+
     '<th data-scol="name" data-slabel="Category">Category</th>'+
@@ -1014,15 +1018,14 @@ function catMixTable(byCat, byCatN, total, opts){
     '<th data-scol="share" data-slabel="Share" style="text-align:right">Share</th>'+
     '<th data-scol="amount" data-slabel="Amount" style="text-align:right">Amount</th>'+
     (avgCol?'<th data-scol="avg" data-slabel="Avg / mo" style="text-align:right">Avg / mo</th>':'')+'</tr>';
-  function section(catsArr, byC, byN, byM, tot, color, dtype, label){
+  function section(catsArr, byC, byN, tot, color, dtype, label){
     if(!catsArr.length || !(tot>0)) return;
     h += '<tr data-secthead><td colspan="'+ncol+'" class="muted" style="font-size:12px;font-weight:600;padding-top:10px">'+label+'</td></tr>';
     catsArr.forEach(function(c){
       var share = byC[c]/tot*100;
       var avgCell = '', avgAttr = '';
       if(avgCol){
-        var activeMonths = Object.keys((byM||{})[c]||{}).length || 1;
-        var avg = byC[c]/activeMonths;
+        var avg = byC[c]/months;
         avgCell = '<td style="text-align:right">'+money(avg)+'</td>';
         avgAttr = ' data-sv-avg="'+avg.toFixed(2)+'"';
       }
@@ -1036,8 +1039,8 @@ function catMixTable(byCat, byCatN, total, opts){
         '<td style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
     });
   }
-  section(incCats, inc?inc.byCat:{}, inc?inc.byCatN:{}, inc?inc.byCatM:{}, inc?inc.total:0, 'var(--accent)', 'income', 'Income');
-  section(cats, byCat, byCatN, opts.byCatM, total, 'var(--danger)', 'expense', 'Expenses');
+  section(incCats, inc?inc.byCat:{}, inc?inc.byCatN:{}, inc?inc.total:0, 'var(--accent)', 'income', 'Income');
+  section(cats, byCat, byCatN, total, 'var(--danger)', 'expense', 'Expenses');
   h += '</table></div>';
   if(opts.footnote) h += '<p class="muted" style="font-size:12px; margin:6px 0 0">'+esc(opts.footnote)+'</p>';
   return h;
@@ -2210,7 +2213,7 @@ function renderDashboard(){
   var rows = txnsForRange(from, to, acct);
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatMExp = {}, byCatNInc = {}, byCatMInc = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatNInc = {}, byMonth = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -2226,12 +2229,10 @@ function renderDashboard(){
     else if(t.txn_type==='income'){ inc+=a; if(bp==='Business')incB+=a; else incP+=a;
       byCatInc[dc] = (byCatInc[dc]||0)+a;
       byCatNInc[dc] = (byCatNInc[dc]||0)+1;
-      if(m.length>=7) (byCatMInc[dc]||(byCatMInc[dc]={}))[m]=1;
     }
     else if(t.txn_type==='expense'){ exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       byCatExp[dc] = (byCatExp[dc]||0)+a;
       byCatNExp[dc] = (byCatNExp[dc]||0)+1;
-      if(m.length>=7) (byCatMExp[dc]||(byCatMExp[dc]={}))[m]=1;
     }
   });
   var net = inc-exp;
@@ -2255,7 +2256,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatMExp:byCatMExp, byCatNInc:byCatNInc, byCatMInc:byCatMInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashChart();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -2315,8 +2316,8 @@ function renderDashChart(){
     var totE = catsE.reduce(function(sum,c){ return sum+d.byCatExp[c]; }, 0);
     var totI = catsI.reduce(function(sum,c){ return sum+d.byCatInc[c]; }, 0);
     var tblBox = box.querySelector('[data-dd-table]');
-    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {byCatM:d.byCatMExp, clickable:true,
-      inc:{byCat:d.byCatInc, byCatN:d.byCatNInc, byCatM:d.byCatMInc, total:totI}}));
+    tblBox.insertAdjacentHTML('beforeend', catMixTable(d.byCatExp, d.byCatNExp, totE, {periodMonths:monthsInRange(d.from, d.to), clickable:true,
+      inc:{byCat:d.byCatInc, byCatN:d.byCatNInc, total:totI}}));
     var catRows = tblBox.querySelectorAll('[data-catrow]');
     for(var ri=0; ri<catRows.length; ri++)(function(n){
       n.addEventListener('click', function(){
@@ -5828,13 +5829,13 @@ function renderReports(){
   var bpVal = acct==='all' ? '' : acct;
   var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
   var rows = txnsForRange(from, to, acct);
-  var inc=0, exp=0, byCat={}, byCatN={}, byCatM={}, byInc={}, byIncN={}, byIncM={}, byMonth={}, byMerch={}, top=[];
+  var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byIncN={}, byMonth={}, byMerch={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
     var a = num(t.amount), m = (t.date||'').slice(0,7);
     if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
-    if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; byIncN[ic]=(byIncN[ic]||0)+1; (byIncM[ic]||(byIncM[ic]={}))[m]=1; }
-    else if(t.txn_type==='expense'){ exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; (byCatM[c]||(byCatM[c]={}))[m]=1; top.push(t);
+    if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; byIncN[ic]=(byIncN[ic]||0)+1; }
+    else if(t.txn_type==='expense'){ exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; top.push(t);
       var mk=String(t.merchant||t.description||'Unknown').trim()||'Unknown'; byMerch[mk]=(byMerch[mk]||0)+a;
       var wd=weekdayIdx(t.date); if(wd>=0) byDay[wd]+=a;
     }
@@ -5860,9 +5861,9 @@ function renderReports(){
   });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
-  $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {byCatM:byCatM,
-    inc:{byCat:byInc, byCatN:byIncN, byCatM:byIncM, total:inc},
-    footnote:'Avg / mo is averaged over the months each category had activity, not the full period.'});
+  $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {periodMonths:monthsInRange(from, to),
+    inc:{byCat:byInc, byCatN:byIncN, total:inc},
+    footnote:'Avg / mo is the category total divided by the number of months in the selected period.'});
   wireCatMixSorting($('rep-cattable'));
 
   // --- budget vs actual: paired bars + variance table, follows the report period ---
