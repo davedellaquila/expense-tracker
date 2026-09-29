@@ -2117,16 +2117,24 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape' || e.defaultPrevented) return;
     var ovs = document.querySelectorAll('#modal-root .overlay');
-    if(!ovs.length) return;
-    var top = ovs[ovs.length - 1];
-    var btns = top.querySelectorAll('button');
-    for(var i = btns.length - 1; i >= 0; i--){
-      var b = btns[i];
-      if(!b.disabled && b.offsetParent !== null && /^\s*cancel\s*$/i.test(b.textContent)){
-        e.preventDefault();
-        b.click();
-        return;
+    if(ovs.length){
+      var top = ovs[ovs.length - 1];
+      var btns = top.querySelectorAll('button');
+      for(var i = btns.length - 1; i >= 0; i--){
+        var b = btns[i];
+        if(!b.disabled && b.offsetParent !== null && /^\s*cancel\s*$/i.test(b.textContent)){
+          e.preventDefault();
+          b.click();
+          return;
+        }
       }
+      return;
+    }
+    // No sheet open: on the Transactions screen, Escape resets the filter card.
+    var txnScreen = document.querySelector('#screen-transactions');
+    if(txnScreen && !txnScreen.hidden){
+      e.preventDefault();
+      resetTxnFilters();
     }
   });
 })();
