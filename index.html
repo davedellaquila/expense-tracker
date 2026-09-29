@@ -547,6 +547,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
               <button class="allchip on" id="allchip-f-cat" data-for="f-cat" type="button">All</button>
               <select id="f-cat" style="flex:1;min-width:0"><option value="">All</option></select>
             </div></div>
+          <div><label class="f" style="margin-top:0" for="f-bank">Bank</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="allchip on" id="allchip-f-bank" data-for="f-bank" type="button">All</button>
+              <select id="f-bank" style="flex:1;min-width:0"><option value="">All</option></select>
+            </div></div>
           <div id="f-custom" class="full" style="display:none;gap:8px">
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-from">From</label><input type="month" id="f-from"></div>
             <div style="flex:1;min-width:0"><label class="f" style="margin-top:0" for="f-to">To</label><input type="month" id="f-to"></div>
@@ -2488,13 +2493,13 @@ function allCategories(){
   return Object.keys(s).sort();
 }
 function syncAllChips(){
-  ['f-type','f-bp','f-cat'].forEach(function(id){
+  ['f-type','f-bp','f-cat','f-bank'].forEach(function(id){
     var chip = document.getElementById('allchip-'+id), sel = document.getElementById(id);
     if(chip && sel) chip.classList.toggle('on', sel.value==='');
   });
 }
 function wireTransactions(){
-  ['f-preset','f-from','f-to','f-type','f-bp','f-cat'].forEach(function(id){
+  ['f-preset','f-from','f-to','f-type','f-bp','f-cat','f-bank'].forEach(function(id){
     // a manual filter edit replaces any chart drill-down: the visible
     // filters are always the single source of truth (search composes)
     $(id).addEventListener('change', function(){
@@ -2767,8 +2772,29 @@ function txnSortRows(rows){
 /* A transfer for display/filter purposes: explicit transfer type, or a
    transfer-looking category (mirrors the dashboard aggregation). */
 function txnIsTransfer(t){ return t.txn_type==='transfer' || repDisplayCat(t)==='Transfers'; }
+/* Bank for filter purposes: normalize payment-method labels to their bank
+   ("Wells Fargo Prime Checking" / "Wells Fargo xxxxxx8345" → "Wells Fargo"). */
+function txnBank(t){
+  var pm = String(t.payment_method||'').trim();
+  if(!pm || /^other$/i.test(pm)) return 'Other';
+  var banks = ['Apple Card','Capital One','Citibank','Wells Fargo','Chase','Discover','Amex'];
+  for(var i=0;i<banks.length;i++){
+    if(pm.toLowerCase().indexOf(banks[i].toLowerCase())===0) return banks[i];
+  }
+  return pm; // custom payment method: listed as-is
+}
+function allBanks(){
+  var s = {};
+  (state.transactions||[]).forEach(function(t){ s[txnBank(t)] = true; });
+  var list = Object.keys(s);
+  list.sort(function(a,b){
+    if(a==='Other') return 1; if(b==='Other') return -1;
+    return a.localeCompare(b);
+  });
+  return list;
+}
 function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
-      cat = $('f-cat').value, q = $('f-q').value.trim().toLowerCase();
+      cat = $('f-cat').value, bk = $('f-bank').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
   if(txnDrill && txnDrill.from){
     if(m < txnDrill.from || m > txnDrill.to) return false;
@@ -2779,6 +2805,7 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(ty && t.txn_type!==ty) return false;
   if(bp && t.business_personal!==bp) return false;
   if(cat && t.category!==cat) return false;
+  if(bk && txnBank(t)!==bk) return false;
   if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
   if(txnDrill && txnDrill.xferOnly && !txnIsTransfer(t)) return false;
   if(txnDrill && txnDrill.noXfer && txnIsTransfer(t)) return false;
@@ -2838,6 +2865,7 @@ function resetTxnFilters(){
   $('f-type').value = '';
   $('f-bp').value = '';
   $('f-cat').value = '';
+  $('f-bank').value = '';
   $('f-q').value = '';
   var si = $('f-q-stick'); if(si) si.value = '';
   txnDrill = null; // also clear any chart drill selection
@@ -2878,6 +2906,7 @@ function drillToTransactions(o){
   var cats = allCategories();
   setCatFilter((o.dispCats && o.dispCats.length===1 && cats.indexOf(o.dispCats[0])>=0)
     ? o.dispCats[0] : '');
+  $('f-bank').value = ''; // drills don't target banks: never leave a stale bank filter on
   $('f-q').value = o.q || '';
   var stickIn = $('f-q-stick'); if(stickIn) stickIn.value = o.q || '';
   showScreen('transactions');
@@ -2898,6 +2927,15 @@ function renderTransactions(){
     var o = el('option',{value:c},c);
     if(c===keep) o.selected = true;
     fcat.appendChild(o);
+  });
+  var fbank = $('f-bank');
+  var keepB = fbank.value;
+  fbank.innerHTML='';
+  fbank.appendChild(el('option',{value:''},'All'));
+  allBanks().forEach(function(b){
+    var o = el('option',{value:b},b);
+    if(b===keepB) o.selected = true;
+    fbank.appendChild(o);
   });
 
   renderDrillChip();
