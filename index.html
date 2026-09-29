@@ -1017,6 +1017,19 @@ function emptyInto(node, big, msg){
 /* onDismiss runs when the user taps outside the sheet. Promise-based callers
    use it to settle the promise — otherwise the awaiting code would hang
    forever with the sheet gone and no toast. */
+/* A bottom-sticky action bar can overlap the last field on iOS when it
+   doesn't unstick cleanly at the end of the scroll. Give every sticky bar a
+   trailing spacer as tall as the bar itself, so the last field always scrolls
+   fully clear of the buttons. */
+function padStickyBars(sh){
+  Array.prototype.forEach.call(sh.querySelectorAll('.stickybar'), function(bar){
+    var nx = bar.nextElementSibling;
+    if(nx && nx.className==='stickybar-spacer') return;
+    var sp = el('div',{class:'stickybar-spacer'});
+    sp.style.height = (bar.offsetHeight + 12) + 'px';
+    bar.parentNode.insertBefore(sp, bar.nextSibling);
+  });
+}
 function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
@@ -1030,6 +1043,7 @@ function openSheet(build, onDismiss){
     if(e.target===ov){ if(onDismiss) onDismiss(); else close(); }
   });
   build(sh, close);
+  padStickyBars(sh);
   return close;
 }
 /* Stacked variant: lays a sheet above the current one instead of replacing
@@ -1047,6 +1061,7 @@ function openSheetStacked(build, onDismiss){
   function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
   ov.addEventListener('click', function(e){ if(e.target===ov){ if(onDismiss) onDismiss(); else close(); } });
   build(sh, close);
+  padStickyBars(sh);
   return close;
 }
 function confirmDialog(message, okLabel){
