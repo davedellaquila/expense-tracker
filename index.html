@@ -7887,14 +7887,21 @@ function renderBillCalendar(){
   });
 }
 
-function billRow(b, showDate, maxAmt){
+function billRow(b, showDate, maxAmt, dueMin, dueMax){
   var st = billStatus(b);
   var row = el('div',{class:'bill-row'});
-  // Relative-amount fill: the priciest bill fills the whole tile, others
-  // fill left-to-right in proportion to it.
+  // Fill: width = amount relative to the priciest bill; color = urgency,
+  // red (due soonest) → green (due latest) across the range of bills.
   if(maxAmt > 0){
     var pct = Math.max(0, Math.min(100, Math.round(num(b.amount)/maxAmt*100)));
-    if(pct > 0) row.style.background = 'linear-gradient(to right, var(--accent-soft) '+pct+'%, transparent '+pct+'%)';
+    if(pct > 0){
+      var hue = 120; // green when there is no date range to compare
+      if(dueMin != null && dueMax > dueMin){
+        var t = Date.parse(String(b.dueDate||'')+'T12:00:00');
+        if(!isNaN(t)) hue = Math.round(Math.max(0, Math.min(1, (t-dueMin)/(dueMax-dueMin)))*120);
+      }
+      row.style.background = 'linear-gradient(to right, hsla('+hue+',70%,45%,0.30) '+pct+'%, transparent '+pct+'%)';
+    }
   }
   var info = el('div',{class:'bi'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
@@ -7926,6 +7933,16 @@ function billMaxAmount(){
   (billsActive()||[]).forEach(function(b){ var a = num(b.amount); if(a > m) m = a; });
   return m;
 }
+// Due-date range across active bills, as epoch ms, for the urgency colors.
+function billDueRange(){
+  var vals = [];
+  (billsActive()||[]).forEach(function(b){
+    var t = Date.parse(String(b.dueDate||'')+'T12:00:00');
+    if(!isNaN(t)) vals.push(t);
+  });
+  if(!vals.length) return null;
+  return { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals) };
+}
 
 function renderBillDay(){
   var card = $('bill-day-card'), list = $('bill-day-list');
@@ -7936,7 +7953,8 @@ function renderBillDay(){
   var bills = billsForDay(billSelDay);
   if(!bills.length) list.appendChild(el('p',{class:'muted'},'No bills due this day.'));
   var maxAmt = billMaxAmount();
-  bills.forEach(function(b){ list.appendChild(billRow(b, false, maxAmt)); });
+  var dr = billDueRange(), dueMin = dr && dr.min, dueMax = dr && dr.max;
+  bills.forEach(function(b){ list.appendChild(billRow(b, false, maxAmt, dueMin, dueMax)); });
 }
 
 function renderBillList(){
@@ -7946,7 +7964,8 @@ function renderBillList(){
   });
   if(!active.length) list.appendChild(el('p',{class:'muted'},'No bills yet. Tap + Add bill to track one.'));
   var maxAmt = billMaxAmount();
-  active.forEach(function(b){ list.appendChild(billRow(b, true, maxAmt)); });
+  var dr = billDueRange(), dueMin = dr && dr.min, dueMax = dr && dr.max;
+  active.forEach(function(b){ list.appendChild(billRow(b, true, maxAmt, dueMin, dueMax)); });
   // paid (one-time) in a collapsed section
   var paid = (state.bills||[]).filter(billIsPaid).sort(function(a,b){
     return String(b.lastPaid||'').localeCompare(String(a.lastPaid||''));
