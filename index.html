@@ -347,10 +347,13 @@ textarea{resize:vertical; min-height:64px;}
 .repfilterstick .rf-cap{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
 .repfilterstick .rf-sum{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 #rep-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
-/* Largest expenses: merchant on one line (truncated), description wraps to fit */
-table.ptable.top-table{min-width:0;}
+/* Largest expenses: fixed layout so Category/Amount stay visible; merchant wraps */
+table.ptable.top-table{min-width:0; table-layout:fixed; width:100%;}
+table.ptable.top-table th:nth-child(1){width:20%;}
+table.ptable.top-table th:nth-child(3){width:24%;}
+table.ptable.top-table th:nth-child(4){width:22%;}
 .top-cell{min-width:0;}
-.top-merch{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.top-merch{font-weight:600; overflow-wrap:anywhere;}
 .top-desc{font-size:12px; color:var(--muted); overflow-wrap:anywhere;}
 .iconbtn{
   flex:none; width:46px; border-radius:12px; border:1px solid var(--border);
@@ -2108,7 +2111,7 @@ async function enterApp(){
   syncHeadH(); // sticky offset for the floating search bar
   window.addEventListener('resize', syncHeadH);
   window.addEventListener('resize', syncFloatingPad);
-  if(!$('bud-month').value) $('bud-month').value = monthLocal();
+  if(!restoreBudFilters() && !$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var targetScreen = lastScreen()||'dashboard';
   showScreen(targetScreen); // show the saved tab first — no dashboard flash on refresh
@@ -2500,11 +2503,11 @@ function txnsForMonth(ym){
 function wireDashboard(){
   $('dash-preset').addEventListener('change', function(){
     $('dash-custom').style.display = $('dash-preset').value==='custom' ? 'flex' : 'none';
-    renderDashboard();
+    saveHomeFilters(); renderDashboard();
   });
-  $('dash-from').addEventListener('change', renderDashboard);
-  $('dash-to').addEventListener('change', renderDashboard);
-  $('dash-acct').addEventListener('change', renderDashboard);
+  $('dash-from').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
+  $('dash-to').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
+  $('dash-acct').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
   // collapsible category filter chips header: persisted in localStorage, default expanded
   var cfHead = $('dash-catfilter-head');
   if(cfHead){
@@ -2520,6 +2523,7 @@ function wireDashboard(){
     if(l.indexOf(this.value)<0){ l.push(this.value); saveDashChartList(l); }
     renderDashCharts();
   });
+  restoreHomeFilters(); // reopen on the saved home filters
 }
 function renderDashboard(){
   var range = presetRange('dash-preset','dash-from','dash-to');
@@ -2542,14 +2546,14 @@ function renderDashboard(){
   if(_dChipBox){
     _dChipBox.innerHTML = '';
     var _dAll = el('button',{class:'catchip'+(dashCatSel.length?'':' on'), type:'button'},'All');
-    _dAll.addEventListener('click', function(){ dashCatSel = []; renderDashboard(); });
+    _dAll.addEventListener('click', function(){ dashCatSel = []; saveHomeFilters(); renderDashboard(); });
     _dChipBox.appendChild(_dAll);
     _dAllCats.forEach(function(c){
       var _b = el('button',{class:'catchip'+(_dSel[c]?' on':''), type:'button'}, c);
       _b.addEventListener('click', function(){
         var _i = dashCatSel.indexOf(c);
         if(_i>=0) dashCatSel.splice(_i,1); else dashCatSel.push(c);
-        renderDashboard();
+        saveHomeFilters(); renderDashboard();
       });
       _dChipBox.appendChild(_b);
     });
@@ -3215,6 +3219,7 @@ function wireTransactions(){
         if(f.value && t.value && t.value < f.value) t.value = f.value;
       }
       if(id==='f-preset'||id==='f-from'||id==='f-to') saveTxnPeriod();
+      if(id==='f-cat'||id==='f-type'||id==='f-bank') saveTxnFilters();
       renderTransactions();
     });
   });
@@ -3308,6 +3313,7 @@ function wireTransactions(){
       .then(function(ok){ if(ok) runBulkDelete(ids); });
   });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
+  restoreTxnFilters(); // reopen on the saved category/type/bank filters
   refreshUndoButtons(); // show Undo only when a completed bulk update exists
 }
 /* bulk selection + bulk update on the Transactions screen */
@@ -3620,6 +3626,104 @@ function restoreTxnPeriod(){
     return true;
   }catch(e){ return false; }
 }
+/* ---- per-page filter persistence: filters survive a reload ----
+   Saved on every filter change; restored during page init before the first
+   render. Search text, the drill pill, and selection mode are deliberately
+   transient and are never persisted. */
+var TXN_FILTERS_KEY = 'expenseTracker.txnFilters';
+var REP_FILTERS_KEY = 'expenseTracker.repFilters';
+var HOME_FILTERS_KEY = 'expenseTracker.homeFilters';
+var BUD_FILTERS_KEY = 'expenseTracker.budFilters';
+var KNOWN_PRESETS = ['month','last-month','last-3','ytd','all','custom'];
+var KNOWN_ACCTS = ['all','Personal','Business'];
+function validYM(s){ return typeof s==='string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s); }
+/* Restore a <select> to a saved value; unknown values fall back to the first option. */
+function restoreSel(id, val, allowed){
+  var s = $(id); if(!s) return;
+  s.value = (allowed.indexOf(val)>=0) ? val : allowed[0];
+}
+/* Set a <select> whose options are rebuilt at render time: ensure the option
+   exists first so the value survives until renderTransactions' keep-logic
+   validates it (unknown values fall back to All there). */
+function ensureSelOption(id, val){
+  var s = $(id); if(!s || !val) return;
+  var has = false;
+  for(var i=0;i<s.options.length;i++) if(s.options[i].value===val){ has=true; break; }
+  if(!has) s.appendChild(el('option',{value:val},val));
+  s.value = val;
+}
+/* Transactions: category / type / bank. The period already persists via TXN_PERIOD_KEY. */
+function saveTxnFilters(){
+  try{
+    localStorage.setItem(TXN_FILTERS_KEY, JSON.stringify({
+      cat: $('f-cat').value, type: $('f-type').value, bank: $('f-bank').value
+    }));
+  }catch(e){}
+}
+function restoreTxnFilters(){
+  try{
+    var f = JSON.parse(localStorage.getItem(TXN_FILTERS_KEY)||'null');
+    if(!f) return;
+    if(typeof f.cat==='string') ensureSelOption('f-cat', f.cat);
+    restoreSel('f-type', f.type, ['', 'income', 'expense', 'transfer']);
+    if(typeof f.bank==='string') ensureSelOption('f-bank', f.bank);
+  }catch(e){}
+}
+/* Reports: period, business/personal scope, category chips. */
+function saveRepFilters(){
+  try{
+    localStorage.setItem(REP_FILTERS_KEY, JSON.stringify({
+      preset: $('rep-preset').value, from: $('rep-from').value, to: $('rep-to').value,
+      acct: $('rep-acct').value, cats: repCatSel.slice()
+    }));
+  }catch(e){}
+}
+function restoreRepFilters(){
+  try{
+    var f = JSON.parse(localStorage.getItem(REP_FILTERS_KEY)||'null');
+    if(!f) return;
+    restoreSel('rep-preset', f.preset, KNOWN_PRESETS);
+    $('rep-custom').style.display = ($('rep-preset').value==='custom') ? 'flex' : 'none';
+    $('rep-from').value = validYM(f.from) ? f.from : '';
+    $('rep-to').value = validYM(f.to) ? f.to : '';
+    restoreSel('rep-acct', f.acct, KNOWN_ACCTS);
+    if(Array.isArray(f.cats)) repCatSel = f.cats.filter(function(c){ return typeof c==='string'; });
+    /* renderReports prunes repCatSel against categories present in the period. */
+  }catch(e){}
+}
+/* Home: period, scope, category chips. */
+function saveHomeFilters(){
+  try{
+    localStorage.setItem(HOME_FILTERS_KEY, JSON.stringify({
+      preset: $('dash-preset').value, from: $('dash-from').value, to: $('dash-to').value,
+      acct: $('dash-acct').value, cats: dashCatSel.slice()
+    }));
+  }catch(e){}
+}
+function restoreHomeFilters(){
+  try{
+    var f = JSON.parse(localStorage.getItem(HOME_FILTERS_KEY)||'null');
+    if(!f) return;
+    restoreSel('dash-preset', f.preset, KNOWN_PRESETS);
+    $('dash-custom').style.display = ($('dash-preset').value==='custom') ? 'flex' : 'none';
+    $('dash-from').value = validYM(f.from) ? f.from : '';
+    $('dash-to').value = validYM(f.to) ? f.to : '';
+    restoreSel('dash-acct', f.acct, KNOWN_ACCTS);
+    if(Array.isArray(f.cats)) dashCatSel = f.cats.filter(function(c){ return typeof c==='string'; });
+    /* renderDashboard prunes dashCatSel against categories present in the period. */
+  }catch(e){}
+}
+/* Budget: the budget month picker. */
+function saveBudFilters(){
+  try{ localStorage.setItem(BUD_FILTERS_KEY, JSON.stringify({month: $('bud-month').value})); }catch(e){}
+}
+function restoreBudFilters(){
+  try{
+    var f = JSON.parse(localStorage.getItem(BUD_FILTERS_KEY)||'null');
+    if(f && validYM(f.month)){ $('bud-month').value = f.month; return true; }
+  }catch(e){}
+  return false;
+}
 /* Reset transaction filters, but keep the remembered period.
    (The drill pill's × now clears only the drill context, not the filters.) */
 function resetTxnFilters(){
@@ -3636,6 +3740,7 @@ function resetTxnFilters(){
   $('f-q').value = '';
   var si = $('f-q-stick'); if(si) si.value = '';
   txnDrill = null; // also clear any chart drill selection
+  saveTxnFilters(); // persist the reset (cleared) filter state
   renderTransactions();
 }
 /* Chart drill-through: single-category drills set the native Transactions
@@ -6462,7 +6567,7 @@ function finishPdfParse(pending, year, stmtMonth){
 
 /* ================= budgets ================= */
 function wireBudgets(){
-  $('bud-month').addEventListener('change', function(){ botReset(); incBotReset(); renderBudgets(); });
+  $('bud-month').addEventListener('change', function(){ saveBudFilters(); botReset(); incBotReset(); renderBudgets(); });
   $('bot-propose').addEventListener('click', botPropose);
   $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
   $('bot-suggest').addEventListener('click', botSuggest);
@@ -8389,13 +8494,16 @@ function repHeatmap(el, cats, months, matrix, monthKeys, onCell){
   }
 }
 function wireReports(){
-  ['rep-preset','rep-acct'].forEach(function(id){ $(id).addEventListener('change', renderReports); });
+  ['rep-preset','rep-acct'].forEach(function(id){
+    $(id).addEventListener('change', function(){ saveRepFilters(); renderReports(); });
+  });
   $('rep-preset').addEventListener('change', function(){
     $('rep-custom').style.display = ($('rep-preset').value==='custom') ? 'flex' : 'none';
   });
-  $('rep-from').addEventListener('change', renderReports);
-  $('rep-to').addEventListener('change', renderReports);
+  $('rep-from').addEventListener('change', function(){ saveRepFilters(); renderReports(); });
+  $('rep-to').addEventListener('change', function(){ saveRepFilters(); renderReports(); });
   $('rep-print').addEventListener('click', function(){ window.print(); });
+  restoreRepFilters(); // reopen on the saved report filters
   // collapsible category filter chips header: persisted in localStorage, default expanded
   var cfHead = $('rep-catfilter-head');
   if(cfHead){
@@ -8444,14 +8552,14 @@ function renderReports(){
   if(_chipBox){
     _chipBox.innerHTML = '';
     var _all = el('button',{class:'catchip'+(repCatSel.length?'':' on'), type:'button'},'All');
-    _all.addEventListener('click', function(){ repCatSel = []; renderReports(); });
+    _all.addEventListener('click', function(){ repCatSel = []; saveRepFilters(); renderReports(); });
     _chipBox.appendChild(_all);
     _allCats.forEach(function(c){
       var _b = el('button',{class:'catchip'+(_sel[c]?' on':''), type:'button'}, c);
       _b.addEventListener('click', function(){
         var _i = repCatSel.indexOf(c);
         if(_i>=0) repCatSel.splice(_i,1); else repCatSel.push(c);
-        renderReports();
+        saveRepFilters(); renderReports();
       });
       _chipBox.appendChild(_b);
     });
@@ -8655,7 +8763,7 @@ function renderReports(){
       var merchCell = merch
         ? '<div class="top-merch">'+esc(merch)+'</div>' + ((desc && desc!==merch) ? '<div class="top-desc">'+esc(desc)+'</div>' : '')
         : '<div class="top-merch">'+esc(desc)+'</div>';
-      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(t.date||'')+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money(num(t.amount))+'</td></tr>';
+      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money(num(t.amount))+'</td></tr>';
     });
     tp.innerHTML = th + '</table></div>';
     var tpRows = tp.querySelectorAll('[data-tid]');
