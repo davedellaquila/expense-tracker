@@ -1019,18 +1019,21 @@ function catMixTable(byCat, byCatN, total, opts){
     h += '<tr data-secthead><td colspan="'+ncol+'" class="muted" style="font-size:12px;font-weight:600;padding-top:10px">'+label+'</td></tr>';
     catsArr.forEach(function(c){
       var share = byC[c]/tot*100;
-      var avgCell = '';
+      var avgCell = '', avgAttr = '';
       if(avgCol){
         var activeMonths = Object.keys((byM||{})[c]||{}).length || 1;
         var avg = byC[c]/activeMonths;
-        avgCell = '<td data-sv-avg="'+avg.toFixed(2)+'" style="text-align:right">'+money(avg)+'</td>';
+        avgCell = '<td style="text-align:right">'+money(avg)+'</td>';
+        avgAttr = ' data-sv-avg="'+avg.toFixed(2)+'"';
       }
       var rowAttr = opts.clickable ? ' class="rep-click" data-catrow="'+esc(c)+'" data-cattype="'+dtype+'"' : '';
-      h += '<tr'+rowAttr+' data-srow>'+
-        '<td data-sv-name="'+esc(String(c).toLowerCase())+'" style="color:'+color+'">'+esc(c)+'</td>'+
-        '<td data-sv-txns="'+(byN[c]||0)+'" style="text-align:right">'+(byN[c]||0)+'</td>'+
-        '<td data-sv-share="'+share.toFixed(2)+'" style="text-align:right">'+Math.round(share)+'%</td>'+
-        '<td data-sv-amount="'+byC[c].toFixed(2)+'" style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
+      h += '<tr'+rowAttr+' data-srow data-sv-name="'+esc(String(c).toLowerCase())+'"'+
+        ' data-sv-txns="'+(byN[c]||0)+'" data-sv-share="'+share.toFixed(2)+'"'+
+        ' data-sv-amount="'+byC[c].toFixed(2)+'"'+avgAttr+'>'+
+        '<td style="color:'+color+'">'+esc(c)+'</td>'+
+        '<td style="text-align:right">'+(byN[c]||0)+'</td>'+
+        '<td style="text-align:right">'+Math.round(share)+'%</td>'+
+        '<td style="text-align:right">'+money(byC[c])+'</td>'+avgCell+'</tr>';
     });
   }
   section(incCats, inc?inc.byCat:{}, inc?inc.byCatN:{}, inc?inc.byCatM:{}, inc?inc.total:0, 'var(--accent)', 'income', 'Income');
