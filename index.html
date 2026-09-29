@@ -858,8 +858,8 @@ table.ptable{border-collapse:collapse; width:100%; font-size:13.5px; min-width:6
       </div>
       <div class="card">
         <h2>Data cleanup</h2>
-        <p class="muted" style="font-size:13px;margin:0 0 10px">Older PDF imports sometimes glued statement section headers (like "JANE DOE #1234: Transactions") onto merchant names. Scan finds those rows so you can review and fix them — with undo.</p>
-        <div class="btnrow"><button class="btn" id="set-scrub">Scan for header text</button></div>
+        <p class="muted" style="font-size:13px;margin:0 0 10px">Older PDF imports sometimes glued statement text onto merchant names — section headers (like "JANE DOE #1234: Transactions") or fine print (like "Important Information You Should Know …"). Scan finds those rows so you can review and fix them — with undo.</p>
+        <div class="btnrow"><button class="btn" id="set-scrub">Scan for statement junk</button></div>
         <div id="set-scrub-results" style="margin-top:6px"></div>
       </div>
       <div class="card">
@@ -3303,18 +3303,29 @@ function openTidyMerchants(){
   });
 }
 
-/* Statement-header scrubber (Settings → Data cleanup). Older PDF imports glued
-   cardholder section headers ("QUENTIN E DELL'AQUILA #7748: Transactions ...")
-   onto the previous row's description (= merchant). This finds those rows,
-   previews the trim, and applies it through the undoable bulk-job system. */
+/* Statement-junk scrubber (Settings → Data cleanup). Older PDF imports glued
+   statement text onto the previous row's description (= merchant):
+   - cardholder section headers ("QUENTIN E DELL'AQUILA #7748: Transactions ...")
+   - fine-print disclosures ("Important Information You Should Know ...")
+   - statement dates ("Interest Payment August 31, 2026")
+   This finds those rows, previews the trim, and applies it through the
+   undoable bulk-job system. */
 var STMT_HEADER_RE = /\s+[A-Z][A-Z.'\- ]{0,40}#\d{3,}\s*:.*$/;
+var STMT_DISCLOSURE_RE = /\s*(important information you should know|if your account has a negative balance|in case of errors or questions about your electronic transfers|all rights reserved).*$/i;
+var STMT_DATE_RE = /\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{2,4}\s*$/i;
+function scrubStatementJunk(s){
+  var t = String(s==null?'':s);
+  t = t.replace(STMT_HEADER_RE,'');
+  t = t.replace(STMT_DISCLOSURE_RE,'');
+  t = t.replace(STMT_DATE_RE,'');
+  return t.trim();
+}
 function scanStatementCruft(){
   var out = [];
   (state.transactions||[]).forEach(function(t){
     if(String(t.id||'').indexOf('tmp-')===0) return; // still saving: leave it alone
     var m = String(t.merchant||''), d = String(t.description||'');
-    var cm = m.replace(STMT_HEADER_RE,'').trim();
-    var cd = d.replace(STMT_HEADER_RE,'').trim();
+    var cm = scrubStatementJunk(m), cd = scrubStatementJunk(d);
     var toM = (cm && cm!==m.trim()) ? cm : null;
     var toD = (cd && cd!==d.trim()) ? cd : null;
     if(toM || toD) out.push({id:t.id, date:t.date, amount:t.amount, fromM:m, toM:toM, fromD:d, toD:toD});
@@ -3339,7 +3350,7 @@ function buildScrubJob(items){
   var job = {
     id:'bj_'+Date.now(), kind:'update',
     startedAt:new Date().toISOString(), completedAt:null,
-    label: items.length+' transaction'+(items.length===1?'':'s')+' (scrub headers)',
+    label: items.length+' transaction'+(items.length===1?'':'s')+' (scrub statement junk)',
     rows: rows, status:{}
   };
   rows.forEach(function(r){ job.status[r.id]='pending'; });
@@ -3350,11 +3361,11 @@ function openScrubber(){
   box.innerHTML = '';
   var found = scanStatementCruft();
   if(!found.length){
-    box.appendChild(el('p',{class:'muted',style:'font-size:13px;margin:0'},'No statement header text found — merchant names look clean.'));
+    box.appendChild(el('p',{class:'muted',style:'font-size:13px;margin:0'},'No statement junk found — merchant names look clean.'));
     return;
   }
   box.appendChild(el('p',{class:'muted',style:'font-size:13px'},
-    found.length+' transaction'+(found.length===1?'':'s')+' with header text stuck to the name. Uncheck any to skip.'));
+    found.length+' transaction'+(found.length===1?'':'s')+' with statement junk stuck to the name. Uncheck any to skip.'));
   var checks = [];
   found.forEach(function(f){
     var lab = el('label',{style:'display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer'});
@@ -4674,7 +4685,7 @@ function stmtPeriodLabel(year, month){
   var names = MONTH_NAMES_RE.split('|');
   return names[month-1].charAt(0).toUpperCase()+names[month-1].slice(1)+' '+year;
 }
-var SKIP_LINE = /page\s*\d+|continued|statement\s*period|account\s*(number|summary)|beginning\s*balance|ending\s*balance|^\s*totals?\b|date\s+description\s+amount|transaction\s+detail|important\s*account|how\s*to\s*avoid|daily\s*balance|for\s*more\s*information/i;
+var SKIP_LINE = /page\s*\d+|continued|statement\s*period|account\s*(number|summary)|beginning\s*balance|ending\s*balance|^\s*totals?\b|date\s+description\s+amount|transaction\s+detail|important\s*account|how\s*to\s*avoid|daily\s*balance|for\s*more\s*information|all rights reserved|^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{2,4}\s*$/i;
 var MONEY_TOK = '-?\\$?[\\d,]+\\.\\d{2}|\\(\\$?[\\d,]+\\.\\d{2}\\)';
 var TXN_RE = new RegExp('^(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{2,4}))?\\s+(.+?)\\s+((?:'+MONEY_TOK+')(?:\\s+(?:'+MONEY_TOK+'))?)\\s*$');
 var MON_ABBR = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec';
@@ -4780,6 +4791,7 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
   var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
+  var done = false; // reached the fine-print disclosures: ignore everything after
   var bankName = bank && bank.name;
   var stmtPayMethod = bankName==='Capital One' ? capOnePaymentMethod(lines)
     : bankName==='Wells Fargo' ? wfPaymentMethod(lines)
@@ -4793,6 +4805,11 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
     return false;
   }
   lines.forEach(function(line){
+    if(done) return;
+    // The fine-print disclosures ("Important Information You Should Know") end
+    // the transaction section — everything after would otherwise glue onto the
+    // last transaction's description (= merchant).
+    if(/important information you should know/i.test(line)){ done = true; return; }
     // Transaction lines take priority: a description may contain words
     // like "deposit" or "check" that also appear in section headers.
     var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null, explicitYear=false, dailyCashAmt=null;
