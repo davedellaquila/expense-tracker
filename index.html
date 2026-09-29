@@ -5356,16 +5356,19 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No spending this year — nothing to base a budget on.'));
     return;
   }
-  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  head.appendChild(el('span'));
   head.appendChild(el('span',null,'Category'));
   head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
   head.appendChild(el('span',null,'Budget'));
   head.appendChild(el('span'));
-  head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
+    line.appendChild(check);
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
@@ -5378,9 +5381,6 @@ function botRenderTable(){
     inp.value = r.amount;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
-    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
-    check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
-    line.appendChild(check);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
@@ -5646,15 +5646,18 @@ function incBotRenderTable(){
     return;
   }
   var months = incBotProposal.months||1;
-  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  var head = el('div',{class:'muted',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+  head.appendChild(el('span'));
   head.appendChild(el('span',null,'Category'));
   head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
   head.appendChild(el('span',null,'Target'));
   head.appendChild(el('span'));
-  head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:1fr 78px 96px 36px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
+    line.appendChild(check);
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
     ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
@@ -5666,9 +5669,6 @@ function incBotRenderTable(){
     inp.value = r.amount;
     inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; incBotRenderTotal(); incBotPersist(); });
     line.appendChild(inp);
-    var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
-    check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
-    line.appendChild(check);
     var del = el('button',{class:'btn small ghost',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, r.category);
