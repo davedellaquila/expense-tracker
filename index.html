@@ -2756,6 +2756,7 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(txnDrill && txnDrill.dispCats && txnDrill.dispCats.indexOf(repDisplayCat(t))===-1) return false;
   if(txnDrill && txnDrill.xferOnly && !txnIsTransfer(t)) return false;
   if(txnDrill && txnDrill.noXfer && txnIsTransfer(t)) return false;
+  if(txnDrill && txnDrill.taxCat!=null && (t.tax_category||'Uncategorized')!==txnDrill.taxCat) return false;
   if(txnDrill && txnDrill.rawCats && txnDrill.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
   if(txnDrill && txnDrill.weekday!=null){
     if(weekdayIdx(t.date)!==txnDrill.weekday) return false;
@@ -2834,10 +2835,10 @@ function setCatFilter(name){
 function drillToTransactions(o){
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var ranged = !!(o.from || o.to);
-  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer)
+  txnDrill = (ranged || o.dispCats || o.weekday!=null || o.xferOnly || o.noXfer || o.taxCat)
     ? {from:from, to:to, weekday:(o.weekday==null?null:o.weekday),
        dispCats:o.dispCats||null, label:o.label||'Report selection',
-       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, rawCats:o.rawCats||null}
+       xferOnly:!!o.xferOnly, noXfer:!!o.noXfer, taxCat:(o.taxCat==null?null:o.taxCat), rawCats:o.rawCats||null}
     : null;
   if(from && to){
     $('f-preset').value = 'custom';
@@ -6147,7 +6148,7 @@ function renderReports(){
 function statHtml(label, value, cls, sub){
   return '<div class="stat"><div class="label">'+esc(label)+'</div><div class="value '+cls+'">'+esc(value)+'</div><div class="split">'+esc(sub)+'</div></div>';
 }
-function renderTaxGroup(node, rows){
+function renderTaxGroup(node, rows, drillBase){
   node.innerHTML='';
   if(!rows.length){ emptyInto(node,'🧾','Nothing here for this year.'); return; }
   var groups = {};
@@ -6160,9 +6161,14 @@ function renderTaxGroup(node, rows){
   var grand = 0;
   keys.forEach(function(k){
     grand += groups[k].total;
-    var r = el('div',{class:'rowline'});
+    var r = el('div',{class:'rowline rep-click'});
     r.appendChild(el('span',null, k+' ('+groups[k].count+')'));
     r.appendChild(el('b',null,money(groups[k].total)));
+    // Tapping a row opens its transactions for the tax year.
+    r.addEventListener('click', function(){
+      drillToTransactions({from:drillBase.from, to:drillBase.to, type:'expense', bp:drillBase.bp,
+        taxCat:k, label:k+' · '+drillBase.scope});
+    });
     node.appendChild(r);
   });
   var g = el('div',{class:'rowline gtotal'});
@@ -6179,8 +6185,8 @@ function renderTax(){
     return String(t.date||'').slice(0,4)===y && t.txn_type==='expense' && t.business_personal==='Personal' &&
       (PERSONAL_DEDUCTION_CATS.indexOf(t.tax_category)!==-1);
   });
-  renderTaxGroup($('tax-biz'), biz);
-  renderTaxGroup($('tax-per'), per);
+  renderTaxGroup($('tax-biz'), biz, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business · '+y});
+  renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y});
 }
 </script>
 </body>
