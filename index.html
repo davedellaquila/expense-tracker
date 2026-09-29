@@ -4231,18 +4231,25 @@ function getImportedFiles(){
 function recordImportedFile(info, count){
   if(!info || !info.h) return;
   var a = getImportedFiles();
-  a.push({h:info.h, name:info.name, bank:info.bank||null, period:info.period||null,
+  a.push({h:info.h, name:info.name, bank:info.bank||null, ym:info.ym||null,
+    period:info.ym?null:(info.period||null),
     at:new Date().toISOString(), count:count});
   try{ localStorage.setItem('et_imported_files', JSON.stringify(a.slice(-50))); }catch(e){}
-  renderImportLog();
+  renderImportLog(info.bank || 'Other');
 }
-/* Statement period for a CSV import: the month span its rows cover. */
-function importPeriodForRows(rows){
+/* Months ('YYYY-MM') covered by a set of import rows. */
+function importMonthsOfRows(rows){
   var ms = {};
   (rows||[]).forEach(function(r){ var m = String(r.date||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(m)) ms[m]=1; });
-  var keys = Object.keys(ms).sort();
-  if(!keys.length) return null;
-  return keys.length===1 ? fmtMonthPretty(keys[0]) : fmtMonthPretty(keys[0])+' – '+fmtMonthPretty(keys[keys.length-1]);
+  return Object.keys(ms).sort();
+}
+function importYm(f){
+  return (f && /^\d{4}-\d{2}$/.test(f.ym||'')) ? f.ym : null;
+}
+function importPeriodLabel(f){
+  var ym = importYm(f);
+  if(ym) return fmtMonthPretty(ym);
+  return f.period || null; // legacy pretty string
 }
 /* Best-effort statement-month guess from a filename ("stmt-2026-08.pdf",
    "August 2026.pdf"). Returns 'YYYY-MM' or null. Only used to prefill the
@@ -4262,44 +4269,83 @@ function guessPeriodFromName(name){
 function setImportPeriod(storedIdx, ym){
   var arr = getImportedFiles();
   if(!arr[storedIdx] || !/^\d{4}-\d{2}$/.test(ym||'')) return;
-  arr[storedIdx].period = fmtMonthPretty(ym);
+  arr[storedIdx].ym = ym;
+  delete arr[storedIdx].period;
   try{ localStorage.setItem('et_imported_files', JSON.stringify(arr)); }catch(e){}
-  renderImportLog();
+  renderImportLog(arr[storedIdx].bank || 'Other');
 }
-function renderImportLog(){
+function importLogRow(w){
+  var f = w.f;
+  var r = el('div',{class:'rowline'});
+  var left = el('div');
+  var pl = importPeriodLabel(f);
+  left.appendChild(el('b',null,(f.bank||'File')+(pl?' · '+pl:'')));
+  left.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.name||'')));
+  if(!pl){
+    // Imports logged before the month was recorded: one-tap to fill it in.
+    var add = el('button',{class:'linkbtn',type:'button',style:'font-size:12px;padding:2px 0'},'+ add month');
+    add.addEventListener('click', function(){
+      var wrap = el('span');
+      var inp = document.createElement('input');
+      inp.type = 'month';
+      var g = guessPeriodFromName(f.name);
+      if(g) inp.value = g;
+      inp.style.fontSize = '13px';
+      var okb = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
+      okb.addEventListener('click', function(){ if(inp.value) setImportPeriod(w.i, inp.value); });
+      wrap.appendChild(inp); wrap.appendChild(okb);
+      add.replaceWith(wrap);
+    });
+    left.appendChild(add);
+  }
+  var right = el('div',{style:'text-align:right;flex:none'});
+  right.appendChild(el('b',null,String(f.count||0)+' txns'));
+  right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
+  r.appendChild(left); r.appendChild(right);
+  return r;
+}
+/* Import log grouped by bank/card, newest activity first. Tap a group to
+   expand its statements. expandKey opens one group (used after an import). */
+function renderImportLog(expandKey){
   var box = $('import-log');
   if(!box) return;
   box.innerHTML='';
   var stored = getImportedFiles();
   if(!stored.length){ box.appendChild(el('p',{class:'muted'},'No imports logged yet.')); return; }
-  stored.map(function(f, i){ return {f:f, i:i}; }).reverse().forEach(function(w){ // newest first
-    var f = w.f;
-    var r = el('div',{class:'rowline'});
-    var left = el('div');
-    left.appendChild(el('b',null,(f.bank||'File')+(f.period?' · '+f.period:'')));
-    left.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.name||'')));
-    if(!f.period){
-      // Imports logged before the month was recorded: one-tap to fill it in.
-      var add = el('button',{class:'linkbtn',type:'button',style:'font-size:12px;padding:2px 0'},'+ add month');
-      add.addEventListener('click', function(){
-        var wrap = el('span');
-        var inp = document.createElement('input');
-        inp.type = 'month';
-        var g = guessPeriodFromName(f.name);
-        if(g) inp.value = g;
-        inp.style.fontSize = '13px';
-        var okb = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
-        okb.addEventListener('click', function(){ if(inp.value) setImportPeriod(w.i, inp.value); });
-        wrap.appendChild(inp); wrap.appendChild(okb);
-        add.replaceWith(wrap);
-      });
-      left.appendChild(add);
-    }
-    var right = el('div',{style:'text-align:right;flex:none'});
-    right.appendChild(el('b',null,String(f.count||0)+' txns'));
-    right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
-    r.appendChild(left); r.appendChild(right);
-    box.appendChild(r);
+  var groups = {};
+  stored.forEach(function(f, i){
+    var k = f.bank || 'Other';
+    var g = groups[k] || (groups[k] = {key:k, entries:[], maxAt:''});
+    g.entries.push({f:f, i:i});
+    if((f.at||'') > g.maxAt) g.maxAt = f.at || '';
+  });
+  Object.keys(groups).sort(function(a,b){ return groups[a].maxAt < groups[b].maxAt ? 1 : -1; }).forEach(function(k){
+    var g = groups[k];
+    g.entries.sort(function(a,b){ return (a.f.at||'') < (b.f.at||'') ? 1 : -1; }); // newest first
+    var yms = g.entries.map(function(w){ return importYm(w.f); }).filter(Boolean).sort();
+    var range = yms.length ? fmtMonthPretty(yms[0]) +
+      ((yms.length>1 && yms[yms.length-1]!==yms[0]) ? ' – '+fmtMonthPretty(yms[yms.length-1]) : '') : null;
+    var tx = g.entries.reduce(function(s,w){ return s + (+w.f.count||0); }, 0);
+    var wrap = el('div',{style:'margin-bottom:2px'});
+    var head = el('div',{class:'rowline', style:'cursor:pointer'});
+    var hl = el('div');
+    hl.appendChild(el('b',null,g.key));
+    hl.appendChild(el('span',{class:'muted',style:'font-size:12px;margin-left:6px'},
+      g.entries.length+' statement'+(g.entries.length>1?'s':'')));
+    hl.appendChild(el('div',{class:'muted',style:'font-size:12px'},
+      (range ? range+' · ' : '')+tx+' txns'));
+    var chev = el('span',{class:'muted',style:'font-size:14px;flex:none'},'▸');
+    head.appendChild(hl); head.appendChild(chev);
+    var body = el('div',{style:'padding-left:12px'});
+    body.hidden = true;
+    g.entries.forEach(function(w){ body.appendChild(importLogRow(w)); });
+    var open = false;
+    head.addEventListener('click', function(){
+      open = !open; body.hidden = !open; chev.textContent = open ? '▾' : '▸';
+    });
+    if(expandKey && k===expandKey){ open = true; body.hidden = false; chev.textContent = '▾'; }
+    wrap.appendChild(head); wrap.appendChild(body);
+    box.appendChild(wrap);
   });
   var clr = el('button',{class:'btn small ghost',type:'button',style:'margin-top:8px'},'Clear history');
   clr.addEventListener('click', function(){
@@ -4710,7 +4756,12 @@ function buildPreviewFromCsv(){
   var noDate = out.filter(function(r){return !r.date;}).length;
   if(noDate) notices.push(noDate+' row(s) had dates we could not parse — fix them in the preview (YYYY-MM-DD).');
   importRows = out;
-  importFileInfo = csvFileInfo ? Object.assign({}, csvFileInfo, {bank:'CSV', period:importPeriodForRows(out)}) : null;
+  var _mths = importMonthsOfRows(out);
+  importFileInfo = csvFileInfo ? Object.assign({}, csvFileInfo, {
+    bank:'CSV',
+    ym: _mths.length===1 ? _mths[0] : null,
+    period: _mths.length>1 ? fmtMonthPretty(_mths[0])+' – '+fmtMonthPretty(_mths[_mths.length-1]) : null
+  }) : null;
   markDuplicates(out);
   var pn = $('preview-notices');
   showImportNotices(pn, notices, out);
@@ -5094,8 +5145,10 @@ function finishPdfParse(pending, year, stmtMonth){
   stmtMonth = stmtMonth || pending.stmtMonth || null;
   var rows = parsePdfTransactions(pending.lines, pending.bank, year, stmtMonth);
   pendingPdf = null;
+  var _pdfYm = (year && stmtMonth) ? year+'-'+String(stmtMonth).padStart(2,'0') : null;
   importFileInfo = pending.fileInfo
-    ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, period:stmtPeriodLabel(year, stmtMonth)||null})
+    ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, ym:_pdfYm,
+        period: _pdfYm ? null : (stmtPeriodLabel(year, stmtMonth)||null)})
     : null;
   markDuplicates(rows);
   var pn = $('preview-notices');
