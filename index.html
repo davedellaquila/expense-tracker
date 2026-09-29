@@ -1710,15 +1710,17 @@ async function enterApp(){
   window.addEventListener('resize', syncFloatingPad);
   if(!$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
-  var instant = loadDashCache(); // render home page instantly from cache if available
+  var targetScreen = lastScreen()||'dashboard';
+  showScreen(targetScreen); // show the saved tab first — no dashboard flash on refresh
+  var instant = loadDashCache(); // fill state from cache if available
   try{
     await loadAll();
-    showScreen(lastScreen()||'dashboard');
+    showScreen(targetScreen);
     maybeResumeBulkJob();
   }catch(err){
     if(instant){
       toast('Could not refresh data — showing your last saved view.', true);
-      showScreen(lastScreen()||'dashboard');
+      showScreen(targetScreen);
     }else{
       toast('Could not load data: '+err.message, true);
       showScreen('settings');
@@ -2288,7 +2290,8 @@ function loadDashCache(){
     if(f.from) $('dash-from').value = f.from;
     if(f.to) $('dash-to').value = f.to;
     if(f.acct) $('dash-acct').value = f.acct;
-    showScreen('dashboard'); // renders immediately from cached data
+    // NOTE: no showScreen here — enterApp already shows the saved tab before
+    // this runs, so navigating to dashboard would flash the wrong page.
     return true;
   }catch(e){ return false; }
 }
