@@ -327,6 +327,14 @@ textarea{resize:vertical; min-height:64px;}
   margin:16px -14px -14px;
   padding:12px 14px;
 }
+/* Inside a bottom sheet there is no tab bar, so the page-style offset would
+   float the action bar over the last fields (e.g. Notes). Dock it flush at
+   the sheet's own bottom edge instead. */
+.sheet .stickybar-page{
+  bottom:0;
+  margin:16px -18px calc(-22px - env(safe-area-inset-bottom));
+  padding:12px 18px calc(14px + env(safe-area-inset-bottom));
+}
 .linkbtn{background:none; border:none; color:var(--blue); font-size:16px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
 /* floating search clone: appears fixed below the app header only after the
@@ -7768,6 +7776,34 @@ function parseBillScan(text){
       if(nm){ res.name = nm; res.found.name = true; break; }
     }
   }
+  /* Where-to-pay block: merchant name + contact lines (street address, PO box,
+     city/state/zip, phone, url, email), plus payment-instruction lines
+     ("make checks payable to", "remit to", "pay online at", ...). */
+  var seenL = {}, contact = [], instr = [];
+  function pushUL(arr, s){
+    s = String(s).replace(/\s+/g,' ').trim();
+    if(s && !seenL[s]){ seenL[s] = 1; arr.push(s); }
+  }
+  var phoneRe = /(^|[\s(])(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}([\s)]|$)/;
+  var urlRe = /(https?:\/\/|www\.)\S+/i;
+  var emailRe = /[\w.+-]+@[\w-]+\.[\w.]+/;
+  var addrRe = /^\d{1,6}\s+[A-Za-z0-9]|p\.?\s*o\.?\s*box\s+\d+/i;
+  var cityStRe = /,\s*[A-Z]{2}\s+\d{5}(-\d{4})?\b/;
+  var instrRe = /make checks? payable|payable to|remit to|mail (the |your )?payment|send (the |your )?payment|pay online|visit \S+ to pay|do not (send|mail)|payment address|questions\?\s*call/i;
+  lines.forEach(function(l){
+    if(instrRe.test(l)) pushUL(instr, l);
+    else if(phoneRe.test(l) || urlRe.test(l) || emailRe.test(l) || addrRe.test(l) || cityStRe.test(l)) pushUL(contact, l);
+  });
+  var payParts = [];
+  if(res.name) payParts.push(res.name);
+  contact.forEach(function(l){ payParts.push(l); });
+  if(payParts.length){ res.payTo = payParts.join('\n'); res.found.payTo = true; }
+  if(instr.length){ res.payNotes = instr.join('\n'); res.found.payNotes = true; }
+  var pi = [];
+  if(res.payTo) pi.push('Where to pay:\n' + res.payTo);
+  if(res.payNotes) pi.push('Payment instructions:\n' + res.payNotes);
+  res.paymentInfo = pi.join('\n\n');
+  res.found.paymentInfo = pi.length > 0;
   return res;
 }
 /* Receipt: merchant, total, date. */
@@ -7887,11 +7923,19 @@ function openScanSheet(kind, onDone){
         if(foundFlag) anyFound = true;
         reviewBox.appendChild(fieldRow(labelText, inp, foundFlag));
       }
+      function addArea(labelText, key, val, foundFlag, rows){
+        var ta = el('textarea', {rows:String(rows || 4), style:'width:100%'});
+        if(val != null && val !== '') ta.value = val;
+        vals[key] = ta;
+        if(foundFlag) anyFound = true;
+        reviewBox.appendChild(fieldRow(labelText, ta, foundFlag));
+      }
       var numAttrs = {type:'number', min:'0.01', step:'0.01', inputmode:'decimal'};
       if(isBill){
         addField('Name', 'name', parsed.name, parsed.found.name);
         addField('Amount', 'amount', parsed.amount != null ? parsed.amount.toFixed(2) : '', parsed.found.amount, numAttrs);
         addField('Due date', 'dueDate', parsed.dueDate || '', parsed.found.dueDate, {type:'date'});
+        addArea('Payment info', 'paymentInfo', parsed.paymentInfo, parsed.found.paymentInfo, 5);
       }else{
         addField('Merchant', 'merchant', parsed.merchant, parsed.found.merchant);
         addField('Amount', 'amount', parsed.amount != null ? parsed.amount.toFixed(2) : '', parsed.found.amount, numAttrs);
@@ -7977,6 +8021,10 @@ function openBillForm(b){
         if(res.values.name){ inName.value = res.values.name; markScanned(inName); }
         if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); }
         if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); }
+        if(res.values.paymentInfo){
+          inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + res.values.paymentInfo;
+          markScanned(inNotes);
+        }
         renderScanBox();
         toast('Filled from scan \u2014 check the fields.');
       });
