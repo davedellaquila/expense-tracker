@@ -1104,11 +1104,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
   <nav class="tabbar" id="tabbar">
     <button data-screen="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
     <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
+    <button data-screen="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
     <button data-screen="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
     <button data-screen="budgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
     <button data-screen="bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
     <button data-screen="tax"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
-    <button data-screen="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
     <button data-screen="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
   </nav>
 </div>
@@ -3745,9 +3745,11 @@ function resetTxnFilters(){
 }
 /* Chart drill-through: single-category drills set the native Transactions
    category dropdown (the pre-pill behavior); multi-category drills set the
-   temporary pill context instead. Native filter controls are otherwise never
-   rewritten by a drill; they stay independent and combine with the pill as
-   additional filters. o.carryCats (the source page's active chip selection)
+   temporary pill context instead. A drill first clears the native selection
+   filters (category/type/bank/tax/scope/search) so it shows exactly what was
+   tapped — the period controls are left alone (drills with a date scope
+   override the period in txnVisible; dateless drills keep it in effect).
+   o.carryCats (the source page's active chip selection)
    is intersected with the tapped element's own categories so an active
    filter is never dropped. Transfers are exempt from chip filtering, so
    xferOnly drills never carry categories. */
@@ -3759,6 +3761,19 @@ function drillHasDims(d){
     d.band || d.minAmt!=null || d.maxAmt!=null || d.q || d.xferOnly || d.noXfer);
 }
 function drillToTransactions(o){
+  // Chart drills start from a clean Transactions slate: clear any previous
+  // native selection filters so the drill shows exactly what was tapped.
+  // Period controls are deliberately untouched: a drill carrying from/to
+  // overrides the native period in txnVisible, while dateless drills (e.g.
+  // budget) intentionally keep the period in effect.
+  $('f-type').value = '';
+  $('f-bp').value = '';
+  $('f-cat').value = '';
+  $('f-bank').value = '';
+  $('f-tax').value = '';
+  $('f-q').value = '';
+  var dqs = $('f-q-stick'); if(dqs) dqs.value = '';
+  saveTxnFilters(); // persist the reset so a reload can't resurrect pre-drill filters
   var from = o.singleMonth || o.from || null, to = o.singleMonth || o.to || null;
   var carry = (!o.xferOnly && o.carryCats && o.carryCats.length) ? o.carryCats : null;
   var dc = (o.dispCats && o.dispCats.length) ? o.dispCats.slice() : null;
