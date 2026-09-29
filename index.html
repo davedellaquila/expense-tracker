@@ -16,7 +16,7 @@
 <style>
 :root{
   --bg:#f3f5f7; --card:#ffffff; --text:#17202a; --muted:#68727f;
-  --border:#e2e7ec; --accent:#177a52; --accent-soft:#e6f4ec; --accent-faint:#f4faf6;
+  --border:#e2e7ec; --accent:#177a52; --accent-soft:#e6f4ec; --accent-faint:#ebf5f0;
   --blue:#2563eb; --blue-soft:#e8effd;
   --danger:#cf3f3f; --danger-soft:#fbecec;
   --warn:#9a6b1a; --warn-soft:#fdf3e0;
@@ -26,7 +26,7 @@
 }
 [data-theme="dark"]{
   --bg:#0f141a; --card:#182028; --text:#edf1f5; --muted:#9aa7b4;
-  --border:#2b3540; --accent:#35a06c; --accent-soft:#123528; --accent-faint:#1a2620;
+  --border:#2b3540; --accent:#35a06c; --accent-soft:#123528; --accent-faint:#152c22;
   --blue:#6b9bf3; --blue-soft:#1b2a4a;
   --danger:#e87a7a; --danger-soft:#3d1f1f;
   --warn:#d9a441; --warn-soft:#3a2c12;
@@ -5365,7 +5365,7 @@ function botRenderTable(){
   host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
-    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
     line.appendChild(check);
@@ -5654,7 +5654,7 @@ function incBotRenderTable(){
   head.appendChild(el('span'));
   host.appendChild(head);
   rows.forEach(function(r){
-    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':'')});
+    var line = el('div',{style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
     line.appendChild(check);
