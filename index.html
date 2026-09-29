@@ -5151,7 +5151,7 @@ function buildPreviewFromCsv(){
   renderPreview();
   if(out.length) toast(out.length+' rows ready to review.');
   else toast('No usable rows found. Check your column mapping.', true);
-  document.querySelector('#preview-card').scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelector('#preview-card').scrollIntoView({behavior:'smooth',block:'nearest'}); // minimal scroll: keep the file buttons in view
 }
 
 /* ================= import: PDF statements ================= */
@@ -5562,7 +5562,7 @@ function finishPdfParse(pending, year, stmtMonth){
   renderPreview();
   if(rows.length){
     toast(rows.length+' transactions ready to review.');
-    document.querySelector('#preview-card').scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelector('#preview-card').scrollIntoView({behavior:'smooth',block:'nearest'}); // minimal scroll: keep the file buttons in view
   }
 }
 
