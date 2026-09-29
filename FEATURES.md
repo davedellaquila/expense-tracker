@@ -17,11 +17,6 @@ it's where ideas wait until Dave says "build it."
   without a walkthrough.
 - **Better app name** (2026-09-29, Dave): think about a better name for the app
   than "Expense Tracker".
-- **Export transactions to CSV** (2026-09-29, Dave): one-tap export from the
-  Transactions page to a spreadsheet-ready CSV with all the necessary fields
-  (date, merchant, amount, type, category, account/bank, notes, ...). Note: the
-  app already has a `downloadCsv()` helper plus CSV downloads on the Tax page,
-  so the building blocks exist.
 
 ## Completed features
 
@@ -42,6 +37,10 @@ live copy of this list.
 - Select mode with floating action bar: bulk update (bank, merchant name), bulk
   delete with undo.
 - Tidy merchant names: editable suggestions, applied in bulk.
+- Export transactions to CSV: exports the filtered list with all fields,
+  spreadsheet-ready.
+- Split a transaction across multiple categories: each part gets its own
+  category and amount; the parts must add up exactly to the original amount.
 - Data cleanup: strip statement headers/boilerplate and Wells Fargo debit-card
   prefixes from merchants, with preview.
 
@@ -51,7 +50,8 @@ live copy of this list.
   jumps back to the filters).
 - Category Mix donut + table, tappable; Income listed above Expenses.
 - Category chips: multi-select filter for the whole page ("All" clears).
-- Bills card: overdue and due-this-week at a glance.
+- Bills card: overdue and due-this-week at a glance; "+ Add bill" button opens
+  the bill form right from the home page.
 - Chart cards: add/remove, drag to reorder, order saved.
 
 ### Reports
@@ -117,3 +117,7 @@ live copy of this list.
 ## Shipped
 
 _(Ideas move here with the date they went live.)_
+
+- Export transactions to CSV (2026-09-29).
+- Split a transaction across multiple categories (2026-09-29).
+- "+ Add bill" button on the Home page Bills card (2026-09-29).
