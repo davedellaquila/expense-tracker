@@ -4609,10 +4609,36 @@ function renderBudgets(){
     wrap.appendChild(ctl);
     list.appendChild(wrap);
   });
+  restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
 }
 
 /* ================= budget bot ================= */
 var botProposal = null; // {month, rows:[{category, avg, last, amount, locked}], avgIncome}
+
+/* Draft persistence: the bot proposal (edited amounts, locks) survives a hard
+   refresh. Stored per budget month in localStorage; switching months restores
+   that month's draft if one was left behind. */
+var BOT_DRAFT_LS = 'expTrackerBotDraft:';
+function persistBotDraft(){
+  try{
+    if(botProposal) localStorage.setItem(BOT_DRAFT_LS+botProposal.month, JSON.stringify(botProposal));
+  }catch(e){}
+}
+function restoreBotDraft(ym){
+  if(botProposal) return;
+  try{
+    var raw = localStorage.getItem(BOT_DRAFT_LS+ym);
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    if(!d || d.month!==ym || !Array.isArray(d.rows) || !d.rows.length) return;
+    botProposal = d;
+    botRenderTable();
+    botRenderGoalInputs();
+    $('bot-goal').hidden = false;
+    $('bot-save-row').hidden = false;
+    $('bot-save-month').textContent = fmtMonthPretty(ym);
+  }catch(e){}
+}
 
 function botNiceRound(avg){
   if(avg>=100) return Math.round(avg/10)*10;
@@ -4725,7 +4751,7 @@ function botRenderTable(){
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
     inp.disabled = r.locked;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); inp.value = r.amount; botRenderTotal(); });
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); inp.value = r.amount; botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
     var lock = el('button',{class:'btn small ghost',type:'button',title:r.locked?'Unlock — bot may suggest trims':'Lock — bot will not touch',style:'padding:4px 0'}, r.locked?'🔒':'🔓');
     lock.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); });
@@ -4762,6 +4788,7 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
       'You bring in about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
   }
+  persistBotDraft();
 }
 function botRenderTotal(){
   var t = $('bot-total');
