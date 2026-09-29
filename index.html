@@ -2131,6 +2131,7 @@ async function authEmailFlow(mode, btn){
 /* Refresh everything after the Firebase auth user changes. */
 async function afterAuthChange(msg){
   toast(msg);
+  _store = null; _fbSignin = null; // auth changed: drop the cached store/uid so reads use the new user
   try{ await loadAll(); }
   catch(e){ toast('Signed in, but data would not load: '+e.message, true); }
   try{ await syncStoreSettings(); }catch(e){}
