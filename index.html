@@ -134,7 +134,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* ---------- stats ---------- */
 .stat-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;}
 .duo-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;}
-.duo-grid .card{margin-bottom:0;}
+.duo-grid .card{margin-bottom:0; display:flex; flex-direction:column;}
+/* Pin the Propose buttons to the bottom so both bot cards line up */
+.bot-actions{margin-top:auto; padding-top:12px;}
 @media (max-width:560px){ .duo-grid{grid-template-columns:1fr;} }
 .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center;}
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
@@ -1000,7 +1002,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       <div class="card">
         <h2>Budget Bot</h2>
         <p class="muted">Studies your spending so far this year and drafts a monthly budget. Edit any number, check the categories you don't want the bot to touch, then set a financial goal and let the bot suggest the trims.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="bot-actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="bot-propose" type="button">Propose my budget</button>
         </div>
         <div id="bot-table" style="margin-top:12px"></div>
@@ -1025,7 +1027,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       <div class="card">
         <h2>Income Bot</h2>
         <p class="muted">Studies your income so far this year and drafts monthly targets. Edit any number, lock categories you don't want touched, then save them as the month's income targets.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="bot-actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="ibot-propose" type="button">Propose my income</button>
         </div>
         <div id="ibot-table" style="margin-top:12px"></div>

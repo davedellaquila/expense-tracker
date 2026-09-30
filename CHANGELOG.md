@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: bot card buttons aligned to the bottom
+- The Budget Bot and Income Bot cards are now flex columns with their
+  "Propose" buttons pinned to the bottom, so the buttons line up even
+  though the intro text is different lengths.
+
 ### Budget page: live totals pill + real-time bars while dragging
 - The sticky month bar at the top now carries a live totals pill: total
   budget vs total income target, plus the budget as a percentage of
