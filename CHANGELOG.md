@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: bot cards side by side, row dividers
+- Budget Bot and Income Bot cards now sit next to each other horizontally;
+  on iPhone they stack vertically as before.
+- Category rows in the budget/income cards (and the Reports Budget vs
+  Actual card) are separated by divider lines, so it's clear where one
+  category ends and the next begins.
+
 ### Budget page: drag sliders + clearer cards
 - Category budgets and Income targets rows now set the amount with a drag
   slider synced to a compact number box: drag for speed, type for precision,
