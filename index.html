@@ -400,9 +400,14 @@ textarea{resize:vertical; min-height:64px;}
   background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
   box-shadow:0 10px 24px rgba(10,20,15,.14);
   padding:10px 14px; margin-bottom:12px;
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
 }
-#bud-stickybar input{margin:0; flex:1; min-width:0;}
+#bud-stickybar input{margin:0;}
+#bud-month{flex:0 0 auto;}
+/* Live budget-vs-income totals pill: shares the sticky bar with the month
+   picker and updates on every slider tick. */
+.bud-totals{flex:1; min-width:150px; margin:0; text-align:right; font-size:12.5px; color:var(--muted);}
+.bud-totals b{color:var(--text); font-variant-numeric:tabular-nums;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -986,6 +991,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     <section id="screen-budgets" class="screen" hidden>
       <div id="bud-stickybar">
         <input type="month" id="bud-month" aria-label="Month">
+        <div id="bud-live-totals" class="bud-totals" hidden></div>
       </div>
       <div class="card">
         <p class="muted" style="margin-top:0">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
@@ -7466,16 +7472,42 @@ function budControl(o){
   var inp = el('input',{type:'number',class:'amt',min:'0',step:'1',
     placeholder:o.placeholder, inputmode:'decimal'});
   if(o.value>0) inp.value = o.value;
-  slider.addEventListener('input', function(){ inp.value = slider.value; });
+  slider.addEventListener('input', function(){ inp.value = slider.value; if(o.onInput) o.onInput(num(slider.value)); });
   inp.addEventListener('input', function(){
     var v = num(inp.value);
-    if(v>=0 && v<=sc.max) slider.value = v;
+    if(v>=0 && v<=sc.max){ slider.value = v; if(o.onInput) o.onInput(v); }
   });
   var sv = el('button',{class:'btn small',type:'button'},'Save');
   sv.style.flex='none';
   sv.onclick = function(){ o.onSave(inp, sv); };
   ctl.appendChild(slider); ctl.appendChild(inp); ctl.appendChild(sv);
   return ctl;
+}
+/* Live budget/income drafts: mirrors the stored budgets/targets, updated on
+   every slider tick so the sticky totals pill and the row bars reflect
+   unsaved edits in real time. Rebuilt from storage on each render. */
+var liveDrafts = {bud:{}, inc:{}};
+function sumDrafts(d){
+  return Object.keys(d).reduce(function(s,k){ return s+num(d[k]); }, 0);
+}
+/* Sticky totals pill next to the month picker: live budget total vs income
+   total, with the budget-as-percent-of-income figure. */
+function paintBudgetTotals(){
+  var box = document.getElementById('bud-live-totals');
+  if(!box) return;
+  var bT = sumDrafts(liveDrafts.bud), iT = sumDrafts(liveDrafts.inc);
+  if(!(bT>0) && !(iT>0)){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '';
+  box.appendChild(el('b',null,money0(bT)));
+  box.appendChild(document.createTextNode(' budget · '));
+  box.appendChild(el('b',null,money0(iT)));
+  box.appendChild(document.createTextNode(' income target'));
+  if(iT>0){
+    var pct = bT/iT*100;
+    box.appendChild(document.createTextNode(' · '));
+    box.appendChild(el('b',{class: pct>100?'neg':'pos'}, Math.round(pct)+'% of income'));
+  }
 }
 function renderIncomeTargets(ym){
   var list = $('income-list'); list.innerHTML='';
@@ -7495,34 +7527,51 @@ function renderIncomeTargets(ym){
   Object.keys(tmap).forEach(function(c){ incSet[c] = true; });
   var cats = Object.keys(incSet).sort();
   if(!cats.length){ emptyInto(list,'💰','No income recorded this year — targets will appear here once there is some.'); return; }
-  var totalTgt = Object.keys(tmap).reduce(function(s,k){ return s+num(tmap[k]); }, 0);
+  liveDrafts.inc = {};
+  Object.keys(tmap).forEach(function(c){ liveDrafts.inc[c] = num(tmap[c]); });
   var mrows = txnsForMonth(ym);
+  var rowRefs = [];
+  function paintIncomeRows(){
+    var total = sumDrafts(liveDrafts.inc);
+    rowRefs.forEach(function(r){
+      var tgt = num(liveDrafts.inc[r.c]);
+      r.lbl.textContent = money(r.got)+(tgt>0?' of '+money(tgt):'');
+      r.lbl.className = (tgt>0 && r.got>=tgt) ? 'pos' : '';
+      var show = tgt>0;
+      r.barlab1.style.display = show?'':'none';
+      r.bar.style.display = show?'':'none';
+      r.barlab2.style.display = show?'':'none';
+      r.sh.style.display = show?'':'none';
+      if(show){
+        r.fill.style.width = Math.min(100, r.got/tgt*100)+'%';
+        var share = total>0 ? tgt/total : 0;
+        r.barlab2.textContent = 'Share of total income target · '+Math.round(share*100)+'% of '+money(total);
+        r.sh.title = Math.round(share*100)+'% of total income target';
+        r.shf.style.width = Math.max(share*100, 1.5)+'%';
+      }
+    });
+    paintBudgetTotals();
+  }
   cats.forEach(function(c){
+    if(!(c in liveDrafts.inc)) liveDrafts.inc[c] = 0;
     var got = 0;
     mrows.forEach(function(t){ if(t.txn_type==='income' && t.category===c) got += num(t.amount); });
-    var tgt = tmap[c]||0;
-    var share = (tgt>0 && totalTgt>0) ? tgt/totalTgt : 0;
+    var tgt = liveDrafts.inc[c];
     var wrap = el('div',{class:'barrow'});
     var top = el('div',{class:'top'});
     var iListName = el('b',{class:'rep-click',title:'Show transactions'},c);
     iListName.addEventListener('click', function(){ botDrillCategory(c, 'income'); });
     top.appendChild(iListName);
-    var lbl = el('span',null,money(got)+(tgt>0?' of '+money(tgt):''));
-    if(tgt>0 && got>=tgt) lbl.className='pos';
-    top.appendChild(lbl);
-    wrap.appendChild(top);
-    if(tgt>0){
-      wrap.appendChild(el('div',{class:'barlab'},'Received vs monthly target'));
-      var bar = el('div',{class:'bar'});
-      var fill = el('div'); fill.style.width = Math.min(100,got/tgt*100)+'%'; bar.appendChild(fill); wrap.appendChild(bar);
-      wrap.appendChild(el('div',{class:'barlab'},'Share of total income target · '+Math.round(share*100)+'% of '+money(totalTgt)));
-      var sh = el('div',{class:'sharebar',title:Math.round(share*100)+'% of total income target'});
-      var shf = el('div'); shf.style.width = Math.max(share*100, 1.5)+'%'; sh.appendChild(shf);
-      wrap.appendChild(sh);
-    }
+    var lbl = el('span'); top.appendChild(lbl); wrap.appendChild(top);
+    var barlab1 = el('div',{class:'barlab'},'Received vs monthly target'); wrap.appendChild(barlab1);
+    var bar = el('div',{class:'bar'}); var fill = el('div'); bar.appendChild(fill); wrap.appendChild(bar);
+    var barlab2 = el('div',{class:'barlab'}); wrap.appendChild(barlab2);
+    var sh = el('div',{class:'sharebar'}); var shf = el('div'); sh.appendChild(shf); wrap.appendChild(sh);
+    rowRefs.push({c:c, got:got, lbl:lbl, barlab1:barlab1, bar:bar, fill:fill, barlab2:barlab2, sh:sh, shf:shf});
     wrap.appendChild(budControl({
       label:'Target:', placeholder:'Monthly target', value:tgt, base:Math.max(tgt,got),
       aria:'Monthly income target for '+c,
+      onInput:function(v){ liveDrafts.inc[c]=v; paintIncomeRows(); },
       onSave: async function(inp, sv){
         var v = num(inp.value);
         if(!(v>0)){ toast('Enter a target greater than zero.', true); return; }
@@ -7539,6 +7588,7 @@ function renderIncomeTargets(ym){
     }));
     list.appendChild(wrap);
   });
+  paintIncomeRows();
 }
 function renderBudgets(){
   var ym = $('bud-month').value || monthLocal();
@@ -7556,35 +7606,52 @@ function renderBudgets(){
     var k = String(b.category||'');
     if(k.indexOf(INC_BUDGET_PREFIX)!==0) bmap[k]=num(b.amount); // income targets are namespaced out
   });
-  var totalBud = Object.keys(bmap).reduce(function(s,k){ return s+num(bmap[k]); }, 0);
+  liveDrafts.bud = {};
+  Object.keys(bmap).forEach(function(c){ liveDrafts.bud[c] = num(bmap[c]); });
+  var browRefs = [];
+  function paintBudgetRows(){
+    var total = sumDrafts(liveDrafts.bud);
+    browRefs.forEach(function(r){
+      var amt = num(liveDrafts.bud[r.c]);
+      r.lbl.textContent = money(r.spent)+(amt>0?' of '+money(amt):'');
+      r.lbl.className = (amt>0 && r.spent>amt) ? 'neg' : '';
+      var show = amt>0;
+      r.barlab1.style.display = show?'':'none';
+      r.bar.style.display = show?'':'none';
+      r.barlab2.style.display = show?'':'none';
+      r.sh.style.display = show?'':'none';
+      if(show){
+        r.bar.className = 'bar'+(r.spent>amt?' over':'');
+        r.fill.style.width = Math.min(100, r.spent/amt*100)+'%';
+        var share = total>0 ? amt/total : 0;
+        r.barlab2.textContent = 'Share of total budget · '+Math.round(share*100)+'% of '+money(total);
+        r.sh.title = Math.round(share*100)+'% of total budget';
+        r.shf.style.width = Math.max(share*100, 1.5)+'%';
+      }
+    });
+    paintBudgetTotals();
+  }
   cats.forEach(function(c){
+    if(!(c in liveDrafts.bud)) liveDrafts.bud[c] = 0;
     var spent = 0;
     rows.forEach(function(t){ if(t.txn_type==='expense' && t.category===c) spent += num(t.amount); });
-    var amt = bmap[c]||0;
-    var share = (amt>0 && totalBud>0) ? amt/totalBud : 0;
+    var amt = liveDrafts.bud[c];
     var wrap = el('div',{class:'barrow'});
     var top = el('div',{class:'top'});
     var bListName = el('b',{class:'rep-click',title:'Show transactions'},c);
     bListName.addEventListener('click', function(){ botDrillCategory(c, 'expense'); });
     top.appendChild(bListName);
-    var lbl = el('span',null,money(spent)+(amt>0?' of '+money(amt):''));
-    if(amt>0 && spent>amt) lbl.className='neg';
-    top.appendChild(lbl);
-    wrap.appendChild(top);
-    if(amt>0){
-      wrap.appendChild(el('div',{class:'barlab'},'Spent vs monthly budget'));
-      var bar = el('div',{class:'bar'+(spent>amt?' over':'')});
-      var fill = el('div'); fill.style.width = Math.min(100,spent/amt*100)+'%'; bar.appendChild(fill);
-      wrap.appendChild(bar);
-      // relative size of this category's budget vs the whole month's budget
-      wrap.appendChild(el('div',{class:'barlab'},'Share of total budget · '+Math.round(share*100)+'% of '+money(totalBud)));
-      var sh = el('div',{class:'sharebar',title:Math.round(share*100)+'% of total budget'});
-      var shf = el('div'); shf.style.width = Math.max(share*100, 1.5)+'%'; sh.appendChild(shf);
-      wrap.appendChild(sh);
-    }
+    var lbl = el('span'); top.appendChild(lbl); wrap.appendChild(top);
+    var barlab1 = el('div',{class:'barlab'},'Spent vs monthly budget'); wrap.appendChild(barlab1);
+    var bar = el('div',{class:'bar'}); var fill = el('div'); bar.appendChild(fill); wrap.appendChild(bar);
+    // relative size of this category's budget vs the whole month's budget
+    var barlab2 = el('div',{class:'barlab'}); wrap.appendChild(barlab2);
+    var sh = el('div',{class:'sharebar'}); var shf = el('div'); sh.appendChild(shf); wrap.appendChild(sh);
+    browRefs.push({c:c, spent:spent, lbl:lbl, barlab1:barlab1, bar:bar, fill:fill, barlab2:barlab2, sh:sh, shf:shf});
     wrap.appendChild(budControl({
       label:'Budget:', placeholder:'Monthly limit', value:amt, base:Math.max(amt,spent),
       aria:'Monthly budget for '+c,
+      onInput:function(v){ liveDrafts.bud[c]=v; paintBudgetRows(); },
       onSave: async function(inp, sv){
         var v = num(inp.value);
         if(!(v>0)){ toast('Enter a budget amount greater than zero.', true); return; }
@@ -7602,6 +7669,7 @@ function renderBudgets(){
     }));
     list.appendChild(wrap);
   });
+  paintBudgetRows();
   restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
   botRecalc(); // refresh calculated values from current transactions; keeps edits/locks
   incBotRestore(ym); // same for the income bot

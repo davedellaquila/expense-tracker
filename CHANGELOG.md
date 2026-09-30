@@ -5,6 +5,16 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: live totals pill + real-time bars while dragging
+- The sticky month bar at the top now carries a live totals pill: total
+  budget vs total income target, plus the budget as a percentage of
+  income (turns red when the budget exceeds the income target).
+- Dragging a budget/target slider now repaints its row in real time: the
+  "$spent of $budget" header, the spend-vs-budget bar (goes red when
+  over), and the share-of-total bar all follow the drag before anything
+  is saved. The totals pill updates too. Income target rows behave the
+  same way.
+
 ### Budget page: each bar labeled directly
 - Every row now labels its bars in place: "Spent vs monthly budget" above
   the green bar, "Share of total budget · 24% of $17,455" above the blue
