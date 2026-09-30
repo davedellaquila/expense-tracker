@@ -5023,8 +5023,8 @@ function openBulkUpdate(ids){
       s.appendChild(el('option',{value:''},'\u2014 no change \u2014'));
       return s;
     }
-    var sCat = noChangeSelect();
-    changeRow('Category', sCat);
+    var inMerch = el('input',{type:'text',placeholder:'New merchant name — leave blank for no change',autocomplete:'off',spellcheck:'false'});
+    changeRow('Merchant name', inMerch);
     var sType = noChangeSelect();
     sType.appendChild(el('option',{value:'income'},'Income'));
     sType.appendChild(el('option',{value:'expense'},'Expense'));
@@ -5034,6 +5034,8 @@ function openBulkUpdate(ids){
     sBp.appendChild(el('option',{value:'Personal'},'Personal'));
     sBp.appendChild(el('option',{value:'Business'},'Business'));
     changeRow('Account (Personal / Business)', sBp);
+    var sCat = noChangeSelect();
+    changeRow('Category', sCat);
     // The category list follows the chosen account type: pick Personal or
     // Business to see only that kind of category; with no account chosen,
     // every category is shown.
@@ -5053,6 +5055,14 @@ function openBulkUpdate(ids){
     }
     sBp.addEventListener('change', refreshBulkCats);
     refreshBulkCats();
+    var sTax = noChangeSelect();
+    sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
+    TAX_GROUPS.forEach(function(g){
+      g.items.forEach(function(it){ sTax.appendChild(el('option',{value:it},it)); });
+    });
+    changeRow('Tax category', sTax);
+    sh.appendChild(el('p',{class:'muted',style:'font-size:12px;margin:-4px 0 8px'},
+      'Tip: if you change the category but not the tax category, blank tax categories are filled in from the new category.'));
     var sPay = noChangeSelect();
     var payOpts = PAYMENT_METHODS.slice();
     state.transactions.forEach(function(t){
@@ -5066,16 +5076,8 @@ function openBulkUpdate(ids){
     var sBank = noChangeSelect();
     allBanks().forEach(function(b){ sBank.appendChild(el('option',{value:b},b)); });
     changeRow('Bank', sBank);
-    var inMerch = el('input',{type:'text',placeholder:'New merchant name — leave blank for no change',autocomplete:'off',spellcheck:'false'});
-    changeRow('Merchant name', inMerch);
-    var sTax = noChangeSelect();
-    sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
-    TAX_GROUPS.forEach(function(g){
-      g.items.forEach(function(it){ sTax.appendChild(el('option',{value:it},it)); });
-    });
-    changeRow('Tax category', sTax);
-    sh.appendChild(el('p',{class:'muted',style:'font-size:12px;margin:-4px 0 8px'},
-      'Tip: if you change the category but not the tax category, blank tax categories are filled in from the new category.'));
+    var inDesc = el('input',{type:'text',placeholder:'New description — leave blank for no change',autocomplete:'off',spellcheck:'false'});
+    changeRow('Description', inDesc);
     var sNotes = noChangeSelect();
     sNotes.appendChild(el('option',{value:'__set__'},'Set to\u2026'));
     sNotes.appendChild(el('option',{value:'__clear__'},'Clear'));
@@ -5090,7 +5092,7 @@ function openBulkUpdate(ids){
     row.appendChild(cancel); row.appendChild(apply);
     sh.appendChild(row);
     apply.onclick = async function(){
-      if(!(sCat.value||sType.value||sBp.value||sPay.value||sBank.value||inMerch.value.trim()||sTax.value||sNotes.value)){
+      if(!(inMerch.value.trim()||sType.value||sBp.value||sCat.value||sTax.value||sPay.value||sBank.value||inDesc.value.trim()||sNotes.value)){
         toast('Choose at least one field to update.', true); return;
       }
       if(sNotes.value==='__set__' && !inNotes.value.trim()){ toast('Type the notes text first.', true); return; }
@@ -5105,6 +5107,7 @@ function openBulkUpdate(ids){
       if(sPay.value) overrides.payment_method = sPay.value;
       if(sBank.value) overrides.payment_method = sBank.value; // Bank wins over Payment method
       if(inMerch.value.trim()) overrides.merchant = inMerch.value.trim();
+      if(inDesc.value.trim()) overrides.description = inDesc.value.trim();
       if(sTax.value) overrides.tax_category = sTax.value==='__empty__' ? '' : sTax.value;
       if(sNotes.value==='__set__') overrides.notes = inNotes.value.trim();
       else if(sNotes.value==='__clear__') overrides.notes = '';
