@@ -5,6 +5,14 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Sheet drag-to-resize + longer tab tooltips
+- Bottom sheets can now be resized by dragging the thumb at the top: the
+  bottom edge stays put, the sticky footer stays pinned, and content slides
+  behind it. Clamped between a collapsed peek and 92% of the viewport;
+  dragging down never dismisses (Cancel / tap-outside / Esc still do).
+- Tab-bar tooltips now carry a slightly longer description of each tab
+  plus its 1–8 keyboard shortcut.
+
 ### Toast ghost + tooltips
 - Fixed the toast's brief ghost at the bottom of the screen: dismissing no
   longer strips its position class mid-fade, so it fades out in place.

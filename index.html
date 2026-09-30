@@ -568,7 +568,14 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
 }
 .sheet h2{margin:0 0 4px; font-size:18px;}
-.grab{width:42px; height:5px; border-radius:99px; background:var(--border); margin:0 auto 12px;}
+/* Drag handle at the top of every bottom sheet: a full-width hit area with
+   the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
+   footer stays pinned at the bottom while content slides behind it. */
+.grab{width:100%; padding:10px 0; margin:0 auto; cursor:grab; touch-action:none;
+  user-select:none; -webkit-user-select:none;}
+.grab::after{content:''; display:block; width:42px; height:5px; border-radius:99px;
+  background:var(--border); margin:0 auto;}
+.grab.resizing{cursor:grabbing;}
 
 /* ---------- toast / spinner ---------- */
 #toast{
@@ -1223,14 +1230,14 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     <div id="float-totals-one"></div>
   </div>
   <nav class="tabbar" id="tabbar">
-    <button data-screen="dashboard" class="on" title="Home (shortcut: 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
-    <button data-screen="transactions" title="Transactions (shortcut: 2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
-    <button data-screen="reports" title="Reports (shortcut: 3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
-    <button data-screen="import" title="Import (shortcut: 4)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
-    <button data-screen="budgets" title="Budget (shortcut: 5)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
-    <button data-screen="bills" title="Bills (shortcut: 6)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
-    <button data-screen="tax" title="Tax (shortcut: 7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
-    <button data-screen="settings" title="Setup (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
+    <button data-screen="dashboard" class="on" title="Home — balances, budgets and bills at a glance (shortcut: 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
+    <button data-screen="transactions" title="Transactions — search, filter and edit transactions (shortcut: 2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
+    <button data-screen="reports" title="Reports — charts and breakdowns of income and spending (shortcut: 3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
+    <button data-screen="import" title="Import — bring in bank and card statements (shortcut: 4)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
+    <button data-screen="budgets" title="Budget — monthly budgets and Bot proposals (shortcut: 5)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
+    <button data-screen="bills" title="Bills — recurring bills and due dates (shortcut: 6)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
+    <button data-screen="tax" title="Tax — categories and summaries for tax time (shortcut: 7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
+    <button data-screen="settings" title="Setup — accounts, categories, sync and app settings (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
   </nav>
 </div>
 
@@ -1533,6 +1540,43 @@ function padStickyBars(sh){
     bar.parentNode.insertBefore(sp, bar.nextSibling);
   });
 }
+/* Drag-to-resize for bottom sheets. Dragging the grab handle changes the
+   sheet's height while the bottom edge stays put; the sticky action bar
+   remains pinned at the bottom and the sheet's content slides behind it.
+   Height is clamped between a collapsed peek and 92% of the viewport.
+   Dragging down never dismisses — Cancel / tap-outside / Esc still do. */
+function wireSheetResize(sh){
+  var grab = sh.querySelector('.grab');
+  if(!grab || grab.dataset.resizeWired) return;
+  grab.dataset.resizeWired = '1';
+  grab.addEventListener('pointerdown', function(e){
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    e.preventDefault();
+    var pid = e.pointerId, startY = e.clientY;
+    var startH = sh.getBoundingClientRect().height;
+    var minH = Math.min(180, startH); /* never grow a short sheet by dragging down */
+    var maxH = Math.round(window.innerHeight * 0.92);
+    sh.style.maxHeight = 'none';
+    try{ grab.setPointerCapture(pid); }catch(err){}
+    grab.classList.add('resizing');
+    function move(ev){
+      if(ev.pointerId!==pid) return;
+      var h = startH + (startY - ev.clientY); /* drag up = taller */
+      h = Math.max(minH, Math.min(maxH, h));
+      sh.style.height = h + 'px';
+    }
+    function done(ev){
+      if(ev.pointerId!==pid) return;
+      grab.removeEventListener('pointermove', move);
+      grab.removeEventListener('pointerup', done);
+      grab.removeEventListener('pointercancel', done);
+      grab.classList.remove('resizing');
+    }
+    grab.addEventListener('pointermove', move);
+    grab.addEventListener('pointerup', done);
+    grab.addEventListener('pointercancel', done);
+  });
+}
 function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
@@ -1547,6 +1591,7 @@ function openSheet(build, onDismiss){
   });
   build(sh, close);
   padStickyBars(sh);
+  wireSheetResize(sh);
   return close;
 }
 /* Stacked variant: lays a sheet above the current one instead of replacing
@@ -1565,6 +1610,7 @@ function openSheetStacked(build, onDismiss){
   ov.addEventListener('click', function(e){ if(e.target===ov){ if(onDismiss) onDismiss(); else close(); } });
   build(sh, close);
   padStickyBars(sh);
+  wireSheetResize(sh);
   return close;
 }
 function confirmDialog(message, okLabel){
