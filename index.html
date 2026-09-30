@@ -2237,7 +2237,7 @@ document.addEventListener('DOMContentLoaded', function(){
    Cmd+1..8 for their own tab switching and never deliver them to the page),
    and Cmd+Shift+1..8 (or Ctrl+Shift+1..8) does the same with a modifier.
    Ignored while typing in a field or when a sheet is open.
-   Escape clicks the visible Cancel button of the topmost open sheet. */
+   Escape clicks the visible Cancel or Done button of the topmost open sheet. */
 (function(){
   var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings'];
   document.addEventListener('keydown', function(e){
@@ -2263,7 +2263,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var btns = top.querySelectorAll('button');
       for(var i = btns.length - 1; i >= 0; i--){
         var b = btns[i];
-        if(!b.disabled && b.offsetParent !== null && /^\s*cancel\s*$/i.test(b.textContent)){
+        if(!b.disabled && b.offsetParent !== null && /^\s*(cancel|done)\s*$/i.test(b.textContent)){
           e.preventDefault();
           b.click();
           return;

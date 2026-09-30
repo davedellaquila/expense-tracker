@@ -9,6 +9,7 @@ documentation. Newest first.
 - Reset moved to the bottom-right edge of the Transactions filter card
   (mirrored in the floating sticky card).
 - Reset's tooltip notes the Esc keyboard shortcut does the same thing.
+- Esc now also activates a dialog's Done button, not just Cancel.
 
 ### Bulk update bar animations + Undo rules
 - The bar now appears with a soft fade/rise when Bulk update is tapped.
