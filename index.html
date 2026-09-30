@@ -1398,6 +1398,54 @@ function wireCatMixSorting(container){
   })(ths[i]);
   paintHeads();
 }
+function sortBudgetRows(tbl, col, dir){
+  // Budget vs Actual table: sorts the category rows in place; the Total row
+  // (no data-srow) always stays last.
+  var mult = dir==='desc' ? -1 : 1;
+  var rows = [], trs = tbl.querySelectorAll('tr[data-srow]');
+  for(var i=0; i<trs.length; i++) rows.push(trs[i]);
+  rows.sort(function(a,b){
+    var av = a.getAttribute('data-sv-'+col), bv = b.getAttribute('data-sv-'+col);
+    var cmp;
+    if(col==='name') cmp = String(av||'').localeCompare(String(bv||''));
+    else{
+      var an = parseFloat(av), bn = parseFloat(bv);
+      cmp = (isNaN(an)?0:an) - (isNaN(bn)?0:bn);
+    }
+    return cmp*mult;
+  });
+  var all = tbl.querySelectorAll('tr');
+  var anchor = all[all.length-1]; // Total row
+  rows.forEach(function(r){ anchor.parentNode.insertBefore(r, anchor); });
+}
+function wireBudgetSorting(container){
+  // Same tap-a-header-to-sort UX as the Category Mix table. Default sort is
+  // Budget descending, matching the order the table is built in.
+  var tbl = container.querySelector('table.ptable');
+  if(!tbl || tbl._sortWired) return;
+  tbl._sortWired = true;
+  tbl._sortCol = 'budget'; tbl._sortDir = 'desc';
+  var ths = tbl.querySelectorAll('tr:first-child th[data-scol]');
+  function paintHeads(){
+    for(var j=0; j<ths.length; j++){
+      var h2 = ths[j], c2 = h2.getAttribute('data-scol');
+      h2.innerHTML = esc(h2.getAttribute('data-slabel')) + (c2===tbl._sortCol ? (tbl._sortDir==='desc'?' ▾':' ▴') : '');
+    }
+  }
+  for(var i=0; i<ths.length; i++)(function(th){
+    th.classList.add('rep-click');
+    th.addEventListener('click', function(){
+      var col = th.getAttribute('data-scol');
+      var dir;
+      if(tbl._sortCol===col) dir = tbl._sortDir==='desc' ? 'asc' : 'desc';
+      else dir = (col==='name') ? 'asc' : 'desc';
+      tbl._sortCol = col; tbl._sortDir = dir;
+      sortBudgetRows(tbl, col, dir);
+      paintHeads();
+    });
+  })(ths[i]);
+  paintHeads();
+}
 var toastTimer = null;
 function toast(msg, isErr){
   var t = $('toast');
@@ -9282,11 +9330,14 @@ function renderReports(){
   var btbl = $('rep-budgettable');
   if(!bCats.length){ btbl.innerHTML = ''; }
   else{
-    var totB = 0, totA = 0, bh = '<div class="ptablewrap"><table class="ptable"><tr><th data-scol="name">Category</th><th data-scol="budget" style="text-align:right">Budget</th><th data-scol="actual" style="text-align:right">Actual</th><th data-scol="var" style="text-align:right">Variance</th><th data-scol="pct" style="text-align:right">% of budget</th></tr>';
+    var totB = 0, totA = 0, bh = '<div class="ptablewrap"><table class="ptable"><tr><th data-scol="name" data-slabel="Category">Category</th><th data-scol="budget" data-slabel="Budget" style="text-align:right">Budget</th><th data-scol="actual" data-slabel="Actual" style="text-align:right">Actual</th><th data-scol="var" data-slabel="Variance" style="text-align:right">Variance</th><th data-scol="pct" data-slabel="% of budget" style="text-align:right">% of budget</th></tr>';
     bItems.forEach(function(it){
       totB += it.budget; totA += it.actual;
       var v = it.actual - it.budget;
-      bh += '<tr class="rep-click" data-bcat="'+esc(it.name)+'"><td data-scol="name">'+esc(it.name)+'</td><td data-scol="budget" style="text-align:right">'+money(it.budget)+'</td>'+
+      bh += '<tr class="rep-click" data-bcat="'+esc(it.name)+'" data-srow'+
+        ' data-sv-name="'+esc(it.name)+'" data-sv-budget="'+it.budget+'" data-sv-actual="'+it.actual+'"'+
+        ' data-sv-var="'+v+'" data-sv-pct="'+(it.budget>0 ? (it.actual/it.budget*100) : 0)+'">'+
+        '<td data-scol="name">'+esc(it.name)+'</td><td data-scol="budget" style="text-align:right">'+money(it.budget)+'</td>'+
         '<td data-scol="actual" style="text-align:right">'+money(it.actual)+'</td>'+
         '<td data-scol="var" style="text-align:right" class="'+(v>0?'neg':'')+'">'+(v>0?'+':'')+money(v)+'</td>'+
         '<td data-scol="pct" style="text-align:right">'+(it.budget>0 ? Math.round(it.actual/it.budget*100)+'%' : '—')+'</td></tr>';
@@ -9306,6 +9357,7 @@ function renderReports(){
         drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
       });
     })(bRows[bi]);
+    wireBudgetSorting(btbl);
   }
 
   // --- monthly trend: one series per selected category when multi-selecting ---
