@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Filter card + Done pill polish
+- The Done pill in bulk update mode is roomier (more background around
+  the label).
+- Less white space at the bottom of the Transactions filter card.
+
 ### Bulk update bar polish
 - The Update button reads "Update 0 transactions" with no ellipsis when
   nothing is selected; the ellipsis appears once rows are selected.
