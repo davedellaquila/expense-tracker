@@ -2787,6 +2787,7 @@ function renderDashboard(){
     if(!_dCatSeen[_cc]){ _dCatSeen[_cc] = 1; _dAllCats.push(_cc); }
   });
   _dAllCats.sort();
+  var dashCatSelBudget = dashCatSel.slice(); // budget card keeps budget-category picks across filter views
   dashCatSel = dashCatSel.filter(function(c){ return !!_dCatSeen[c]; }); // prune cats absent this period
   var _dSel = {};
   dashCatSel.forEach(function(c){ _dSel[c] = 1; });
@@ -2906,7 +2907,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, bank:dashBank, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth, catSelBudget:dashCatSelBudget};
   renderDashCharts();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -3427,7 +3428,8 @@ function renderDashBudgets(box, d){
   var from=d.from, to=d.to, rows=d.rows;
   var bMap = budgetsForRange(from, to);
   var bCats = Object.keys(bMap).sort(function(a,b){ return a.localeCompare(b); });
-  if(!bCats.length){ emptyInto(box,'🎯', from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.'); return; }
+  if(d.catSelBudget && d.catSelBudget.length) bCats = bCats.filter(function(c){ return d.catSelBudget.indexOf(c)>=0; });
+  if(!bCats.length){ emptyInto(box,'🎯', (d.catSelBudget && d.catSelBudget.length) ? 'No budgets for the selected categories.' : (from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.')); return; }
   var totB = 0, totS = 0;
   var perCat = bCats.map(function(bc){
     var spent = 0;

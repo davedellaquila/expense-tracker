@@ -5,6 +5,14 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Budget vs Actual category filter
+- The Home page's Budget vs Actual card now also respects the selected
+  categories at the top of the page, matching the Reports behavior: with
+  categories selected it shows only those budgeted categories; a selected
+  budgeted category with no transactions still shows with $0 actual; if none
+  of the selected categories has a budget it says "No budgets for the selected
+  categories."
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow
