@@ -9462,8 +9462,8 @@ function renderReports(){
   var ics = Object.keys(byInc).sort(function(a,b){ return byInc[b]-byInc[a]; });
   if(!ics.length){ ic2.innerHTML = '<p class="muted">No income in this period.</p>'; }
   else{
-    var ih2 = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th></tr>';
-    ics.forEach(function(c){ ih2 += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td></tr>'; });
+    var ih2 = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
+    ics.forEach(function(c){ ih2 += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td><td style="text-align:right">'+Math.round(byInc[c]/inc*100)+'%</td></tr>'; });
     ic2.innerHTML = ih2 + '</table></div>';
     var icRows = ic2.querySelectorAll('[data-icat]');
     for(var ici=0; ici<icRows.length; ici++)(function(n){

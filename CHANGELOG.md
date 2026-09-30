@@ -65,6 +65,7 @@ documentation. Newest first.
   at its monthly average × the number of months in the period, so a September-only
   budget shows 3× on a 3-month report instead of one month against three months
   of actuals. Applies to the Home budget card too.
+- Income by category table gained a % of total column.
 
 ### Transactions
 - Export CSV button: exports the filtered, sorted list with all fields,
