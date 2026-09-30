@@ -3300,7 +3300,13 @@ function renderDashChartBody(pick, box, c){
       bandCounts[bi2]++;
     });
     repVBars(box, BANDS.map(function(b,i){ return {name:b[0], value:bandCounts[i]}; }),
-      REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); });
+      REP_TEAL, 'No expenses in this period.', function(v){ return v+(v===1?' txn':' txns'); },
+      function(it){
+        var bi=0;
+        while(bi<BANDS.length && BANDS[bi][0]!==it.name) bi++;
+        var lo = bi===0 ? 0 : BANDS[bi-1][1], hi = BANDS[bi][1];
+        dashDrill({band:it.name, minAmt:lo, maxAmt:hi});
+      });
   } else if(pick==='owner'){
     var byOwner = {};
     d.rows.forEach(function(t){
@@ -3309,7 +3315,10 @@ function renderDashChartBody(pick, box, c){
       byOwner[o] = (byOwner[o]||0) + num(t.amount);
     });
     repDonut(box, Object.keys(byOwner).sort(function(a,b){ return byOwner[b]-byOwner[a]; })
-      .map(function(o){ return {name:o, value:byOwner[o]}; }), null, 'No expenses in this period.');
+      .map(function(o){ return {name:o, value:byOwner[o]}; }),
+      function(it){
+        dashDrill({owners:(it.names && it.names.length ? it.names : [it.name])});
+      }, 'No expenses in this period.');
   } else if(pick==='card'){
     var byBank = {};
     d.rows.forEach(function(t){

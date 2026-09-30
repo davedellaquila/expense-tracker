@@ -19,6 +19,12 @@ documentation. Newest first.
   charts. Rows show a pointer cursor on hover and work with the keyboard
   (Enter/Space).
 
+### Chart drill-through audit
+- Audited every chart on Home, Reports, Budget, and Tax: all chart
+  elements now drill into their transactions. Fixed the two that didn't:
+  the Home "Transaction Size Bands" bars (drill to the amount range) and
+  the Home "Owner Split" donut slices (drill to that owner's expenses).
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow
