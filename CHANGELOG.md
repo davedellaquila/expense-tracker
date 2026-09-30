@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Footer tooltip delay
+- Tab-bar buttons now use a custom tooltip with a 500ms hover delay
+  (native title timing isn't controllable). Mouse-only; touch taps still
+  navigate immediately.
+
 ### Sheet drag-to-resize + longer tab tooltips
 - Bottom sheets can now be resized by dragging the thumb at the top: the
   bottom edge stays put, the sticky footer stays pinned, and content slides
