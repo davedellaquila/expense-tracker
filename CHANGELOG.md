@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Bills page: Edit and Delete buttons on every bill
+- Each upcoming bill tile now has explicit Edit and Delete buttons next
+  to Paid (editing was previously only discoverable by tapping the bill
+  name). Delete asks for confirmation first, as before.
+
 ### Budget page: auto-save, no more Save button + clearer category rows
 - Budget and income-target amounts now save automatically: pause for a
   moment after dragging/typing and the value persists (a small "Saved ✓"

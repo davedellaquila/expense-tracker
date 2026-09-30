@@ -8563,6 +8563,13 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
   var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
   paidBtn.addEventListener('click', function(){ openBillPaidSheet(b); });
   l2.appendChild(paidBtn);
+  var editBtn = el('button',{class:'btn small ghost',type:'button'},'Edit');
+  editBtn.addEventListener('click', function(){ openBillForm(b); });
+  l2.appendChild(editBtn);
+  var delBtn = el('button',{class:'btn small ghost',type:'button',title:'Delete bill','aria-label':'Delete '+(b.name||'bill')},'✕');
+  delBtn.style.color = 'var(--danger)';
+  delBtn.addEventListener('click', function(){ deleteBill(b); });
+  l2.appendChild(delBtn);
   main.appendChild(l2);
   tile.appendChild(main);
   return tile;
