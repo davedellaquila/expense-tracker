@@ -230,15 +230,6 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   margin-top:0;
   padding-top:12px;
 }
-/* Budget Bot: per-category adjust slider at the bottom of the proposal */
-.bot-slider{margin-top:14px; padding:12px 14px;
-  background:color-mix(in srgb, var(--card) 55%, var(--bg));
-  border:1px solid var(--border); border-radius:12px;}
-.bot-slider-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;}
-.bot-slider-head b{font-size:15px;}
-#bot-slider-amt{font-size:18px; font-weight:700;}
-.bot-slider input[type=range]{width:100%; margin:6px 0 2px;}
-.bot-slider-ends{display:flex; justify-content:space-between; font-size:12px; color:var(--muted);}
 
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
@@ -7754,7 +7745,6 @@ function renderBudgets(){
 
 /* ================= budget bot ================= */
 var botProposal = null; // {month, rows:[{category, avg, last, amount, locked}], avgIncome}
-var botSliderCat = null; // category currently shown in the adjust slider (the checked row)
 
 /* Draft persistence: the bot proposal (edited amounts, locks) survives a hard
    refresh. Stored per budget month in localStorage; switching months restores
@@ -7965,7 +7955,6 @@ function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = botCompute(ym);
   botProposal = {v:2, month:ym, rows:botFilterRemoved(BOT_REMOVED_LS, ym, c.rows), avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, billFloors:c.billFloors};
-  botSliderCat = null; // fresh proposal: no category selected for the slider yet
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
@@ -7982,50 +7971,24 @@ function botDrillCategory(cat, type){
   if(ym) o.singleMonth = ym;
   drillToTransactions(o);
 }
-/* Nice round ceiling >= v, for the adjust-slider range. */
+/* Nice round ceiling >= v, for the per-row adjust-slider range. */
 function botSliderCeil(v){
   var t = Math.max(v, 50);
   var mag = Math.pow(10, Math.floor(Math.log10(t)));
   var n = t/mag, step = n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10;
   return step*mag;
 }
-/* Keep the adjust slider + amount label in sync with a row's amount. */
-function botSliderSync(r){
-  var s = document.getElementById('bot-slider-input');
-  if(!s || botSliderCat!==r.category) return;
-  s.value = Math.min(num(r.amount), num(s.max));
-  var a = document.getElementById('bot-slider-amt');
-  if(a) a.textContent = money(Math.round(num(r.amount)));
-}
-/* Budget Bot: slider at the bottom of the proposal for the selected (checked)
-   category. The proposed amount sits in the middle of the range so it can be
-   nudged lower or higher; drags update the row's amount live. */
-function botSliderPanel(r, rowInp){
-  var box = el('div',{class:'bot-slider'});
-  var head = el('div',{class:'bot-slider-head'});
-  head.appendChild(el('b',null,'Adjust: '+r.category));
-  head.appendChild(el('div',{id:'bot-slider-amt'},money(Math.round(num(r.amount)))));
-  box.appendChild(head);
-  var center = Math.max(0, num(r.amount));
-  var max = botSliderCeil(Math.max(2*center, num(r.amount)*1.2));
-  var step = Math.max(1, Math.round(max/200));
-  var s = el('input',{type:'range',id:'bot-slider-input',min:'0',max:String(max),
-    step:String(step),value:String(Math.min(center,max)),
-    'aria-label':'Adjust budget for '+r.category});
-  s.addEventListener('input', function(){
-    var v = num(s.value);
-    r.amount = v; r.touched = true;
-    if(rowInp) rowInp.value = v;
-    botSliderSync(r);
-    botRenderTotal(); persistBotDraft();
-  });
-  box.appendChild(s);
-  var ends = el('div',{class:'bot-slider-ends'});
-  ends.appendChild(el('span',null,'$0'));
-  ends.appendChild(el('span',null,'proposed '+money(Math.round(center))));
-  ends.appendChild(el('span',null,money(Math.round(max))));
-  box.appendChild(ends);
-  return box;
+/* Mark a proposal row enabled (locked) in place, without a full re-render,
+   so a slider drag isn't interrupted. Mirrors botRenderTable's locked styling. */
+function botEnableRow(r, line, check){
+  if(r.locked) return;
+  r.locked = true;
+  check.style.color = 'var(--accent)';
+  check.style.opacity = '1';
+  check.title = 'Uncheck — bot may suggest trims';
+  line.style.background = 'var(--accent-faint)';
+  line.style.borderRadius = '8px';
+  line.style.opacity = '';
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
@@ -8042,17 +8005,11 @@ function botRenderTable(){
   head.appendChild(el('span',null,'Budget'));
   head.appendChild(el('span'));
   host.appendChild(head);
-  var selInp = null; // number input of the row shown in the adjust slider
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?';background:var(--accent-faint);border-radius:8px':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
-    check.addEventListener('click', function(){
-      r.locked = !r.locked;
-      if(r.locked) botSliderCat = r.category; // checking a row selects it for the slider
-      else if(botSliderCat===r.category) botSliderCat = null;
-      botRenderTable(); persistBotDraft();
-    });
+    check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
     line.appendChild(check);
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
@@ -8064,17 +8021,32 @@ function botRenderTable(){
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; botSliderSync(r); botRenderTotal(); persistBotDraft(); });
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max)); botRenderTotal(); persistBotDraft(); });
     line.appendChild(inp);
-    if(r.category===botSliderCat) selInp = inp;
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
-      if(botSliderCat===r.category) botSliderCat = null;
       botProposal.rows = botProposal.rows.filter(function(x){ return x!==r; });
       botRenderTable(); botRenderGoalInputs(); persistBotDraft();
     });
     line.appendChild(del);
+    /* Per-row adjust slider: proposed amount sits in the middle of the range;
+       moving it enables the row (as if the ✓ was clicked) and updates the
+       row's amount field live. */
+    var sMax = botSliderCeil(Math.max(2*Math.max(0, num(r.amount)), num(r.amount)*1.2));
+    var sld = el('input',{type:'range',min:'0',max:String(sMax),
+      step:String(Math.max(1, Math.round(sMax/200))),
+      value:String(Math.min(Math.max(0, num(r.amount)), sMax)),
+      style:'grid-column:1/-1;width:100%;margin:0;padding:0',
+      'aria-label':'Adjust budget for '+r.category});
+    sld.addEventListener('input', function(){
+      var v = num(sld.value);
+      r.amount = v; r.touched = true;
+      inp.value = v;
+      botEnableRow(r, line, check);
+      botRenderTotal(); persistBotDraft();
+    });
+    line.appendChild(sld);
     host.appendChild(line);
   });
   var have = {};
@@ -8109,13 +8081,6 @@ function botRenderTable(){
   var nRemoved = botRemovedGet(BOT_REMOVED_LS, botProposal.month).length;
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this proposal — re-add above to bring one back.'));
-  /* Adjust slider for the selected (checked) category, at the bottom of the proposal. */
-  if(botSliderCat){
-    var selRow = null;
-    rows.forEach(function(r){ if(r.category===botSliderCat) selRow = r; });
-    if(selRow) host.appendChild(botSliderPanel(selRow, selInp));
-    else botSliderCat = null;
-  }
   persistBotDraft();
   updateFloatTotals();
 }
@@ -8265,7 +8230,6 @@ async function botSave(){
 }
 function botReset(){
   botProposal = null;
-  botSliderCat = null;
   $('bot-table').innerHTML = '';
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;

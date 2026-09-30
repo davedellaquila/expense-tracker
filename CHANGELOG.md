@@ -5,6 +5,14 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget Bot: per-category sliders that auto-enable
+- Every category row in a budget proposal now has its own slider under
+  the row, with the proposed amount in the middle of its range. Checks
+  start off; moving a slider automatically enables that category (check
+  mark lights up, row highlights, joins the proposed total) and updates
+  the row's amount field live. Typing in the amount field moves that
+  row's slider too. Replaces the single bottom-of-card adjust slider.
+
 ### Budget Bot: adjust slider for the checked category
 - Checking a category's ✓ in a budget proposal now shows an "Adjust"
   slider at the bottom of the proposal for that category. The proposed
