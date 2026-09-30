@@ -212,6 +212,24 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .barrow input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
 .barrow input[type=number]{-moz-appearance:textfield; appearance:textfield;}
 .barlab{font-size:11px; color:var(--muted); margin:8px 0 3px;}
+/* auto-save status note inside budget/target controls */
+.save-state{font-size:11px; color:var(--muted); min-width:54px; text-align:right;}
+.save-state.ok{color:var(--accent);}
+.save-state.err{color:var(--danger);}
+/* Budget/income category rows: distinct panels so categories are easy to
+   tell apart (replaces the thin divider line inside these two lists). */
+#budget-list .barrow, #income-list .barrow{
+  background:color-mix(in srgb, var(--card) 55%, var(--bg));
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+  margin:0 0 10px;
+}
+#budget-list .barrow + .barrow, #income-list .barrow + .barrow{
+  border-top:none;
+  margin-top:0;
+  padding-top:12px;
+}
 
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
@@ -7464,6 +7482,12 @@ function budSliderScale(base){
 }
 /* Budget/target control: a drag slider synced with a compact number input,
    plus Save. o = {label, placeholder, value, base, aria, onSave(inp, sv)}. */
+/* Budget/target amount control: slider + compact number input with auto-save.
+   o.save(v) persists the value (may return a promise); it fires debounced
+   after edits and immediately when the slider is released or the number
+   field is committed. The Save button is gone — a small status note shows
+   Saving… / Saved ✓ instead. o.onInput(v) still fires on every tick for
+   live previews. */
 function budControl(o){
   var ctl = el('div',{class:'bud-ctl'});
   ctl.appendChild(el('span',{class:'blab'},o.label));
@@ -7474,16 +7498,56 @@ function budControl(o){
   var inp = el('input',{type:'number',class:'amt',min:'0',step:'1',
     placeholder:o.placeholder, inputmode:'decimal'});
   if(o.value>0) inp.value = o.value;
-  slider.addEventListener('input', function(){ inp.value = slider.value; if(o.onInput) o.onInput(num(slider.value)); });
+  var st = el('span',{class:'save-state','aria-live':'polite'});
+  st.style.flex='none';
+  var timer = null, pending = null;
+  function setState(s){
+    st.textContent = s==='saving' ? 'Saving…' : s==='saved' ? 'Saved ✓' : s==='error' ? 'Save failed' : '';
+    st.className = 'save-state' + (s==='error' ? ' err' : s==='saved' ? ' ok' : '');
+    if(s==='saved') setTimeout(function(){
+      if(st.textContent==='Saved ✓'){ st.textContent=''; st.className='save-state'; }
+    }, 2000);
+  }
+  async function doSave(v){
+    if(!o.save) return;
+    setState('saving');
+    try{
+      await withSaveLock(function(){ return o.save(v); });
+      setState('saved');
+    }catch(err){ setState('error'); toast('Save failed: '+((err&&err.message)||err), true); }
+  }
+  function schedule(v){
+    pending = v;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ timer=null; var p=pending; pending=null; doSave(p); }, 800);
+  }
+  function flush(){
+    if(timer){ clearTimeout(timer); timer=null; }
+    if(pending!==null){ var p=pending; pending=null; doSave(p); }
+  }
+  function push(v){
+    if(o.onInput) o.onInput(v);
+    if(o.save) schedule(v);
+  }
+  slider.addEventListener('input', function(){ inp.value = slider.value; push(num(slider.value)); });
+  slider.addEventListener('change', flush);
   inp.addEventListener('input', function(){
     var v = num(inp.value);
-    if(v>=0 && v<=sc.max){ slider.value = v; if(o.onInput) o.onInput(v); }
+    if(v>=0 && v<=sc.max){ slider.value = v; push(v); }
   });
-  var sv = el('button',{class:'btn small',type:'button'},'Save');
-  sv.style.flex='none';
-  sv.onclick = function(){ o.onSave(inp, sv); };
-  ctl.appendChild(slider); ctl.appendChild(inp); ctl.appendChild(sv);
+  inp.addEventListener('change', flush);
+  ctl.appendChild(slider); ctl.appendChild(inp); ctl.appendChild(st);
   return ctl;
+}
+/* Keep the in-memory budget list in sync after an auto-save, so Reports and
+   the bots see the new value without a full reload/re-render. */
+function upsertStateBudget(cat, ym, amount){
+  var found = null;
+  state.budgets.forEach(function(b){
+    if(String(b.month)===ym && String(b.category)===cat) found = b;
+  });
+  if(found) found.amount = amount;
+  else state.budgets.push({month:ym, category:cat, amount:amount});
 }
 /* Live budget/income drafts: mirrors the stored budgets/targets, updated on
    every slider tick so the sticky totals pill and the row bars reflect
@@ -7574,18 +7638,11 @@ function renderIncomeTargets(ym){
       label:'Target:', placeholder:'Monthly target', value:tgt, base:Math.max(tgt,got),
       aria:'Monthly income target for '+c,
       onInput:function(v){ liveDrafts.inc[c]=v; paintIncomeRows(); },
-      onSave: async function(inp, sv){
-        var v = num(inp.value);
-        if(!(v>0)){ toast('Enter a target greater than zero.', true); return; }
-        sv.disabled = true;
-        await withSaveLock(async function(){
-        try{
-          await getStore().setBudget(INC_BUDGET_PREFIX+c, ym, Math.round(v*100)/100);
-          await loadAll(); renderBudgets();
-          toast('Income target saved for '+c+'.');
-        }catch(err){ toast('Save failed: '+err.message, true); }
+      save:function(v){
+        var amt = Math.round(v*100)/100;
+        return getStore().setBudget(INC_BUDGET_PREFIX+c, ym, amt).then(function(){
+          upsertStateBudget(INC_BUDGET_PREFIX+c, ym, amt);
         });
-        sv.disabled = false;
       }
     }));
     list.appendChild(wrap);
@@ -7654,19 +7711,11 @@ function renderBudgets(){
       label:'Budget:', placeholder:'Monthly limit', value:amt, base:Math.max(amt,spent),
       aria:'Monthly budget for '+c,
       onInput:function(v){ liveDrafts.bud[c]=v; paintBudgetRows(); },
-      onSave: async function(inp, sv){
-        var v = num(inp.value);
-        if(!(v>0)){ toast('Enter a budget amount greater than zero.', true); return; }
-        sv.disabled = true;
-        await withSaveLock(async function(){
-        try{
-          await getStore().setBudget(c, ym, Math.round(v*100)/100);
-          await loadAll();
-          renderBudgets();
-          toast('Budget saved for '+c+'.');
-        }catch(err){ toast('Save failed: '+err.message, true); }
+      save:function(v){
+        var amt = Math.round(v*100)/100;
+        return getStore().setBudget(c, ym, amt).then(function(){
+          upsertStateBudget(c, ym, amt);
         });
-        sv.disabled = false;
       }
     }));
     list.appendChild(wrap);

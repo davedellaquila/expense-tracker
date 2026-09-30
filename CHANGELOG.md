@@ -5,6 +5,15 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: auto-save, no more Save button + clearer category rows
+- Budget and income-target amounts now save automatically: pause for a
+  moment after dragging/typing and the value persists (a small "Saved ✓"
+  note confirms it); releasing the slider saves immediately. The Save
+  button is gone.
+- Each category row in the Category budgets and Income targets cards is
+  now its own bordered panel, so it's easy to tell where one category
+  ends and the next begins.
+
 ### Budget page: bot card buttons aligned to the bottom
 - The Budget Bot and Income Bot cards are now flex columns with their
   "Propose" buttons pinned to the bottom, so the buttons line up even
