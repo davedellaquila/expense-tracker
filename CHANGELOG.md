@@ -25,6 +25,10 @@ documentation. Newest first.
   the Home "Transaction Size Bands" bars (drill to the amount range) and
   the Home "Owner Split" donut slices (drill to that owner's expenses).
 
+### Budget page sticky month bar
+- The month picker now lives in a sticky panel pinned under the app
+  header, so it's always visible while scrolling the Budget page.
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow

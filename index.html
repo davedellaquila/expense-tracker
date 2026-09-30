@@ -371,6 +371,16 @@ textarea{resize:vertical; min-height:64px;}
 }
 .linkbtn{background:none; border:none; color:var(--blue); font-size:16px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
+/* Budget sticky month bar: stays pinned under the app header while the page scrolls */
+#bud-stickybar{
+  position:sticky; top:calc(var(--headH, 64px) + 6px); z-index:15;
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:0 10px 24px rgba(10,20,15,.14);
+  padding:10px 14px; margin-bottom:12px;
+  display:flex; align-items:center; gap:10px;
+}
+#bud-stickybar label.f{margin:0; white-space:nowrap;}
+#bud-stickybar input{margin:0; flex:1; min-width:0;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -923,10 +933,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 
     <!-- BUDGETS -->
     <section id="screen-budgets" class="screen" hidden>
-      <div class="card">
-        <label class="f" style="margin-top:0" for="bud-month">Month</label>
+      <div id="bud-stickybar">
+        <label class="f" for="bud-month">Month</label>
         <input type="month" id="bud-month">
-        <p class="muted">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
+      </div>
+      <div class="card">
+        <p class="muted" style="margin-top:0">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
       </div>
       <div class="card">
         <h2>Budget Bot</h2>
