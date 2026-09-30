@@ -3,7 +3,35 @@
 Running record of what ships in the expense tracker, kept for future
 documentation. Newest first.
 
-## 2026-09-29
+## 2026-09-30
+
+### Budget page: drag sliders + clearer cards
+- Category budgets and Income targets rows now set the amount with a drag
+  slider synced to a compact number box: drag for speed, type for precision,
+  then Save. The old full-width inputs (with spinner arrows) are gone.
+- Each card now explains its two bars up top: green = spent/received vs this
+  month's budget/target; blue = that budget's share of the total budget.
+- Amount controls are labeled ("Budget:" / "Target:") so it's obvious which
+  row you're editing.
+
+### Import log: rename accounts, delete statements
+- Account groups on the Import page have a Rename link, so cryptic imported
+  names ("xxxxxx8345") can get readable labels. Renaming applies to every
+  statement in that bank/account group and syncs to other devices.
+- Each statement row has a Delete button (with confirmation): it removes the
+  entry from the import history and deletes its stored file copy from
+  Firebase Storage. Imported transactions are left untouched.
+- Deletes are tombstoned and synced, so a delete on one device can't be
+  resurrected by another device's stale copy. Clear history tombstones too.
+
+### Floating add button is translucent
+- The floating + button background is now 85% opaque, so content behind it
+  shows through. The + itself stays fully white.
+
+### Delete confirmations are red
+- Confirmation dialogs now use a red button for destructive actions labeled
+  Delete (they used to be green for every custom label). Non-destructive
+  confirmations (Sign in, Proceed, etc.) stay green.
 
 ### Home category filter now applies to transfers
 - The Transfers donut in Category Mix used to ignore the Home category
@@ -23,6 +51,8 @@ documentation. Newest first.
   taps still navigate immediately.
 - Fixed the tooltip overflowing the screen edge: its position is now
   clamped using its real rendered width.
+
+## 2026-09-29
 
 ### Sheet drag-to-resize + longer tab tooltips
 - Bottom sheets can now be resized by dragging the thumb at the top: the

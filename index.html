@@ -201,6 +201,15 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .sharebar{height:6px; background:var(--track); border-radius:99px; overflow:hidden; margin:8px 0 2px;}
 .sharebar > div{height:100%; background:var(--blue); border-radius:99px;}
 .sharecap{font-size:11px; color:var(--muted);}
+/* Budget / income-target rows: slider + compact amount */
+.bud-legend{font-size:12.5px; margin:-2px 0 6px;}
+.bud-ctl{display:flex; align-items:center; gap:8px; margin-top:8px;}
+.bud-ctl .blab{font-size:12px; color:var(--muted); flex:none;}
+.bud-ctl input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:28px;}
+.bud-ctl input.amt{width:96px; flex:none; text-align:right; font-variant-numeric:tabular-nums;}
+.barrow input[type=number]::-webkit-outer-spin-button,
+.barrow input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+.barrow input[type=number]{-moz-appearance:textfield; appearance:textfield;}
 
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
@@ -463,7 +472,7 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 .fab{
   position:fixed; right:18px; bottom:calc(var(--tabbar-h) + 20px + env(safe-area-inset-bottom));
   width:58px; height:58px; border-radius:50%; border:none; z-index:30;
-  background:var(--accent); color:#fff; font-size:30px; line-height:1; cursor:pointer;
+  background:color-mix(in srgb, var(--accent) 85%, transparent); color:#fff; font-size:30px; line-height:1; cursor:pointer;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
 .fab:active{transform:scale(.94);}
@@ -1017,8 +1026,8 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="btn" id="ibot-save" type="button">Save as <span id="ibot-save-month"></span> income targets</button>
         </div>
       </div>
-      <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
-      <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
+      <div class="card"><h2>Category budgets</h2><p class="muted bud-legend">Green bar: spent vs this month's budget. Blue bar: this budget's share of the total budget. Drag the slider or type an amount, then Save.</p><div id="budget-list"></div></div>
+      <div class="card"><h2>Income targets</h2><p class="muted bud-legend">Set a monthly income target per category. Green bar: received vs this month's target. Blue bar: this target's share of the total income target. Drag the slider or type an amount, then Save.</p><div id="income-list"></div></div>
     </section>
 
     <!-- BILLS -->
@@ -1632,7 +1641,11 @@ function confirmDialog(message, okLabel){
       sh.appendChild(el('p',{class:'muted'},message));
       var row = el('div',{class:'btnrow'});
       var no = el('button',{class:'btn ghost'},'Cancel');
-      var yes = el('button',{class:'btn'+(okLabel?' go':' danger')}, okLabel||'Delete');
+      // Destructive confirmations (the default "Delete" label, or an
+      // explicit Delete label) get the red danger button; other actions
+      // ("Sign in", "Proceed", ...) keep the green go button.
+      var destructive = !okLabel || /delete/i.test(okLabel);
+      var yes = el('button',{class:'btn '+(destructive?'danger':'go')}, okLabel||'Delete');
       no.onclick = function(){ done(); resolve(false); };
       yes.onclick = function(){ done(); resolve(true); };
       row.appendChild(no); row.appendChild(yes);
@@ -2189,6 +2202,26 @@ FirebaseStore.prototype.saveImportLog = function(entries){
   return this._r().then(function(r){
     return fbCol(r, 'Meta').doc('importLog').set({
       entries: (entries||[]).slice(-100),
+      updated_at: new Date().toISOString()
+    });
+  });
+};
+/* Import-log delete tombstones: hashes of entries the user removed, so a
+   delete syncs across devices instead of being resurrected by a stale copy.
+   Kept in its own doc (never touched by older app copies). */
+FirebaseStore.prototype.getImportTombstones = function(){
+  return this._r().then(function(r){
+    return fbCol(r, 'Meta').doc('importLogDeleted').get().then(function(snap){
+      if(!snap.exists) return [];
+      var d = snap.data()||{};
+      return Array.isArray(d.deleted) ? d.deleted : [];
+    });
+  });
+};
+FirebaseStore.prototype.saveImportTombstones = function(hashes){
+  return this._r().then(function(r){
+    return fbCol(r, 'Meta').doc('importLogDeleted').set({
+      deleted: (hashes||[]).slice(-200),
       updated_at: new Date().toISOString()
     });
   });
@@ -6092,10 +6125,28 @@ var importFileInfo = null; // {h, name} for the file currently in the preview
 function importLogRemote(){
   return (storeKind()==='firebase' && firebaseConfigured()) ? getStore() : null;
 }
-function mergeImportLogs(remote, local){
+/* Deleted import-log entries are tombstoned by file hash so a delete on one
+   device isn't resurrected by another device's stale copy during log sync.
+   Local cache in localStorage; shared via Firestore meta/importLogDeleted —
+   a separate doc so older app copies (which overwrite the importLog doc)
+   can't wipe the tombstones. */
+function getImportTombstones(){
+  try{ return JSON.parse(localStorage.getItem('et_imported_deleted')||'[]'); }catch(e){ return []; }
+}
+function addImportTombstones(hashes){
+  var seen = {}, out = [];
+  getImportTombstones().concat(hashes||[]).forEach(function(h){
+    if(h && !seen[h]){ seen[h] = 1; out.push(h); }
+  });
+  out = out.slice(-200);
+  try{ localStorage.setItem('et_imported_deleted', JSON.stringify(out)); }catch(e){}
+  return out;
+}
+function mergeImportLogs(remote, local, tombstoned){
   var byH = {};
   (remote||[]).concat(local||[]).forEach(function(f){
     if(!f || !f.h) return;
+    if(tombstoned && tombstoned[f.h]) return;
     var cur = byH[f.h];
     if(!cur){ byH[f.h] = f; return; }
     var score = function(x){ return (x.bank?2:0)+(x.acct?2:0)+(importYm(x)?2:0)+(x.filePath?2:0)+(x.period?1:0); };
@@ -6108,17 +6159,28 @@ function persistImportLog(){
   if(!st || !st.saveImportLog) return;
   var entries = getImportedFiles();
   st.saveImportLog(entries).catch(function(e){ console.warn('import log sync failed:', e); });
+  if(st.saveImportTombstones){
+    st.saveImportTombstones(getImportTombstones()).catch(function(e){ console.warn('import tombstone sync failed:', e); });
+  }
 }
 /* Boot: pull the shared log, merge with this device's entries, re-render. */
 function syncImportLog(){
   var st = importLogRemote();
   if(!st || !st.getImportLog) return;
+  var tombP = st.getImportTombstones ? st.getImportTombstones().catch(function(){ return []; }) : Promise.resolve([]);
   st.getImportLog().then(function(remote){
-    var local = getImportedFiles();
-    var merged = mergeImportLogs(remote||[], local);
-    try{ localStorage.setItem('et_imported_files', JSON.stringify(merged.slice(-100))); }catch(e){}
-    renderImportLog();
-    if(JSON.stringify(remote||[]) !== JSON.stringify(merged)) persistImportLog();
+    return tombP.then(function(remoteTombs){
+      var tombSet = {};
+      getImportTombstones().concat(remoteTombs||[]).forEach(function(h){ tombSet[h] = 1; });
+      var local = getImportedFiles();
+      var merged = mergeImportLogs(remote||[], local, tombSet);
+      try{ localStorage.setItem('et_imported_files', JSON.stringify(merged.slice(-100))); }catch(e){}
+      var tombsBefore = JSON.stringify(getImportTombstones());
+      addImportTombstones(remoteTombs||[]); // union: never forget a remote delete
+      renderImportLog();
+      if(JSON.stringify(remote||[]) !== JSON.stringify(merged) ||
+         JSON.stringify(getImportTombstones()) !== tombsBefore) persistImportLog();
+    });
   }).catch(function(e){ console.warn('import log sync failed:', e); });
 }
 /* Firebase Storage: keep the original statement file so it can be reopened
@@ -6196,6 +6258,69 @@ function guessBankFromName(name){
   return null;
 }
 var IMPORT_BANKS = ['Apple Card','Capital One','Citibank','Wells Fargo','Chase','Discover','Amex','CSV','Other'];
+/* Rename every import-log entry in one bank/account group. A rename that
+   matches another account in the same bank merges the two groups. */
+function renameImportAccount(bankKey, acctKey, newName){
+  newName = String(newName||'').trim();
+  if(!newName){ toast('Enter an account name.', true); return; }
+  var arr = getImportedFiles(), n = 0;
+  arr.forEach(function(f){
+    if((f.bank||'Other')===bankKey && (f.acct||'Unknown account')===acctKey){ f.acct = newName; n++; }
+  });
+  if(!n){ renderImportLog(); return; }
+  try{ localStorage.setItem('et_imported_files', JSON.stringify(arr.slice(-100))); }catch(e){}
+  renderImportLog(bankKey, newName);
+  persistImportLog();
+  toast('Account renamed.');
+}
+/* Swap the account header label for an inline editor. */
+function startRenameAccount(ahl, bankKey, acctKey){
+  if(ahl.querySelector('.acct-rename-input')) return;
+  var labelEl = ahl.querySelector('b');
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'acct-rename-input';
+  inp.value = acctKey;
+  inp.setAttribute('aria-label', 'Account name');
+  inp.style.cssText = 'font-size:14px;max-width:170px';
+  var saveB = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
+  var cancelB = el('button',{class:'btn small ghost',type:'button',style:'margin-left:4px'},'Cancel');
+  function close(){ renderImportLog(bankKey, acctKey); }
+  saveB.addEventListener('click', function(ev){ ev.stopPropagation(); renameImportAccount(bankKey, acctKey, inp.value); });
+  cancelB.addEventListener('click', function(ev){ ev.stopPropagation(); close(); });
+  inp.addEventListener('click', function(ev){ ev.stopPropagation(); });
+  inp.addEventListener('keydown', function(ev){
+    ev.stopPropagation();
+    if(ev.key === 'Enter'){ ev.preventDefault(); renameImportAccount(bankKey, acctKey, inp.value); }
+    else if(ev.key === 'Escape'){ ev.preventDefault(); close(); }
+  });
+  if(labelEl) labelEl.replaceWith(inp); else ahl.insertBefore(inp, ahl.firstChild);
+  inp.after(saveB); saveB.after(cancelB);
+  inp.focus(); inp.select();
+}
+/* Delete one import-log entry: removes it from the history on this device
+   and tombstones it so sync drops it everywhere. The stored original file
+   goes with it; imported transactions are untouched (they aren't linked to
+   the log entry). */
+function deleteImportEntry(f){
+  if(!f || !f.h) return;
+  var msg = 'Remove "'+String(f.name||'statement')+'" from the import history?'+
+    (f.filePath ? ' Its stored file copy will be deleted too.' : '')+
+    ' Your imported transactions stay untouched.';
+  confirmDialog(msg, 'Delete').then(function(ok){
+    if(!ok) return;
+    var arr = getImportedFiles().filter(function(x){ return x.h !== f.h; });
+    try{ localStorage.setItem('et_imported_files', JSON.stringify(arr.slice(-100))); }catch(e){}
+    addImportTombstones([f.h]);
+    renderImportLog();
+    persistImportLog();
+    if(f.filePath && importLogRemote()){
+      firebaseStorage().then(function(storage){ return storage.ref(f.filePath).delete(); })
+        .catch(function(e){ console.warn('statement file delete failed:', e); });
+    }
+    toast('Removed from import history.');
+  });
+}
 function setImportBank(storedIdx, bank){
   var arr = getImportedFiles();
   if(!arr[storedIdx]) return;
@@ -6279,6 +6404,9 @@ function importLogRow(w){
     vw.addEventListener('click', function(){ openStatementFile(f.filePath); });
     right.appendChild(vw);
   }
+  var del = el('button',{class:'linkbtn',type:'button',style:'font-size:12px; padding:0; margin-top:2px; margin-left:8px; color:var(--danger)'},'Delete');
+  del.addEventListener('click', function(){ deleteImportEntry(f); });
+  right.appendChild(del);
   r.appendChild(left); r.appendChild(right);
   return r;
 }
@@ -6379,6 +6507,9 @@ function renderImportLog(expandKey, expandAcct){
       ahl.appendChild(el('b',{style:'font-weight:600'},acctDisplayLabel(ak, g.key)));
       ahl.appendChild(el('span',{class:'muted',style:'font-size:12px;margin-left:6px'},
         ag.entries.length+' statement'+(ag.entries.length>1?'s':'')));
+      var rn = el('button',{class:'linkbtn',type:'button',style:'font-size:12px;margin-left:8px',title:'Rename this account'},'Rename');
+      rn.addEventListener('click', function(ev){ ev.stopPropagation(); startRenameAccount(ahl, g.key, ak); });
+      ahl.appendChild(rn);
       ahl.appendChild(el('div',{class:'muted',style:'font-size:12px'},
         (art.range ? art.range+' · ' : '')+art.tx+' txns'));
       var achev = el('span',{class:'muted',style:'font-size:14px;flex:none'},'▸');
@@ -6408,6 +6539,8 @@ function renderImportLog(expandKey, expandAcct){
   var clr = el('button',{class:'btn small ghost',type:'button',style:'margin-top:8px'},'Clear history');
   clr.addEventListener('click', function(){
     if(!confirm('Forget the list of imported statements? (Your transactions stay untouched.)')) return;
+    var had = getImportedFiles();
+    addImportTombstones(had.map(function(f){ return f.h; }));
     try{ localStorage.removeItem('et_imported_files'); }catch(e){}
     renderImportLog();
     persistImportLog();
@@ -7311,6 +7444,37 @@ function wireBudgets(){
 /* Income targets live in the same Budgets store as spending budgets, namespaced
    with this prefix so no backend changes are needed on any of the three stores. */
 var INC_BUDGET_PREFIX = 'income:';
+/* Slider scale for a budget/target row: headroom past the current amount or
+   what's been spent/received, on a round number. */
+function budSliderScale(base){
+  var m = Math.max(num(base)*1.5, 200);
+  var nice = m<=500 ? 50 : m<=2000 ? 100 : 500;
+  var max = Math.ceil(m/nice)*nice;
+  return {max:max, step: max<=500 ? 5 : max<=2000 ? 10 : 25};
+}
+/* Budget/target control: a drag slider synced with a compact number input,
+   plus Save. o = {label, placeholder, value, base, aria, onSave(inp, sv)}. */
+function budControl(o){
+  var ctl = el('div',{class:'bud-ctl'});
+  ctl.appendChild(el('span',{class:'blab'},o.label));
+  var sc = budSliderScale(o.base);
+  var startVal = Math.max(0, Math.min(num(o.value), sc.max));
+  var slider = el('input',{type:'range',min:'0',max:String(sc.max),step:String(sc.step),
+    value:String(startVal),'aria-label':o.aria});
+  var inp = el('input',{type:'number',class:'amt',min:'0',step:'1',
+    placeholder:o.placeholder, inputmode:'decimal'});
+  if(o.value>0) inp.value = o.value;
+  slider.addEventListener('input', function(){ inp.value = slider.value; });
+  inp.addEventListener('input', function(){
+    var v = num(inp.value);
+    if(v>=0 && v<=sc.max) slider.value = v;
+  });
+  var sv = el('button',{class:'btn small',type:'button'},'Save');
+  sv.style.flex='none';
+  sv.onclick = function(){ o.onSave(inp, sv); };
+  ctl.appendChild(slider); ctl.appendChild(inp); ctl.appendChild(sv);
+  return ctl;
+}
 function renderIncomeTargets(ym){
   var list = $('income-list'); list.innerHTML='';
   var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
@@ -7353,26 +7517,23 @@ function renderIncomeTargets(ym){
       wrap.appendChild(sh);
       wrap.appendChild(el('div',{class:'sharecap'}, Math.round(share*100)+'% of '+money(totalTgt)+' total income target'));
     }
-    var ctl = el('div',{style:'display:flex;gap:8px;margin-top:6px'});
-    var inp = el('input',{type:'number',min:'0',step:'1',placeholder:'Monthly target',inputmode:'decimal',style:'flex:1'});
-    if(tgt>0) inp.value = tgt;
-    var sv = el('button',{class:'btn small',type:'button'},'Save');
-    sv.style.flex='none';
-    sv.onclick = async function(){
-      var v = num(inp.value);
-      if(!(v>0)){ toast('Enter a target greater than zero.', true); return; }
-      sv.disabled = true;
-      await withSaveLock(async function(){
-      try{
-        await getStore().setBudget(INC_BUDGET_PREFIX+c, ym, Math.round(v*100)/100);
-        await loadAll(); renderBudgets();
-        toast('Income target saved for '+c+'.');
-      }catch(err){ toast('Save failed: '+err.message, true); }
-      });
-      sv.disabled = false;
-    };
-    ctl.appendChild(inp); ctl.appendChild(sv);
-    wrap.appendChild(ctl);
+    wrap.appendChild(budControl({
+      label:'Target:', placeholder:'Monthly target', value:tgt, base:Math.max(tgt,got),
+      aria:'Monthly income target for '+c,
+      onSave: async function(inp, sv){
+        var v = num(inp.value);
+        if(!(v>0)){ toast('Enter a target greater than zero.', true); return; }
+        sv.disabled = true;
+        await withSaveLock(async function(){
+        try{
+          await getStore().setBudget(INC_BUDGET_PREFIX+c, ym, Math.round(v*100)/100);
+          await loadAll(); renderBudgets();
+          toast('Income target saved for '+c+'.');
+        }catch(err){ toast('Save failed: '+err.message, true); }
+        });
+        sv.disabled = false;
+      }
+    }));
     list.appendChild(wrap);
   });
 }
@@ -7418,27 +7579,24 @@ function renderBudgets(){
       wrap.appendChild(el('div',{class:'sharecap'},
         Math.round(share*100)+'% of '+money(totalBud)+' total budget'));
     }
-    var ctl = el('div',{style:'display:flex;gap:8px;margin-top:6px'});
-    var inp = el('input',{type:'number',min:'0',step:'1',placeholder:'Monthly limit',inputmode:'decimal',style:'flex:1'});
-    if(amt>0) inp.value = amt;
-    var sv = el('button',{class:'btn small',type:'button'},'Save');
-    sv.style.flex='none';
-    sv.onclick = async function(){
-      var v = num(inp.value);
-      if(!(v>0)){ toast('Enter a budget amount greater than zero.', true); return; }
-      sv.disabled = true;
-      await withSaveLock(async function(){
-      try{
-        await getStore().setBudget(c, ym, Math.round(v*100)/100);
-        await loadAll();
-        renderBudgets();
-        toast('Budget saved for '+c+'.');
-      }catch(err){ toast('Save failed: '+err.message, true); }
-      });
-      sv.disabled = false;
-    };
-    ctl.appendChild(inp); ctl.appendChild(sv);
-    wrap.appendChild(ctl);
+    wrap.appendChild(budControl({
+      label:'Budget:', placeholder:'Monthly limit', value:amt, base:Math.max(amt,spent),
+      aria:'Monthly budget for '+c,
+      onSave: async function(inp, sv){
+        var v = num(inp.value);
+        if(!(v>0)){ toast('Enter a budget amount greater than zero.', true); return; }
+        sv.disabled = true;
+        await withSaveLock(async function(){
+        try{
+          await getStore().setBudget(c, ym, Math.round(v*100)/100);
+          await loadAll();
+          renderBudgets();
+          toast('Budget saved for '+c+'.');
+        }catch(err){ toast('Save failed: '+err.message, true); }
+        });
+        sv.disabled = false;
+      }
+    }));
     list.appendChild(wrap);
   });
   restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
