@@ -409,6 +409,17 @@ textarea{resize:vertical; min-height:64px;}
 }
 .searchstick[hidden]{display:none;}
 .searchstick input{margin:0;}
+/* animated handoff between the filter card and the floating sticky card:
+   the stick fades + slides instead of popping via display:none */
+#searchstick{transition:opacity .22s ease, transform .22s ease, visibility .22s;}
+#searchstick.gone{opacity:0; visibility:hidden; pointer-events:none; transform:translateX(-50%) translateY(-10px);}
+/* the bulk-update bar fades in whenever it docks into / out of the stick */
+@keyframes selbar-dock-in{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
+.selbar.dock-in{animation:selbar-dock-in .22s ease;}
+@media (prefers-reduced-motion: reduce){
+  #searchstick{transition:none;}
+  .selbar.dock-in{animation:none;}
+}
 /* Reports sticky filter summary: same floating placement as the Transactions
    search clone; appears once the filter card scrolls off-screen. Tapping it
    scrolls back to the filters. */
@@ -3619,13 +3630,17 @@ function wireTransactions(){
     $('f-q').value = this.value;
     renderTransactions(); syncSearchClear();
   });
-  // show the floating clone only once the in-card search has scrolled off above
+  // show the floating clone only once the in-card search has scrolled off above.
+  // visibility animates via the .gone class (fade + slide) instead of the
+  // hidden attribute, so the handoff doesn't pop.
   var stick = $('searchstick'), stickInput = $('f-q-stick'), origInput = $('f-q');
+  stick.hidden = false;
+  stick.classList.add('gone');
   if('IntersectionObserver' in window){
     new IntersectionObserver(function(entries){
       var r = entries[0].boundingClientRect;
       var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='transactions';
-      stick.hidden = !offTop;
+      stick.classList.toggle('gone', !offTop);
       syncSelbarDock();
       if(offTop){
         if(document.activeElement!==stickInput && stickInput.value!==origInput.value){
@@ -3708,11 +3723,16 @@ function setTxnSelectMode(on){
 function syncSelbarDock(){
   var bar = $('selbar'), stick = $('searchstick'), list = $('txn-list');
   if(!bar || !stick || !list) return;
-  if(txnSelectMode && !stick.hidden){
-    if(bar.parentNode!==stick){ stick.appendChild(bar); bar.classList.add('stuck'); }
+  var moved = false;
+  if(txnSelectMode && !stick.classList.contains('gone')){
+    if(bar.parentNode!==stick){ stick.appendChild(bar); bar.classList.add('stuck'); moved = true; }
   }else{
-    if(bar.parentNode!==list.parentNode){ list.parentNode.insertBefore(bar, list); }
+    if(bar.parentNode!==list.parentNode){ list.parentNode.insertBefore(bar, list); moved = true; }
     bar.classList.remove('stuck');
+  }
+  // replay a subtle fade whenever the bar changes homes while visible
+  if(moved && !bar.hidden){
+    bar.classList.remove('dock-in'); void bar.offsetWidth; bar.classList.add('dock-in');
   }
 }
 function updateSelbar(){

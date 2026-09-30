@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Sticky card transition
+- The floating sticky card now fades and slides in/out instead of popping
+  when the filter card scrolls off/on screen. The bulk update bar fades
+  along with it when docking/undocking. Respects prefers-reduced-motion.
+
 ### Filter card + Done pill polish
 - The Done pill in bulk update mode is roomier (more background around
   the label).
