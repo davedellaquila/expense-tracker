@@ -5,6 +5,10 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Filter card Reset position
+- Reset moved to the bottom-right edge of the Transactions filter card
+  (mirrored in the floating sticky card).
+
 ### Bulk update bar animations + Undo rules
 - The bar now appears with a soft fade/rise when Bulk update is tapped.
 - When the Update button's label changes width (count changes, or it
