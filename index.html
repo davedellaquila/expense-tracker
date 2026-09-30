@@ -233,12 +233,12 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* Expense vs income category panels: red tint for expense budgets,
    green tint for income targets. */
 #budget-list .barrow{
-  border-color:color-mix(in srgb, var(--danger) 45%, var(--border));
-  background:color-mix(in srgb, var(--danger) 7%, var(--card));
+  border-color:color-mix(in srgb, var(--danger) 55%, var(--border));
+  background:color-mix(in srgb, var(--danger) 12%, var(--card));
 }
 #income-list .barrow{
-  border-color:color-mix(in srgb, var(--accent) 45%, var(--border));
-  background:color-mix(in srgb, var(--accent) 7%, var(--card));
+  border-color:color-mix(in srgb, var(--accent) 55%, var(--border));
+  background:color-mix(in srgb, var(--accent) 12%, var(--card));
 }
 
 /* ---------- lists ---------- */
@@ -1042,6 +1042,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <div class="bot-actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="bot-propose" type="button">Propose my budget</button>
         </div>
+        <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
+          <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
+          <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
+        </div>
         <div id="bot-table" style="margin-top:12px"></div>
         <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
@@ -1066,6 +1070,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <p class="muted">Studies your income so far this year and drafts monthly targets. Edit any number, lock categories you don't want touched, then save them as the month's income targets.</p>
         <div class="bot-actions" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" id="ibot-propose" type="button">Propose my income</button>
+        </div>
+        <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
+          <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
+          <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
         </div>
         <div id="ibot-table" style="margin-top:12px"></div>
         <div id="ibot-save-row" hidden style="margin-top:14px">
@@ -7500,6 +7508,10 @@ function wireBudgets(){
   $('bot-save').addEventListener('click', botSave);
   $('ibot-propose').addEventListener('click', incBotPropose);
   $('ibot-save').addEventListener('click', incBotSave);
+  $('bot-enable-all').addEventListener('click', function(){ botSetAllLocked(true); });
+  $('bot-disable-all').addEventListener('click', function(){ botSetAllLocked(false); });
+  $('ibot-enable-all').addEventListener('click', function(){ incBotSetAllLocked(true); });
+  $('ibot-disable-all').addEventListener('click', function(){ incBotSetAllLocked(false); });
   $('bud-copy').addEventListener('click', openBudgetCopySheet);
 }
 /* Income targets live in the same Budgets store as spending budgets, namespaced
@@ -8075,10 +8087,22 @@ function botEnableRow(r, line, check){
   line.style.borderRadius = '8px';
   line.style.opacity = '';
 }
+/* Bulk enable/disable for bot proposal rows (expense and income). */
+function botSetAllLocked(locked){
+  if(!botProposal || !botProposal.rows.length) return;
+  botProposal.rows.forEach(function(r){ r.locked = locked; });
+  botRenderTable(); persistBotDraft();
+}
+function incBotSetAllLocked(locked){
+  if(!incBotProposal || !incBotProposal.rows.length) return;
+  incBotProposal.rows.forEach(function(r){ r.locked = locked; });
+  incBotRenderTable(); incBotPersist();
+}
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
-  if(!botProposal) return;
+  if(!botProposal){ $('bot-bulk-row').style.display = 'none'; return; }
   var rows = botProposal.rows;
+  $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
   if(!rows.length){
     host.appendChild(el('p',{class:'muted'},'No spending this year — nothing to base a budget on.'));
     return;
@@ -8316,6 +8340,8 @@ async function botSave(){
 function botReset(){
   botProposal = null;
   $('bot-table').innerHTML = '';
+  $('bot-bulk-row').style.display = 'none';
+  $('bot-suggestions').innerHTML = '';
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
   $('bot-save-row').hidden = true;
@@ -8408,8 +8434,9 @@ function incBotTotal(){
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
-  if(!incBotProposal) return;
+  if(!incBotProposal){ $('ibot-bulk-row').style.display = 'none'; return; }
   var rows = incBotProposal.rows;
+  $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
   if(!rows.length){
     host.appendChild(el('p',{class:'muted'},'No income this year — nothing to base targets on.'));
     return;
@@ -8502,6 +8529,7 @@ async function incBotSave(){
 function incBotReset(){
   incBotProposal = null;
   $('ibot-table').innerHTML = '';
+  $('ibot-bulk-row').style.display = 'none';
   $('ibot-save-row').hidden = true;
   updateFloatTotals();
 }

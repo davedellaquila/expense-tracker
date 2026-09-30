@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Enable/disable all in both bots
+- The Budget Bot and Income Bot proposals each gained "Enable all" /
+  "Disable all" buttons above the proposal table (shown only when a
+  proposal exists). One tap checks or unchecks every category, updating
+  the proposed total and persisting the draft.
+
 ### Category panels tinted red/green
 - Category budget panels now carry a subtle red tint (expense) and
   income target panels a subtle green tint, so the category type is
