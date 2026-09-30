@@ -423,7 +423,12 @@ textarea{resize:vertical; min-height:64px;}
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
 }
 #bud-stickybar input{margin:0;}
-#bud-month{flex:0 0 auto;}
+/* Month stepper: prev/next chevrons around the native month picker */
+.bud-monthnav{display:flex; align-items:center; gap:2px; flex:none;}
+.bud-monthnav .btn{padding:4px 10px; font-size:16px; line-height:1;}
+#bud-month{border:1px solid transparent; background:transparent; font-size:15px;
+  font-weight:600; color:var(--text); padding:5px 4px; border-radius:8px; width:auto;}
+#bud-month:hover{border-color:var(--border);}
 /* Live budget-vs-income totals pill: shares the sticky bar with the month
    picker and updates on every slider tick. */
 .bud-totals{flex:1; min-width:150px; margin:0; text-align:right; font-size:12.5px; color:var(--muted);}
@@ -1010,7 +1015,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     <!-- BUDGETS -->
     <section id="screen-budgets" class="screen" hidden>
       <div id="bud-stickybar">
-        <input type="month" id="bud-month" aria-label="Month">
+        <div class="bud-monthnav">
+          <button class="btn small ghost" id="bud-prev" type="button" aria-label="Previous month">‹</button>
+          <input type="month" id="bud-month" aria-label="Month">
+          <button class="btn small ghost" id="bud-next" type="button" aria-label="Next month">›</button>
+        </div>
         <div id="bud-live-totals" class="bud-totals" hidden></div>
       </div>
       <div class="card">
@@ -7460,8 +7469,15 @@ function finishPdfParse(pending, year, stmtMonth){
 }
 
 /* ================= budgets ================= */
+function budMonthStep(d){
+  var m = $('bud-month');
+  m.value = monthAdd(m.value || monthLocal(), d);
+  m.dispatchEvent(new Event('change'));
+}
 function wireBudgets(){
   $('bud-month').addEventListener('change', function(){ saveBudFilters(); botReset(); incBotReset(); renderBudgets(); });
+  $('bud-prev').addEventListener('click', function(){ budMonthStep(-1); });
+  $('bud-next').addEventListener('click', function(){ budMonthStep(1); });
   $('bot-propose').addEventListener('click', botPropose);
   $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
   $('bot-suggest').addEventListener('click', botSuggest);

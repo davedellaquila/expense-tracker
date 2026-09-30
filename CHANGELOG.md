@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: month stepper in the sticky bar
+- The sticky bar's month picker now has ‹ › steppers for flipping through
+  months one tap at a time (same pattern as the Bills calendar header);
+  the native month field is still there for jumping straight to a month,
+  now styled to sit cleanly in the bar.
+
 ### Bills page: Edit and Delete buttons on every bill
 - Each upcoming bill tile now has explicit Edit and Delete buttons next
   to Paid (editing was previously only discoverable by tapping the bill
