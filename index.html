@@ -3289,7 +3289,7 @@ function renderDashChartBody(pick, box, c){
       dashDrill({singleMonth: it.key});
     });
   } else if(pick==='budget'){
-    renderDashBudgets(box, d);
+    renderDashBudgets(box, d, dashDrill);
   } else if(pick==='bands'){
     var BANDS = [['Under $25',25],['$25–$99',100],['$100–$249',250],['$250–$499',500],['$500–$999',1000],['$1,000+',Infinity]];
     var bandCounts = BANDS.map(function(){ return 0; });
@@ -3423,7 +3423,7 @@ function renderDashChartBody(pick, box, c){
     }
   }
 }
-function renderDashBudgets(box, d){
+function renderDashBudgets(box, d, drill){
   box.innerHTML='';
   var from=d.from, to=d.to, rows=d.rows;
   var bMap = budgetsForRange(from, to);
@@ -3448,6 +3448,7 @@ function renderDashBudgets(box, d){
   var sumFill = el('div');
   sumFill.style.width = (totB>0 ? Math.min(100, totS/totB*100) : 0)+'%';
   sumBar.appendChild(sumFill); sumWrap.appendChild(sumBar);
+  if(drill){ wireBudgetRowTap(sumWrap, function(){ drill({}); }); }
   box.appendChild(sumWrap);
   perCat.forEach(function(p){
     var wrap = el('div',{class:'barrow'});
@@ -3460,7 +3461,16 @@ function renderDashBudgets(box, d){
     var bar = el('div',{class:'bar'+(p.spent>p.amt?' over':'')});
     var fill = el('div'); fill.style.width = (p.amt>0?Math.min(100, p.spent/p.amt*100):0)+'%'; bar.appendChild(fill);
     wrap.appendChild(bar);
+    if(drill){ (function(cat){ wireBudgetRowTap(wrap, function(){ drill({dispCats:[cat]}); }); })(p.c); }
     box.appendChild(wrap);
+  });
+}
+function wireBudgetRowTap(row, go){
+  row.classList.add('rep-click');
+  row.setAttribute('role','button'); row.setAttribute('tabindex','0');
+  row.addEventListener('click', go);
+  row.addEventListener('keydown', function(e){
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }
   });
 }
 

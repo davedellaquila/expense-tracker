@@ -13,6 +13,12 @@ documentation. Newest first.
   of the selected categories has a budget it says "No budgets for the selected
   categories."
 
+### Budget vs Actual drill-through
+- Tapping a category row (or the Total row) in the Home page's Budget vs
+  Actual card now opens the matching transactions, like the other Home
+  charts. Rows show a pointer cursor on hover and work with the keyboard
+  (Enter/Space).
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow
