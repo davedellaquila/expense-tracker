@@ -5,6 +5,15 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar repositioned and restyled
+- The bulk selection bar is no longer a floating bar at the bottom of the
+  screen; it now sits in the page flow directly below the filter card and
+  above the transaction list (in-flight bulk-job progress bars moved with
+  it). The obsolete bottom-padding compensation is removed.
+- Restyled as an editing-mode toolbar: blue accent edge, neutral "N
+  selected" pill instead of red text, softer shadow, and a slimmer dismiss
+  button.
+
 ### Budget vs Actual category filter
 - The Home page's Budget vs Actual card now also respects the selected
   categories at the top of the page, matching the Reports behavior: with

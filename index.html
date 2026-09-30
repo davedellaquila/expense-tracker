@@ -215,24 +215,22 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .txn .amt{font-weight:700; font-variant-numeric:tabular-nums; flex:none;}
 .txn .who{font-size:11px; color:var(--muted); background:var(--bg); border-radius:99px; padding:2px 8px; flex:none;}
 .datehead{font-size:14.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:14px 2px 8px;}
-/* bulk selection */
-.selbar{position:fixed; z-index:45; left:12px; right:12px;
-  bottom:calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom));
-  background:var(--card); border:1px solid var(--border); border-radius:14px;
-  box-shadow:0 10px 24px rgba(10,20,15,.18); padding:10px 12px;
-  display:flex; align-items:center; justify-content:center; gap:8px;}
-.selbar #selbar-count{flex:none; font-weight:700; font-size:15.5px; color:var(--danger);}
+/* bulk selection: editing-mode toolbar between the filter card and the list */
+.selbar{background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  border-left:3px solid var(--blue);
+  box-shadow:0 2px 10px rgba(10,20,15,.08); padding:8px 10px; margin:0 0 12px;
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.selbar #selbar-count{flex:none; font-weight:700; font-size:13.5px; color:var(--text);
+  background:var(--th-bg); border-radius:999px; padding:5px 12px; white-space:nowrap;}
 .selbar .btn{margin:0;}
 /* bulk-update bar dismiss: compact xmark pinned to the bar's far right */
-.selbar #selbar-done{margin-left:auto; flex:none; width:38px; height:38px; padding:0;
-  border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--text);
-  font-size:19px; line-height:1; cursor:pointer;
+.selbar #selbar-done{margin-left:auto; flex:none; width:34px; height:34px; padding:0;
+  border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
+  font-size:16px; line-height:1; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;}
 .selbar #selbar-done:active{opacity:.7;}
 /* in-flight bulk jobs: one slim progress bar each, stacked above the selection bar */
-#jobbars{position:fixed; z-index:46; left:12px; right:12px;
-  bottom:calc(var(--tabbar-h) + 80px + env(safe-area-inset-bottom));
-  display:flex; flex-direction:column; gap:8px;}
+#jobbars{display:flex; flex-direction:column; gap:8px; margin:0 0 12px;}
 #jobbars:empty{display:none;}
 .jobbar{background:var(--card); border:1px solid var(--border); border-radius:14px;
   box-shadow:0 10px 24px rgba(10,20,15,.18); padding:8px 12px;
@@ -839,7 +837,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       <div id="txn-drill"></div>
-      <div id="txn-list"></div>
       <div id="jobbars"></div>
       <div id="selbar" class="selbar" hidden>
         <span id="selbar-count">0 selected</span>
@@ -850,6 +847,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
         <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
       </div>
+      <div id="txn-list"></div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
     </section>
 
@@ -2319,7 +2317,6 @@ async function enterApp(){
   updateUserChip();
   syncHeadH(); // sticky offset for the floating search bar
   window.addEventListener('resize', syncHeadH);
-  window.addEventListener('resize', syncFloatingPad);
   if(!restoreBudFilters() && !$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var targetScreen = lastScreen()||'dashboard';
@@ -3677,7 +3674,6 @@ function setTxnSelectMode(on){
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
   updateSelbar();
-  syncFloatingPad();
 }
 function updateSelbar(){
   var n = txnSelCount();
@@ -3697,29 +3693,6 @@ function bulkJobRowState(id){
   }
   return pending;
 }
-/* Keep the list scrollable clear of the floating selection bar and any
-   in-flight job bars — no row stays trapped underneath them. Called whenever
-   the selection bar shows/hides, job bars change, or the window resizes. */
-function syncFloatingPad(){
-  var mainEl = document.querySelector('main');
-  if(!mainEl) return;
-  var need = 0;
-  var selbar = $('selbar');
-  if(selbar && !selbar.hidden){
-    // selbar bottom sits (tabbar-h + 10px) above the viewport bottom
-    need = Math.max(need, selbar.offsetHeight + 10 + 12);
-  }
-  var wrap = $('jobbars');
-  if(wrap && wrap.children.length){
-    // job bars stack above the selection bar
-    need = Math.max(need, wrap.offsetHeight + 80 + 12);
-  }
-  mainEl.style.paddingBottom = need
-    ? 'calc(var(--tabbar-h) + ' + need + 'px + env(safe-area-inset-bottom))'
-    : '';
-}
-/* One slim progress bar per in-flight bulk job, stacked above the selection bar.
-   Each bar carries its own Stop button; the selection bar stays fully usable. */
 function renderJobBars(){
   var wrap = $('jobbars');
   if(!wrap) return;
@@ -3744,7 +3717,6 @@ function renderJobBars(){
     rec.barEl = bar;
     updateJobBar(rec);
   });
-  syncFloatingPad();
 }
 function updateJobBar(rec){
   if(!rec.subEl) return;
