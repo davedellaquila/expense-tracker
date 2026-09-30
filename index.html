@@ -675,6 +675,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
               <option value="Business">Business</option>
             </select>
           </div>
+          <div style="flex:1; min-width:130px">
+            <label class="f" style="margin-top:0" for="dash-bank">Bank</label>
+            <select id="dash-bank"><option value="all">All</option></select>
+          </div>
         </div>
         <div style="margin-top:10px">
           <div class="rowline" id="dash-catfilter-head" role="button" tabindex="0" aria-expanded="true" style="cursor:pointer;border-bottom:none;padding:10px 0">
@@ -2639,6 +2643,7 @@ function wireDashboard(){
   $('dash-from').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
   $('dash-to').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
   $('dash-acct').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
+  $('dash-bank').addEventListener('change', function(){ saveHomeFilters(); renderDashboard(); });
   // collapsible category filter chips header: persisted in localStorage, default expanded
   var cfHead = $('dash-catfilter-head');
   if(cfHead){
@@ -2679,6 +2684,19 @@ function renderDashboard(){
   var from = range.from, to = range.to, acct = $('dash-acct').value;
   var bpVal = acct==='all' ? '' : acct;
   var rows = txnsForRange(from, to, acct);
+  // Bank filter: options rebuilt from current data with the selection preserved.
+  var dashBank = (function(){
+    var db = $('dash-bank'), keepB = db.value;
+    db.innerHTML = '';
+    db.appendChild(el('option',{value:'all'},'All'));
+    allBanks().forEach(function(b){
+      var o = el('option',{value:b},b);
+      if(b===keepB) o.selected = true;
+      db.appendChild(o);
+    });
+    return db.value;
+  })();
+  if(dashBank!=='all') rows = rows.filter(function(t){ return txnBank(t)===dashBank; });
   // --- category filter chips (multi-select, same pattern as the Reports page) ---
   var _dCatSeen = {}, _dAllCats = [];
   rows.forEach(function(t){
@@ -2755,7 +2773,7 @@ function renderDashboard(){
     var dfsCats = !dashCatSel.length ? 'All categories'
       : dashCatSel.length===1 ? dashCatSel[0]
       : dashCatSel[0]+' + '+(dashCatSel.length-1)+' more';
-    dfsT.textContent = rangeLabel + ' · ' + dfsCats + (acct==='all' ? '' : ' · '+acct) + ' · ' + rows.length + ' transactions';
+    dfsT.textContent = rangeLabel + ' · ' + dfsCats + (acct==='all' ? '' : ' · '+acct) + (dashBank==='all' ? '' : ' · '+dashBank) + ' · ' + rows.length + ' transactions';
   }
 
   // Bills card: due this week + overdue. Tap to open the Bills page.
@@ -2787,6 +2805,7 @@ function renderDashboard(){
   // Transactions page. Net = income + expenses (transfers excluded).
   function tileDrill(extra){
     var o = {bp:bpVal, carryCats:dashCatSel};
+    if(dashBank!=='all') o.banks = [dashBank];
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
@@ -3090,6 +3109,7 @@ function renderDashCharts(){
   var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel;
   function dashDrill(extra){
     var o = {type:'expense', bp:bpVal, carryCats:dashCatSel};
+    if(dashBank!=='all') o.banks = [dashBank];
     if(from===to) o.singleMonth = from; else { o.from = from; o.to = to; }
     for(var k in extra) o[k] = extra[k];
     drillToTransactions(o);
@@ -3371,7 +3391,7 @@ function saveDashCache(){
   try{
     localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({
       filters: {preset: $('dash-preset').value, from: $('dash-from').value,
-                to: $('dash-to').value, acct: $('dash-acct').value},
+                to: $('dash-to').value, acct: $('dash-acct').value, bank: $('dash-bank').value},
       transactions: state.transactions,
       budgets: state.budgets || [],
       savedAt: Date.now()
@@ -3390,6 +3410,7 @@ function loadDashCache(){
     if(f.from) $('dash-from').value = f.from;
     if(f.to) $('dash-to').value = f.to;
     if(f.acct) $('dash-acct').value = f.acct;
+    if(f.bank) ensureSelOption('dash-bank', f.bank);
     // NOTE: no showScreen here — enterApp already shows the saved tab before
     // this runs, so navigating to dashboard would flash the wrong page.
     return true;
@@ -3899,7 +3920,7 @@ function saveHomeFilters(){
   try{
     localStorage.setItem(HOME_FILTERS_KEY, JSON.stringify({
       preset: $('dash-preset').value, from: $('dash-from').value, to: $('dash-to').value,
-      acct: $('dash-acct').value, cats: dashCatSel.slice()
+      acct: $('dash-acct').value, bank: $('dash-bank').value, cats: dashCatSel.slice()
     }));
   }catch(e){}
 }
@@ -3912,6 +3933,7 @@ function restoreHomeFilters(){
     $('dash-from').value = validYM(f.from) ? f.from : '';
     $('dash-to').value = validYM(f.to) ? f.to : '';
     restoreSel('dash-acct', f.acct, KNOWN_ACCTS);
+    ensureSelOption('dash-bank', f.bank); // bank list is data-driven; keep a saved pick even if unseen yet
     if(Array.isArray(f.cats)) dashCatSel = f.cats.filter(function(c){ return typeof c==='string'; });
     /* renderDashboard prunes dashCatSel against categories present in the period. */
   }catch(e){}

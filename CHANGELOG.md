@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Home
+- New Bank filter in the first row of the Home filters (Period, Account, Bank).
+  All Home charts, stat tiles, and category chips respect it; it persists across
+  reloads and appears in the sticky filter summary; tile and chart
+  drill-throughs carry it to Transactions.
+
 ### Bulk update (Transactions)
 - Fields reordered: Merchant name, Type, Account (Personal/Business), Category,
   Tax category, Payment method, Bank, Description, Notes.
