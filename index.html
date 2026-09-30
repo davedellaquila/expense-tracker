@@ -224,8 +224,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar .selbar-left{display:flex; align-items:center; gap:6px; margin-right:auto;}
 .selbar #selbar-update{flex:none;}
 .selbar .selbar-right{display:flex; align-items:center; gap:6px; margin-left:auto;}
-/* bulk-update bar dismiss: compact xmark at the bar's far right */
-.selbar #selbar-done{flex:none; width:34px; height:34px; padding:0;
+/* bulk-update bar dismiss: compact xmark at the bar's far right, kept well
+   clear of Delete to avoid mis-taps */
+.selbar #selbar-done{flex:none; width:34px; height:34px; padding:0; margin-left:14px;
   border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
   font-size:16px; line-height:1; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;}
@@ -3723,7 +3724,7 @@ function updateSelbar(){
   }
   selbarUndoArmed = false;
   var n = txnSelCount();
-  btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + '…';
+  btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + (n ? '…' : '');
 }
 /* Row state across all in-flight bulk jobs: 'done' | 'failed' | 'pending' | null */
 function bulkJobRowState(id){

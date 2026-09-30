@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar polish
+- The Update button reads "Update 0 transactions" with no ellipsis when
+  nothing is selected; the ellipsis appears once rows are selected.
+- More space between the Delete button and the dismiss ✕ at the bar's
+  right edge, to avoid mis-taps.
+
 ### Bulk update bar docks into the sticky card
 - While bulk update mode is on and the floating sticky card is visible
   (filter card scrolled off-screen), the bulk update bar docks into the
