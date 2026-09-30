@@ -223,6 +223,12 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   display:flex; align-items:center; justify-content:center; gap:8px;}
 .selbar #selbar-count{flex:none; font-weight:700; font-size:15.5px; color:var(--danger);}
 .selbar .btn{margin:0;}
+/* bulk-update bar dismiss: compact xmark pinned to the bar's far right */
+.selbar #selbar-done{margin-left:auto; flex:none; width:38px; height:38px; padding:0;
+  border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--text);
+  font-size:19px; line-height:1; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;}
+.selbar #selbar-done:active{opacity:.7;}
 /* in-flight bulk jobs: one slim progress bar each, stacked above the selection bar */
 #jobbars{position:fixed; z-index:46; left:12px; right:12px;
   bottom:calc(var(--tabbar-h) + 80px + env(safe-area-inset-bottom));
@@ -824,7 +830,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
         <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
         <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
-        <button class="btn small" id="selbar-done" type="button">Done</button>
+        <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
       </div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
     </section>
