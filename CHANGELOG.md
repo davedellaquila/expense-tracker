@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: each bar labeled directly
+- Every row now labels its bars in place: "Spent vs monthly budget" above
+  the green bar, "Share of total budget · 24% of $17,455" above the blue
+  one (income rows read "Received vs monthly target" / "Share of total
+  income target"). The card-top legend was removed as redundant.
+
 ### Budget page: bot cards side by side, row dividers
 - Budget Bot and Income Bot cards now sit next to each other horizontally;
   on iPhone they stack vertically as before.
