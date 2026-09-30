@@ -5025,14 +5025,25 @@ function openBulkUpdate(ids){
     }
     var inMerch = el('input',{type:'text',placeholder:'New merchant name — leave blank for no change',autocomplete:'off',spellcheck:'false'});
     changeRow('Merchant name', inMerch);
-    var sType = noChangeSelect();
-    sType.appendChild(el('option',{value:'income'},'Income'));
-    sType.appendChild(el('option',{value:'expense'},'Expense'));
-    sType.appendChild(el('option',{value:'transfer'},'Transfer'));
+    // Segmented tab control: the first tab is "No change" (value ''), matching
+    // the old dropdown default; picking a tab sets .value just like a select.
+    function segTabs(opts, onPick){
+      var wrap = el('div',{class:'seg'});
+      wrap.value = '';
+      opts.forEach(function(o){
+        var b = el('button',{type:'button',class:o.value===''?'on':''},o.label);
+        b.onclick = function(){
+          wrap.value = o.value;
+          Array.prototype.forEach.call(wrap.children, function(x){ x.className = x===b ? 'on' : ''; });
+          if(onPick) onPick(o.value);
+        };
+        wrap.appendChild(b);
+      });
+      return wrap;
+    }
+    var sType = segTabs([{value:'',label:'No change'},{value:'income',label:'Income'},{value:'expense',label:'Expense'},{value:'transfer',label:'Transfer'}]);
     changeRow('Type', sType);
-    var sBp = noChangeSelect();
-    sBp.appendChild(el('option',{value:'Personal'},'Personal'));
-    sBp.appendChild(el('option',{value:'Business'},'Business'));
+    var sBp = segTabs([{value:'',label:'No change'},{value:'Personal',label:'Personal'},{value:'Business',label:'Business'}], function(){ refreshBulkCats(); });
     changeRow('Account (Personal / Business)', sBp);
     var sCat = noChangeSelect();
     changeRow('Category', sCat);
@@ -5053,7 +5064,6 @@ function openBulkUpdate(ids){
         .forEach(function(nm){ sCat.appendChild(el('option',{value:nm},nm)); });
       sCat.value = prev; // reverts to '— no change —' when the old pick is filtered out
     }
-    sBp.addEventListener('change', refreshBulkCats);
     refreshBulkCats();
     var sTax = noChangeSelect();
     sTax.appendChild(el('option',{value:'__empty__'},'Non-deductible / n/a'));
