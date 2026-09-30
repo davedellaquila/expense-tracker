@@ -5,6 +5,15 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget Bot: adjust slider for the checked category
+- Checking a category's ✓ in a budget proposal now shows an "Adjust"
+  slider at the bottom of the proposal for that category. The proposed
+  amount sits in the middle of the range ($0 to ~2x proposed) so it can
+  be nudged lower or higher; dragging updates the row's amount, the
+  proposed total, and the saved draft live, and stays in sync with the
+  row's number field both ways. Unchecking (or removing) the category
+  hides the slider again.
+
 ### Budget page: month stepper in the sticky bar
 - The sticky bar's month picker now has ‹ › steppers for flipping through
   months one tap at a time (same pattern as the Bills calendar header);
