@@ -6,9 +6,9 @@ documentation. Newest first.
 ## 2026-09-29
 
 ### Footer tooltip delay
-- Tab-bar buttons now use a custom tooltip with a 500ms hover delay
-  (native title timing isn't controllable). Mouse-only; touch taps still
-  navigate immediately.
+- Tab-bar buttons now use a custom tooltip with a 1000ms hover delay
+  (native title timing isn't controllable; was 500ms). Mouse-only; touch
+  taps still navigate immediately.
 - Fixed the tooltip overflowing the screen edge: its position is now
   clamped using its real rendered width.
 

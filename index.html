@@ -2361,7 +2361,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   });
 })();
-/* Footer tooltip with a 500ms hover delay (mouse only — touch taps navigate
+/* Footer tooltip with a 1000ms hover delay (mouse only — touch taps navigate
    immediately). Native `title` timing can't be controlled, so the tab bar
    buttons carry data-tip instead. */
 (function(){
@@ -2382,7 +2382,7 @@ document.addEventListener('DOMContentLoaded', function(){
         var x = Math.min(Math.max(r.left + r.width/2, half), window.innerWidth - half);
         tip.style.left = x + 'px';
         tip.classList.add('show');
-      }, 500);
+      }, 1000);
     });
     b.addEventListener('pointerleave', hide);
     b.addEventListener('pointerdown', hide);
