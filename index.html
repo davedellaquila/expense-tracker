@@ -379,7 +379,6 @@ textarea{resize:vertical; min-height:64px;}
   padding:10px 14px; margin-bottom:12px;
   display:flex; align-items:center; gap:10px;
 }
-#bud-stickybar label.f{margin:0; white-space:nowrap;}
 #bud-stickybar input{margin:0; flex:1; min-width:0;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
@@ -934,8 +933,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     <!-- BUDGETS -->
     <section id="screen-budgets" class="screen" hidden>
       <div id="bud-stickybar">
-        <label class="f" for="bud-month">Month</label>
-        <input type="month" id="bud-month">
+        <input type="month" id="bud-month" aria-label="Month">
       </div>
       <div class="card">
         <p class="muted" style="margin-top:0">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
