@@ -53,6 +53,12 @@ documentation. Newest first.
 - Escape cancels the topmost open sheet; during bulk-update mode it exits that
   mode; on Transactions with nothing open it resets the filter card.
 
+### Reports
+- New Bank filter on the same row as Period and Account. All report charts,
+  tables, and stat tiles respect it; it persists across reloads, appears in
+  the sticky filter summary and report subtitle; chart drill-throughs carry
+  it to Transactions.
+
 ### Transactions
 - Export CSV button: exports the filtered, sorted list with all fields,
   spreadsheet-ready.
