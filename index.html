@@ -164,6 +164,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-days{text-align:center; min-width:52px;}
 .bill-days .bd-n{font-size:19px; font-weight:800; line-height:1.05;}
 .bill-days .bd-l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
+.bill-row .bdue{white-space:nowrap; color:var(--muted); font-size:14px; min-width:92px;}
 /* Mark-paid confirmation sheet */
 .paid-card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin:12px 0;}
 .paid-card-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -7905,7 +7906,6 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
   nm.addEventListener('click', function(){ openBillForm(b); });
   info.appendChild(nm);
   var meta = (b.category||'Uncategorized')+' · '+(b.account||'Personal');
-  if(showDate) meta += ' · due '+fmtBillDate(b.dueDate);
   if(b.recurrence && b.recurrence!=='once') meta += ' · '+b.recurrence;
   info.appendChild(el('div',{class:'bm'},meta));
   if(b.scanPath || b.scanDataUrl){
@@ -7915,6 +7915,7 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
     info.appendChild(sc);
   }
   row.appendChild(info);
+  if(showDate) row.appendChild(el('div',{class:'bdue'},'due '+fmtBillDate(b.dueDate)));
   var badge = billBadge(st);
   if(badge) row.appendChild(badge);
   var days = billDaysUntil(b);
