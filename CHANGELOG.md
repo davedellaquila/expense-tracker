@@ -28,6 +28,8 @@ documentation. Newest first.
 ### Budget page sticky month bar
 - The month picker now lives in a sticky panel pinned under the app
   header, so it's always visible while scrolling the Budget page.
+  (The redundant "Month" label was dropped; the input keeps an
+  accessible name.)
 
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
