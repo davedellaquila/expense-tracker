@@ -2695,9 +2695,21 @@ function txnsForRange(from, to, acct){
 function budgetsForRange(from, to){
   var mlist = [];
   for(var m=from; m<=to; m=monthAdd(m,1)) mlist.push(m);
-  var map = {};
+  var sum = {}, cnt = {};
   state.budgets.forEach(function(b){
-    if(mlist.indexOf(String(b.month))>=0 && num(b.amount)>0 && String(b.category||'').indexOf(INC_BUDGET_PREFIX)!==0) map[b.category] = (map[b.category]||0)+num(b.amount);
+    if(mlist.indexOf(String(b.month))>=0 && num(b.amount)>0 && String(b.category||'').indexOf(INC_BUDGET_PREFIX)!==0){
+      var c = b.category;
+      sum[c] = (sum[c]||0)+num(b.amount);
+      cnt[c] = (cnt[c]||0)+1;
+    }
+  });
+  // The budget must cover the same duration as the period: each category counts
+  // at its monthly average × the number of months in the range. With budgets set
+  // for every month this is exactly the sum; with only some months set, it scales
+  // (e.g. a September-only budget × 3 on a 3-month report).
+  var map = {};
+  Object.keys(sum).forEach(function(c){
+    map[c] = Math.round(sum[c]/cnt[c]*mlist.length*100)/100;
   });
   return map;
 }

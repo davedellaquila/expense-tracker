@@ -58,6 +58,13 @@ documentation. Newest first.
   tables, and stat tiles respect it; it persists across reloads, appears in
   the sticky filter summary and report subtitle; chart drill-throughs carry
   it to Transactions.
+- Budget vs Actual table: tapping a column header (Category, Budget, Actual,
+  Variance, % of budget) sorts by that column; tapping again flips direction.
+  The Total row stays pinned at the bottom.
+- Budget vs Actual budgets now scale to the report period: each category counts
+  at its monthly average × the number of months in the period, so a September-only
+  budget shows 3× on a 3-month report instead of one month against three months
+  of actuals. Applies to the Home budget card too.
 
 ### Transactions
 - Export CSV button: exports the filtered, sorted list with all fields,
