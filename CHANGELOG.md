@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Category panels tinted red/green
+- Category budget panels now carry a subtle red tint (expense) and
+  income target panels a subtle green tint, so the category type is
+  visible at a glance. Works in light and dark mode.
+
 ### Copy a budget from another month
 - The Category budgets card has a "Copy from…" button. It opens a sheet
   defaulting to the previous month (any month can be picked) and copies

@@ -230,6 +230,16 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   margin-top:0;
   padding-top:12px;
 }
+/* Expense vs income category panels: red tint for expense budgets,
+   green tint for income targets. */
+#budget-list .barrow{
+  border-color:color-mix(in srgb, var(--danger) 45%, var(--border));
+  background:color-mix(in srgb, var(--danger) 7%, var(--card));
+}
+#income-list .barrow{
+  border-color:color-mix(in srgb, var(--accent) 45%, var(--border));
+  background:color-mix(in srgb, var(--accent) 7%, var(--card));
+}
 
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
