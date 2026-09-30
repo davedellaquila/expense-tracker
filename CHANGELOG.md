@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update mode affordance + tighter filter card
+- The Transactions filter card's bottom margin is reduced so the bulk
+  update toolbar sits tight beneath it.
+- The Bulk update/Done toggle now gets an active pill background while
+  bulk update mode is on, in both the filter card and the sticky clone.
+
 ### Bulk update bar: Update button doubles as Undo
 - Removed the selection count and the standalone Undo button.
 - The Update button now reads "Update N transactions…" (with ellipsis).

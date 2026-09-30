@@ -370,6 +370,10 @@ textarea{resize:vertical; min-height:64px;}
 }
 .linkbtn{background:none; border:none; color:var(--blue); font-size:16px; font-weight:600; cursor:pointer; padding:6px 4px;}
 .linkbtn:active{opacity:.7;}
+/* bulk-update mode is on: the Done toggle gets an active pill background */
+.linkbtn.on{background:var(--blue-soft); border-radius:999px;}
+/* transactions filter card sits tight above the bulk-update toolbar */
+#txn-filtercard{margin-bottom:6px;}
 /* Budget sticky month bar: stays pinned under the app header while the page scrolls */
 #bud-stickybar{
   position:sticky; top:calc(var(--headH, 64px) + 6px); z-index:15;
@@ -739,7 +743,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 
     <!-- TRANSACTIONS -->
     <section id="screen-transactions" class="screen" hidden>
-      <div class="card">
+      <div class="card" id="txn-filtercard">
         <h2 style="margin:0 0 10px">Filters</h2>
         <div class="filters">
           <div><label class="f" style="margin-top:0" for="f-preset">Period</label>
@@ -3677,6 +3681,8 @@ function setTxnSelectMode(on){
   }
   $('f-select').textContent = on ? 'Done' : 'Bulk update';
   $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
+  $('f-select').classList.toggle('on', on);
+  $('f-select-stick').classList.toggle('on', on);
   $('selbar').hidden = !on;
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
