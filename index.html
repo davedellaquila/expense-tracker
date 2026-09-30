@@ -201,9 +201,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .barrow .top b{font-weight:700;}
 .sharebar{height:6px; background:var(--track); border-radius:99px; overflow:hidden; margin:8px 0 2px;}
 .sharebar > div{height:100%; background:var(--blue); border-radius:99px;}
-.sharecap{font-size:11px; color:var(--muted);}
 /* Budget / income-target rows: slider + compact amount */
-.bud-legend{font-size:12.5px; margin:-2px 0 6px;}
 .bud-ctl{display:flex; align-items:center; gap:8px; margin-top:8px;}
 .bud-ctl .blab{font-size:12px; color:var(--muted); flex:none;}
 .bud-ctl input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:28px;}
@@ -211,6 +209,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .barrow input[type=number]::-webkit-outer-spin-button,
 .barrow input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
 .barrow input[type=number]{-moz-appearance:textfield; appearance:textfield;}
+.barlab{font-size:11px; color:var(--muted); margin:8px 0 3px;}
 
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
@@ -1029,8 +1028,8 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       </div>
-      <div class="card"><h2>Category budgets</h2><p class="muted bud-legend">Green bar: spent vs this month's budget. Blue bar: this budget's share of the total budget. Drag the slider or type an amount, then Save.</p><div id="budget-list"></div></div>
-      <div class="card"><h2>Income targets</h2><p class="muted bud-legend">Set a monthly income target per category. Green bar: received vs this month's target. Blue bar: this target's share of the total income target. Drag the slider or type an amount, then Save.</p><div id="income-list"></div></div>
+      <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
+      <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
     </section>
 
     <!-- BILLS -->
@@ -7513,12 +7512,13 @@ function renderIncomeTargets(ym){
     top.appendChild(lbl);
     wrap.appendChild(top);
     if(tgt>0){
+      wrap.appendChild(el('div',{class:'barlab'},'Received vs monthly target'));
       var bar = el('div',{class:'bar'});
       var fill = el('div'); fill.style.width = Math.min(100,got/tgt*100)+'%'; bar.appendChild(fill); wrap.appendChild(bar);
+      wrap.appendChild(el('div',{class:'barlab'},'Share of total income target · '+Math.round(share*100)+'% of '+money(totalTgt)));
       var sh = el('div',{class:'sharebar',title:Math.round(share*100)+'% of total income target'});
       var shf = el('div'); shf.style.width = Math.max(share*100, 1.5)+'%'; sh.appendChild(shf);
       wrap.appendChild(sh);
-      wrap.appendChild(el('div',{class:'sharecap'}, Math.round(share*100)+'% of '+money(totalTgt)+' total income target'));
     }
     wrap.appendChild(budControl({
       label:'Target:', placeholder:'Monthly target', value:tgt, base:Math.max(tgt,got),
@@ -7572,15 +7572,15 @@ function renderBudgets(){
     top.appendChild(lbl);
     wrap.appendChild(top);
     if(amt>0){
+      wrap.appendChild(el('div',{class:'barlab'},'Spent vs monthly budget'));
       var bar = el('div',{class:'bar'+(spent>amt?' over':'')});
       var fill = el('div'); fill.style.width = Math.min(100,spent/amt*100)+'%'; bar.appendChild(fill);
       wrap.appendChild(bar);
       // relative size of this category's budget vs the whole month's budget
+      wrap.appendChild(el('div',{class:'barlab'},'Share of total budget · '+Math.round(share*100)+'% of '+money(totalBud)));
       var sh = el('div',{class:'sharebar',title:Math.round(share*100)+'% of total budget'});
       var shf = el('div'); shf.style.width = Math.max(share*100, 1.5)+'%'; sh.appendChild(shf);
       wrap.appendChild(sh);
-      wrap.appendChild(el('div',{class:'sharecap'},
-        Math.round(share*100)+'% of '+money(totalBud)+' total budget'));
     }
     wrap.appendChild(budControl({
       label:'Budget:', placeholder:'Monthly limit', value:amt, base:Math.max(amt,spent),
