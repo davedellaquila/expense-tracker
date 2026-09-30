@@ -1063,7 +1063,13 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       </div>
-      <div class="card"><h2>Category budgets</h2><div id="budget-list"></div></div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h2 style="margin:0">Category budgets</h2>
+          <button class="btn small ghost" id="bud-copy" type="button">Copy from…</button>
+        </div>
+        <div id="budget-list"></div>
+      </div>
       <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
     </section>
 
@@ -7484,6 +7490,7 @@ function wireBudgets(){
   $('bot-save').addEventListener('click', botSave);
   $('ibot-propose').addEventListener('click', incBotPropose);
   $('ibot-save').addEventListener('click', incBotSave);
+  $('bud-copy').addEventListener('click', openBudgetCopySheet);
 }
 /* Income targets live in the same Budgets store as spending budgets, namespaced
    with this prefix so no backend changes are needed on any of the three stores. */
@@ -7664,6 +7671,59 @@ function renderIncomeTargets(ym){
     list.appendChild(wrap);
   });
   paintIncomeRows();
+}
+/* Copy a month's budget (category budgets + income targets) into the month
+   selected in the sticky bar. Source defaults to the previous month. */
+function openBudgetCopySheet(){
+  var targetYm = $('bud-month').value || monthLocal();
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,'Copy budget'));
+    sh.appendChild(el('p',{class:'muted'},'Copy category budgets and income targets into '+fmtMonthPretty(targetYm)+'.'));
+    var inSrc = el('input',{type:'month',value:monthAdd(targetYm,-1),style:'width:100%'});
+    sh.appendChild(el('label',{class:'f'},'From month'));
+    sh.appendChild(inSrc);
+    var info = el('p',{class:'muted'}); sh.appendChild(info);
+    var bar = el('div',{class:'btnrow stickybar-page'});
+    var go = el('button',{class:'btn',type:'button'},'Copy');
+    function refreshInfo(){
+      var src = inSrc.value;
+      if(!src){ info.textContent = 'Pick a source month.'; go.disabled = true; return; }
+      if(src===targetYm){ info.textContent = 'That is the month shown above — pick a different source month.'; go.disabled = true; return; }
+      var nb = 0, ni = 0;
+      state.budgets.forEach(function(b){
+        if(String(b.month)!==src) return;
+        if(String(b.category||'').indexOf(INC_BUDGET_PREFIX)===0) ni++; else nb++;
+      });
+      if(nb+ni===0){ info.textContent = 'No budgets saved for '+fmtMonthPretty(src)+'.'; go.disabled = true; return; }
+      go.disabled = false;
+      info.textContent = 'Copy '+nb+' categor'+(nb===1?'y':'ies')+' and '+ni+' income target'+(ni===1?'':'s')+
+        ' from '+fmtMonthPretty(src)+' to '+fmtMonthPretty(targetYm)+
+        '. This replaces anything already set for '+fmtMonthPretty(targetYm)+'.';
+    }
+    go.addEventListener('click', async function(){
+      var src = inSrc.value;
+      if(!src || src===targetYm) return;
+      go.disabled = true;
+      try{
+        var rows = state.budgets.filter(function(b){ return String(b.month)===src; });
+        for(var i=0;i<rows.length;i++){
+          var amt = Math.round(num(rows[i].amount)*100)/100;
+          await getStore().setBudget(rows[i].category, targetYm, amt);
+          upsertStateBudget(rows[i].category, targetYm, amt);
+        }
+        toast('Budget copied from '+fmtMonthPretty(src)+'.');
+      }catch(e){ toast('Copy failed.', true); go.disabled = false; refreshInfo(); return; }
+      close(); renderBudgets();
+    });
+    bar.appendChild(go);
+    var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancel.addEventListener('click', close);
+    bar.appendChild(cancel);
+    sh.appendChild(bar);
+    inSrc.addEventListener('input', refreshInfo);
+    inSrc.addEventListener('change', refreshInfo);
+    refreshInfo();
+  });
 }
 function renderBudgets(){
   var ym = $('bud-month').value || monthLocal();

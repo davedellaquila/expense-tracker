@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Copy a budget from another month
+- The Category budgets card has a "Copy from…" button. It opens a sheet
+  defaulting to the previous month (any month can be picked) and copies
+  that month's category budgets and income targets into the month shown
+  in the sticky bar, replacing anything already set there. The sheet
+  states exactly what will be copied before confirming.
+
 ### Category budgets: YTD total + monthly average per category
 - Each category panel now shows a reference line under its name, e.g.
   "Jan–Sep YTD $4,320 · avg $480/mo" — the year-to-date total and the
