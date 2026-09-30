@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar docks into the sticky card
+- While bulk update mode is on and the floating sticky card is visible
+  (filter card scrolled off-screen), the bulk update bar docks into the
+  sticky card as an attached section instead of scrolling away with the
+  page. One node is moved between the two homes, so all buttons and state
+  keep working.
+
 ### Bulk update mode affordance + tighter filter card
 - The Transactions filter card's bottom margin is reduced so the bulk
   update toolbar sits tight beneath it.
