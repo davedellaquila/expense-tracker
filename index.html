@@ -7485,10 +7485,12 @@ function botPropose(){
   toast(c.rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
 }
 /* Budget page: tapping a category name opens the Transactions page filtered to
-   that category. The period is left alone — whatever the Transactions page's
-   Period menu is currently set to stays in effect. */
+   that category for the budget month selected in the sticky bar. */
 function botDrillCategory(cat, type){
-  drillToTransactions({type:type, dispCats:[cat]});
+  var o = {type:type, dispCats:[cat]};
+  var ym = $('bud-month') ? $('bud-month').value : '';
+  if(ym) o.singleMonth = ym;
+  drillToTransactions(o);
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';

@@ -36,6 +36,11 @@ documentation. Newest first.
   row, the overdue/due-this-week status on its own line below, so nothing
   scrunches together on iPhone.
 
+### Budget drill carries the month
+- Tapping a category on the Budget page now sets the Transactions period
+  to the budget month selected in the sticky bar, instead of leaving the
+  old period in effect.
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow
