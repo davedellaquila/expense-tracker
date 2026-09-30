@@ -506,11 +506,18 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 
 /* ---------- desktop: the app is a centered 760px column; scale type down so it
    doesn't feel oversized on wide screens (body 18px -> ~10px effective).
-   Root-level zoom acts like page zoom, so fixed/sticky chrome keeps working.
-   iPads (<=1194px landscape) are untouched. ---------- */
+   Root-level zoom acts like page zoom, so fixed/sticky chrome keeps working. ---------- */
 @media (min-width:1200px){
   html{ zoom:.56; }
   select{ font-size:19px; }
+}
+
+/* ---------- tablet (iPad, 761-1199px): "medium" layout. Widen the content
+   column so the app uses the tablet's width instead of the narrow phone-width
+   column. Type stays full-size (unlike the zoomed-down desktop tier). ---------- */
+@media (min-width:761px) and (max-width:1199px){
+  main{max-width:1000px;}
+  .sheet{max-width:880px;}
 }
 
 /* ---------- modal ---------- */
