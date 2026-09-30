@@ -5,6 +5,16 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar animations + Undo rules
+- The bar now appears with a soft fade/rise when Bulk update is tapped.
+- When the Update button's label changes width (count changes, or it
+  becomes "Undo Bulk Update"), All/Clear and Delete glide to their new
+  positions instead of jumping (FLIP animation; skipped under
+  prefers-reduced-motion).
+- "Undo Bulk Update" now stays until any change to the selection: row
+  toggles, All/Clear, any filter/sort/search change, Reset, drill
+  changes, or closing bulk mode.
+
 ### Sticky card transition
 - The floating sticky card now fades and slides in/out instead of popping
   when the filter card scrolls off/on screen. The bulk update bar fades

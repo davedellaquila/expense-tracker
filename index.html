@@ -413,12 +413,12 @@ textarea{resize:vertical; min-height:64px;}
    the stick fades + slides instead of popping via display:none */
 #searchstick{transition:opacity .22s ease, transform .22s ease, visibility .22s;}
 #searchstick.gone{opacity:0; visibility:hidden; pointer-events:none; transform:translateX(-50%) translateY(-10px);}
-/* the bulk-update bar fades in whenever it docks into / out of the stick */
-@keyframes selbar-dock-in{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
-.selbar.dock-in{animation:selbar-dock-in .22s ease;}
+/* soft appear for the bulk-update bar: first shown, docking, undocking */
+@keyframes selbar-soft-in{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
+.selbar.soft-in{animation:selbar-soft-in .22s ease;}
 @media (prefers-reduced-motion: reduce){
   #searchstick{transition:none;}
-  .selbar.dock-in{animation:none;}
+  .selbar.soft-in{animation:none;}
 }
 /* Reports sticky filter summary: same floating placement as the Transactions
    search clone; appears once the filter card scrolls off-screen. Tapping it
@@ -3577,10 +3577,11 @@ function wireTransactions(){
       }
       if(id==='f-preset'||id==='f-from'||id==='f-to') saveTxnPeriod();
       if(id==='f-cat'||id==='f-type'||id==='f-bank') saveTxnFilters();
+      disarmSelbarUndo(); // a filter change retires the Update-as-Undo button
       renderTransactions();
     });
   });
-  $('f-q').addEventListener('input', function(){ renderTransactions(); syncSearchClear(); });
+  $('f-q').addEventListener('input', function(){ disarmSelbarUndo(); renderTransactions(); syncSearchClear(); });
   // "All" chips: one tap resets the paired menu to All without opening it
   document.querySelectorAll('.allchip').forEach(function(chip){
     chip.addEventListener('click', function(){
@@ -3593,10 +3594,12 @@ function wireTransactions(){
   });
   $('f-q-clear').addEventListener('click', function(){
     $('f-q').value = ''; var si = $('f-q-stick'); if(si) si.value = '';
+    disarmSelbarUndo();
     renderTransactions(); syncSearchClear(); $('f-q').focus();
   });
   $('f-q-clear-stick').addEventListener('click', function(){
     $('f-q-stick').value = ''; $('f-q').value = '';
+    disarmSelbarUndo();
     renderTransactions(); syncSearchClear(); $('f-q-stick').focus();
   });
   var fsort = $('f-sort');
@@ -3605,6 +3608,7 @@ function wireTransactions(){
     fsort.addEventListener('change', function(){
       try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
       var fs2 = $('f-sort-stick'); if(fs2) fs2.value = this.value;
+      disarmSelbarUndo();
       renderTransactions();
     });
   }
@@ -3615,6 +3619,7 @@ function wireTransactions(){
     fsortStick.addEventListener('change', function(){
       try{ localStorage.setItem(TXN_SORT_KEY, this.value); }catch(e){}
       if(fsort) fsort.value = this.value;
+      disarmSelbarUndo();
       renderTransactions();
     });
   }
@@ -3628,6 +3633,7 @@ function wireTransactions(){
   // floating search clone: typing here drives the real filter
   $('f-q-stick').addEventListener('input', function(){
     $('f-q').value = this.value;
+    disarmSelbarUndo();
     renderTransactions(); syncSearchClear();
   });
   // show the floating clone only once the in-card search has scrolled off above.
@@ -3658,12 +3664,12 @@ function wireTransactions(){
   $('f-select-stick').addEventListener('click', function(){ setTxnSelectMode(!txnSelectMode); });
   $('selbar-all').addEventListener('click', function(){
     state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
-    selbarUndoArmed = false; // new selection: back to the Update button
+    disarmSelbarUndo(); // new selection: back to the Update button
     renderTransactions(); updateSelbar();
   });
   $('selbar-clear').addEventListener('click', function(){
     txnSelected = {};
-    selbarUndoArmed = false; // new selection: back to the Update button
+    disarmSelbarUndo(); // new selection: back to the Update button
     renderTransactions(); updateSelbar();
   });
   $('selbar-update').addEventListener('click', function(){
@@ -3673,6 +3679,11 @@ function wireTransactions(){
     openBulkUpdate(ids);
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
+  // drop the soft-in class once its animation finishes, so later label
+  // changes can tell "appearing" apart from "already visible"
+  $('selbar').addEventListener('animationend', function(e){
+    if(e.target===this) this.classList.remove('soft-in');
+  });
   $('selbar-delete').addEventListener('click', function(){
     var ids = Object.keys(txnSelected);
     if(!ids.length){ toast('No transactions selected.', true); return; }
@@ -3689,6 +3700,20 @@ var txnSelected = {}; // id -> true
 var activeBulkJobs = []; // in-flight bulk jobs: {job, verb, title, running, doneIds, failIds, skipIds, stopRequested, stopped, barEl, subEl}
 var lastCompletedBulkJob = null; // most recent finished update job, for Undo
 var selbarUndoArmed = false; // Update button is currently acting as Undo
+/* The Update button doubles as Undo only until the next change to the
+   selection: row toggles, All/Clear, any filter change, or closing bulk mode. */
+function disarmSelbarUndo(){
+  if(!selbarUndoArmed) return;
+  selbarUndoArmed = false;
+  updateSelbar();
+}
+/* Soft-appear for the bulk-update bar, replayed whenever it is shown or
+   changes homes (in-flow <-> docked in the sticky card). */
+function softInBar(){
+  var bar = $('selbar');
+  if(!bar || bar.hidden) return;
+  bar.classList.remove('soft-in'); void bar.offsetWidth; bar.classList.add('soft-in');
+}
 var bulkDoneIds = {}; // ids tinted green after the last bulk update finished
 var bulkFailIds = {}; // ids tinted red after the last bulk update finished
 var bulkBars = {}; // id -> .bulkbar element, rebuilt on every renderTransactions
@@ -3696,6 +3721,7 @@ var bulkFills = {}; // id -> .bulkfill sweep element, rebuilt on every renderTra
 function txnSelCount(){ return Object.keys(txnSelected).length; }
 function setTxnSelectMode(on){
   txnSelectMode = on;
+  disarmSelbarUndo(); // any mode toggle resets the selection
   if(on){
     // pre-select everything currently visible (filters/search apply)
     txnSelected = {};
@@ -3711,6 +3737,7 @@ function setTxnSelectMode(on){
   $('f-select').classList.toggle('on', on);
   $('f-select-stick').classList.toggle('on', on);
   $('selbar').hidden = !on;
+  if(on) softInBar();
   $('txn-add').style.display = on ? 'none' : '';
   renderTransactions();
   updateSelbar();
@@ -3730,21 +3757,42 @@ function syncSelbarDock(){
     if(bar.parentNode!==list.parentNode){ list.parentNode.insertBefore(bar, list); moved = true; }
     bar.classList.remove('stuck');
   }
-  // replay a subtle fade whenever the bar changes homes while visible
-  if(moved && !bar.hidden){
-    bar.classList.remove('dock-in'); void bar.offsetWidth; bar.classList.add('dock-in');
-  }
+  if(moved) softInBar();
 }
 function updateSelbar(){
   var btn = $('selbar-update');
   if(!btn) return;
+  var bar = $('selbar');
+  /* FLIP: capture the bar items' positions before the label change, so
+     All/Clear and Delete glide (instead of jumping) when the Update button
+     changes width. Skipped while the bar is soft-appearing or under
+     reduced motion. */
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var items = (!reduceMotion && bar && !bar.hidden && !bar.classList.contains('soft-in'))
+    ? [bar.querySelector('.selbar-left'), btn, bar.querySelector('.selbar-right')] : null;
+  var before = items ? items.map(function(el){
+    var r = el.getBoundingClientRect(); return {left:r.left, top:r.top};
+  }) : null;
   if(selbarUndoArmed && undoAvailable()){
     btn.textContent = 'Undo Bulk Update';
-    return;
+  }else{
+    selbarUndoArmed = false;
+    var n = txnSelCount();
+    btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + (n ? '…' : '');
   }
-  selbarUndoArmed = false;
-  var n = txnSelCount();
-  btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + (n ? '…' : '');
+  if(!items) return;
+  requestAnimationFrame(function(){
+    items.forEach(function(el, i){
+      var r = el.getBoundingClientRect();
+      var dx = before[i].left - r.left, dy = before[i].top - r.top;
+      if(Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      void el.offsetWidth;
+      el.style.transition = 'transform .22s ease';
+      el.style.transform = '';
+    });
+  });
 }
 /* Row state across all in-flight bulk jobs: 'done' | 'failed' | 'pending' | null */
 function bulkJobRowState(id){
@@ -3946,7 +3994,7 @@ function renderDrillChip(){
   var chip = el('div',{class:'drillchip'});
   chip.appendChild(el('span',null,'📊 '+drillPillLabel(txnDrill)));
   var x = el('button',{class:'drillx',type:'button','aria-label':'Clear drill filter'},'\u00D7');
-  x.addEventListener('click', function(){ txnDrill = null; renderTransactions(); });
+  x.addEventListener('click', function(){ txnDrill = null; disarmSelbarUndo(); renderTransactions(); });
   chip.appendChild(x);
   td.appendChild(chip);
 }
@@ -4112,6 +4160,7 @@ function resetTxnFilters(){
   var si = $('f-q-stick'); if(si) si.value = '';
   txnDrill = null; // also clear any chart drill selection
   saveTxnFilters(); // persist the reset (cleared) filter state
+  disarmSelbarUndo(); // a filter change retires the Update-as-Undo button
   renderTransactions();
 }
 /* Export the currently visible Transactions list (same filters and sort as the
@@ -4148,6 +4197,7 @@ function drillToTransactions(o){
   // Period controls are deliberately untouched: a drill carrying from/to
   // overrides the native period in txnVisible, while dateless drills (e.g.
   // budget) intentionally keep the period in effect.
+  disarmSelbarUndo(); // a drill replaces the filter context
   $('f-type').value = '';
   $('f-bp').value = '';
   $('f-cat').value = '';
@@ -4282,7 +4332,7 @@ function renderTransactions(){
     if(txnSelectMode){
       b.addEventListener('click', function(){
         if(txnSelected[t.id]) delete txnSelected[t.id]; else txnSelected[t.id]=true;
-        selbarUndoArmed = false; // new selection: back to the Update button
+        disarmSelbarUndo(); // new selection: back to the Update button
         cb.checked = !!txnSelected[t.id];
         b.classList.toggle('checked', !!txnSelected[t.id]);
         updateSelbar();
