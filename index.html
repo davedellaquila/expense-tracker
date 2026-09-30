@@ -7683,6 +7683,18 @@ function renderBudgets(){
   });
   liveDrafts.bud = {};
   Object.keys(bmap).forEach(function(c){ liveDrafts.bud[c] = num(bmap[c]); });
+  // Year-to-date per-category expense totals (same convention as the Budget
+  // Bot): Jan 1 of the budget year through the selected month, transfers out.
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
+  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdByCat = {};
+  var mShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][ytdMonths-1];
+  state.transactions.forEach(function(t){
+    if(!t.date || t.date<y0 || t.date>=yEnd) return;
+    if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
+    if(t.txn_type!=='expense') return;
+    var c = t.category || 'Uncategorized';
+    ytdByCat[c] = (ytdByCat[c]||0) + num(t.amount);
+  });
   var browRefs = [];
   function paintBudgetRows(){
     var total = sumDrafts(liveDrafts.bud);
@@ -7717,6 +7729,9 @@ function renderBudgets(){
     bListName.addEventListener('click', function(){ botDrillCategory(c, 'expense'); });
     top.appendChild(bListName);
     var lbl = el('span'); top.appendChild(lbl); wrap.appendChild(top);
+    var ytd = ytdByCat[c]||0;
+    wrap.appendChild(el('div',{class:'muted',style:'font-size:12.5px;margin:2px 0 8px'},
+      'Jan–'+mShort+' YTD '+money0(ytd)+' · avg '+money0(ytd/ytdMonths)+'/mo'));
     var barlab1 = el('div',{class:'barlab'},'Spent vs monthly budget'); wrap.appendChild(barlab1);
     var bar = el('div',{class:'bar'}); var fill = el('div'); bar.appendChild(fill); wrap.appendChild(bar);
     // relative size of this category's budget vs the whole month's budget

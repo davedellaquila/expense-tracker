@@ -5,6 +5,15 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Category budgets: YTD total + monthly average per category
+- Each category panel now shows a reference line under its name, e.g.
+  "Jan–Sep YTD $4,320 · avg $480/mo" — the year-to-date total and the
+  monthly average for that category. Both follow the month picked in the
+  sticky bar (YTD runs Jan 1 through that month; the average divides by
+  the months elapsed through it), transfers excluded, same convention
+  as the Budget Bot. The selected month's spent-vs-budget stays in the
+  panel's top row as before.
+
 ### Budget Bot: per-category sliders that auto-enable
 - Every category row in a budget proposal now has its own slider under
   the row, with the proposed amount in the middle of its range. Checks
