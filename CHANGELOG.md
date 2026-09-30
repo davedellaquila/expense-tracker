@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Home category filter now applies to transfers
+- The Transfers donut in Category Mix used to ignore the Home category
+  filter (transfers always passed), so it showed every transfer in the
+  period while the Transactions page (Type + Category must both match)
+  correctly showed none. Transfers are now filtered by their own category,
+  matching the Transactions page.
 ### Footer tooltip delay
 - Tab-bar buttons now use a custom tooltip with a 1000ms hover delay
   (native title timing isn't controllable; was 500ms). Mouse-only; touch

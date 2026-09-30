@@ -2933,10 +2933,9 @@ function renderDashboard(){
   setDashCatCollapsed(dashCatCollapsed()); // keep collapsed state across re-renders
   if(dashCatSel.length){
     rows = rows.filter(function(t){
-      if(t.txn_type!=='income' && t.txn_type!=='expense') return true; // transfers always pass
-      var _cc = repDisplayCat(t);
-      if(_cc==='Transfers') return true;
-      return !!_dSel[_cc];
+      // Transfers follow the category filter by their own display category,
+      // so the Transfers donut matches the Transactions page (type + category).
+      return !!_dSel[repDisplayCat(t)];
     });
   }
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
