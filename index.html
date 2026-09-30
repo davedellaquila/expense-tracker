@@ -223,8 +223,11 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar #selbar-count{flex:none; font-weight:700; font-size:13.5px; color:var(--text);
   background:var(--th-bg); border-radius:999px; padding:5px 12px; white-space:nowrap;}
 .selbar .btn{margin:0;}
-/* bulk-update bar dismiss: compact xmark pinned to the bar's far right */
-.selbar #selbar-done{margin-left:auto; flex:none; width:34px; height:34px; padding:0;
+.selbar .selbar-left{display:flex; align-items:center; gap:6px; margin-right:auto;}
+.selbar #selbar-update{flex:none;}
+.selbar .selbar-right{display:flex; align-items:center; gap:6px; margin-left:auto;}
+/* bulk-update bar dismiss: compact xmark at the bar's far right */
+.selbar #selbar-done{flex:none; width:34px; height:34px; padding:0;
   border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
   font-size:16px; line-height:1; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;}
@@ -839,13 +842,17 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       <div id="txn-drill"></div>
       <div id="jobbars"></div>
       <div id="selbar" class="selbar" hidden>
-        <span id="selbar-count">0 selected</span>
-        <button class="btn small ghost" id="selbar-all" type="button">All</button>
-        <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
+        <div class="selbar-left">
+          <span id="selbar-count">0 selected</span>
+          <button class="btn small ghost" id="selbar-all" type="button">All</button>
+          <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
+        </div>
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
-        <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
-        <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
-        <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
+        <div class="selbar-right">
+          <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
+          <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
+          <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
+        </div>
       </div>
       <div id="txn-list"></div>
       <button class="fab" id="txn-add" aria-label="Add transaction">+</button>

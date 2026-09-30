@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar button layout
+- Buttons rearranged into three zones: All/Clear (plus the selection
+  count) on the left, Update centered, Delete/Undo and the dismiss ✕ on
+  the right edge.
+
 ### Bulk update bar repositioned and restyled
 - The bulk selection bar is no longer a floating bar at the bottom of the
   screen; it now sits in the page flow directly below the filter card and
