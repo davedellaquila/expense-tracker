@@ -31,6 +31,11 @@ documentation. Newest first.
   (The redundant "Month" label was dropped; the input keeps an
   accessible name.)
 
+### Home Bills card layout
+- The Bills card is now two lines: "Bills" + "+ Add bill" on the first
+  row, the overdue/due-this-week status on its own line below, so nothing
+  scrunches together on iPhone.
+
 ### Layout
 - New tablet tier (iPad): the content column widens to 1000px and bottom
   sheets to 880px, so the app uses the tablet's width instead of the narrow

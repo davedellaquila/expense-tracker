@@ -724,13 +724,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <div class="stat" id="tile-net" style="cursor:pointer"><div class="label">Net</div><div class="value" id="stat-net">$0</div><div class="split" id="stat-net-split"></div></div>
       </div>
       <div class="card" id="dash-bills-card" style="cursor:pointer">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <div><b>Bills</b> <span class="muted" id="dash-bills-sub"></span></div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div id="dash-bills-vals" style="font-weight:800"></div>
-            <button class="linkbtn" id="dash-bill-add" type="button" style="flex:none">+ Add bill</button>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <b>Bills</b>
+          <button class="linkbtn" id="dash-bill-add" type="button" style="flex:none">+ Add bill</button>
         </div>
+        <div id="dash-bills-vals" style="font-weight:800;margin-top:6px"></div>
       </div>
       <div id="dash-charts"></div>
       <div class="card no-print" style="text-align:center">
@@ -2878,7 +2876,7 @@ function renderDashboard(){
       if(st==='overdue') over++;
       else if(st==='due-soon') soon++;
     });
-    var vals = $('dash-bills-vals'), sub = $('dash-bills-sub');
+    var vals = $('dash-bills-vals');
     if(vals){
       vals.innerHTML = '';
       if(over>0) vals.appendChild(el('span',{style:'color:var(--danger)'},over+' overdue'));
@@ -2886,7 +2884,6 @@ function renderDashboard(){
       if(soon>0) vals.appendChild(el('span',null,soon+' due this week'));
       if(!over && !soon) vals.appendChild(el('span',{class:'muted'},'all clear'));
     }
-    if(sub) sub.textContent = '';
     var card = $('dash-bills-card');
     if(card) card.onclick = function(){ showScreen('bills'); };
     var dashBillAdd = $('dash-bill-add');
