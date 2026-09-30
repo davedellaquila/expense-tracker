@@ -161,10 +161,23 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-badge{font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-faint); color:var(--accent);}
 .bill-badge.over{background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger);}
 .bill-badge.soon{background:color-mix(in srgb, #f6c85f 20%, transparent); color:#b8860b;}
-.bill-days{text-align:center; min-width:52px;}
-.bill-days .bd-n{font-size:19px; font-weight:800; line-height:1.05;}
-.bill-days .bd-l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
-.bill-row .bdue{white-space:nowrap; color:var(--muted); font-size:14px; min-width:92px;}
+.bill-tile{position:relative; overflow:hidden; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:11px 14px; margin-bottom:10px; box-shadow:0 1px 2px rgba(20,30,40,.04);}
+.bill-tile:last-child{margin-bottom:2px;}
+.bill-fill{position:absolute; left:0; top:0; bottom:0; width:0; pointer-events:none;}
+.bill-tile-main{position:relative;}
+.bill-line1{display:flex; align-items:baseline; gap:10px;}
+.bill-line1 .bn{flex:1; min-width:0; font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.bill-line1 .bdue{flex:0 0 96px; color:var(--muted); font-size:13px; white-space:nowrap;}
+.bill-line1 .bdue-sp{flex:0 0 96px;}
+.bill-line1 .amt{font-weight:800; font-size:17px; white-space:nowrap;}
+.bill-line2{display:flex; align-items:center; gap:10px; margin-top:3px;}
+.bill-line2 .bm{flex:1; min-width:0; font-size:13px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.bill-line2 .bdue-sp{flex:0 0 96px;}
+.bill-days2{font-size:14px; font-weight:800; white-space:nowrap;}
+@media (max-width:560px){
+  .bill-line1 .bdue, .bill-line1 .bdue-sp, .bill-line2 .bdue-sp{flex-basis:78px;}
+  .bill-tile{padding:10px 12px;}
+}
 /* Mark-paid confirmation sheet */
 .paid-card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin:12px 0;}
 .paid-card-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -7892,48 +7905,57 @@ function renderBillCalendar(){
 }
 
 function billRow(b, showDate, maxAmt, dueMin, dueMax){
-  var st = billStatus(b);
-  var row = el('div',{class:'bill-row'});
+  var tile = el('div',{class:'bill-tile'});
   var hue = billUrgencyHue(b, dueMin, dueMax); // 0=red (due soonest) … 120=green (latest)
   // Fill: width = amount relative to the priciest bill; color = urgency.
   if(maxAmt > 0){
     var pct = Math.max(0, Math.min(100, Math.round(num(b.amount)/maxAmt*100)));
-    if(pct > 0) row.style.background = 'linear-gradient(to right, hsla('+hue+',70%,45%,0.30) '+pct+'%, transparent '+pct+'%)';
+    if(pct > 0){
+      var fill = el('div',{class:'bill-fill'});
+      fill.style.width = pct+'%';
+      fill.style.background = 'hsla('+hue+',70%,45%,0.22)';
+      tile.appendChild(fill);
+    }
   }
-  var info = el('div',{class:'bi'});
+  var main = el('div',{class:'bill-tile-main'});
+  // Line 1: name | due date (aligned column) | amount
+  var l1 = el('div',{class:'bill-line1'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
   nm.style.cursor = 'pointer';
   nm.addEventListener('click', function(){ openBillForm(b); });
-  info.appendChild(nm);
+  l1.appendChild(nm);
+  l1.appendChild(el('div',{class: showDate ? 'bdue' : 'bdue-sp'}, showDate ? 'due '+fmtBillDate(b.dueDate) : ''));
+  l1.appendChild(el('div',{class:'amt'},money(num(b.amount))));
+  main.appendChild(l1);
+  // Line 2: meta | spacer | days left | Paid
+  var l2 = el('div',{class:'bill-line2'});
   var meta = (b.category||'Uncategorized')+' · '+(b.account||'Personal');
   if(b.recurrence && b.recurrence!=='once') meta += ' · '+b.recurrence;
-  info.appendChild(el('div',{class:'bm'},meta));
+  var metaEl = el('div',{class:'bm'},meta);
   if(b.scanPath || b.scanDataUrl){
-    var sc = el('span',{class:'scanbadge', title:'Scanned photo attached'},'\uD83D\uDCF7');
+    var sc = el('span',{class:'scanbadge', title:'Scanned photo attached'},'📷');
     sc.style.cursor = 'pointer';
     sc.addEventListener('click', function(e){ e.stopPropagation(); openScanPhoto(b); });
-    info.appendChild(sc);
+    metaEl.appendChild(document.createTextNode(' '));
+    metaEl.appendChild(sc);
   }
-  row.appendChild(info);
-  if(showDate) row.appendChild(el('div',{class:'bdue'},'due '+fmtBillDate(b.dueDate)));
-  var badge = billBadge(st);
-  if(badge) row.appendChild(badge);
+  l2.appendChild(metaEl);
+  l2.appendChild(el('div',{class:'bdue-sp'}));
   var days = billDaysUntil(b);
   if(days !== null){
-    var chip = el('div',{class:'bill-days'});
-    var big = el('div',{class:'bd-n'}), lab = el('div',{class:'bd-l'});
-    big.style.color = 'hsl('+hue+',70%,38%)';
-    if(days < 0){ big.textContent = Math.abs(days); lab.textContent = 'days overdue'; }
-    else if(days === 0){ big.textContent = 'today'; lab.textContent = 'due'; }
-    else { big.textContent = days; lab.textContent = days===1 ? 'day left' : 'days left'; }
-    chip.appendChild(big); chip.appendChild(lab);
-    row.appendChild(chip);
+    var dl = el('div',{class:'bill-days2'});
+    dl.style.color = 'hsl('+hue+',70%,38%)';
+    dl.textContent = days < 0 ? Math.abs(days)+' days overdue'
+      : days === 0 ? 'due today'
+      : days === 1 ? '1 day left' : days+' days left';
+    l2.appendChild(dl);
   }
-  row.appendChild(el('div',{class:'amt'},money(num(b.amount))));
   var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
   paidBtn.addEventListener('click', function(){ openBillPaidSheet(b); });
-  row.appendChild(paidBtn);
-  return row;
+  l2.appendChild(paidBtn);
+  main.appendChild(l2);
+  tile.appendChild(main);
+  return tile;
 }
 
 function billMaxAmount(){
