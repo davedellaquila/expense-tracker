@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Bulk update bar: Update button doubles as Undo
+- Removed the selection count and the standalone Undo button.
+- The Update button now reads "Update N transactions…" (with ellipsis).
+- After a bulk update completes, the Update button becomes "Undo Bulk
+  Update"; selecting any row switches it back to the Update button. The
+  ✕/Done behavior is unchanged.
+
 ### Bulk update bar button layout
 - Buttons rearranged into three zones: All/Clear (plus the selection
   count) on the left, Update centered, Delete/Undo and the dismiss ✕ on

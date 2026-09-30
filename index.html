@@ -220,8 +220,6 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   border-left:3px solid var(--blue);
   box-shadow:0 2px 10px rgba(10,20,15,.08); padding:8px 10px; margin:0 0 12px;
   display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
-.selbar #selbar-count{flex:none; font-weight:700; font-size:13.5px; color:var(--text);
-  background:var(--th-bg); border-radius:999px; padding:5px 12px; white-space:nowrap;}
 .selbar .btn{margin:0;}
 .selbar .selbar-left{display:flex; align-items:center; gap:6px; margin-right:auto;}
 .selbar #selbar-update{flex:none;}
@@ -843,14 +841,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       <div id="jobbars"></div>
       <div id="selbar" class="selbar" hidden>
         <div class="selbar-left">
-          <span id="selbar-count">0 selected</span>
           <button class="btn small ghost" id="selbar-all" type="button">All</button>
           <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         </div>
         <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
         <div class="selbar-right">
           <button class="btn small danger" id="selbar-delete" type="button">Delete</button>
-          <button class="btn small ghost" id="selbar-undo" type="button" hidden>Undo</button>
           <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
         </div>
       </div>
@@ -3631,18 +3627,21 @@ function wireTransactions(){
   $('f-select-stick').addEventListener('click', function(){ setTxnSelectMode(!txnSelectMode); });
   $('selbar-all').addEventListener('click', function(){
     state.transactions.filter(txnVisible).forEach(function(t){ txnSelected[t.id]=true; });
+    selbarUndoArmed = false; // new selection: back to the Update button
     renderTransactions(); updateSelbar();
   });
   $('selbar-clear').addEventListener('click', function(){
-    txnSelected = {}; renderTransactions(); updateSelbar();
+    txnSelected = {};
+    selbarUndoArmed = false; // new selection: back to the Update button
+    renderTransactions(); updateSelbar();
   });
   $('selbar-update').addEventListener('click', function(){
+    if(selbarUndoArmed && undoAvailable()){ undoBulkUpdate(); return; }
     var ids = Object.keys(txnSelected);
     if(!ids.length){ toast('No transactions selected.', true); return; }
     openBulkUpdate(ids);
   });
   $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
-  $('selbar-undo').addEventListener('click', undoBulkUpdate);
   $('selbar-delete').addEventListener('click', function(){
     var ids = Object.keys(txnSelected);
     if(!ids.length){ toast('No transactions selected.', true); return; }
@@ -3651,13 +3650,14 @@ function wireTransactions(){
   });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
   restoreTxnFilters(); // reopen on the saved category/type/bank filters
-  refreshUndoButtons(); // show Undo only when a completed bulk update exists
+  refreshUndoButtons(); // arm the Update-as-Undo button when a completed bulk update exists
 }
 /* bulk selection + bulk update on the Transactions screen */
 var txnSelectMode = false;
 var txnSelected = {}; // id -> true
 var activeBulkJobs = []; // in-flight bulk jobs: {job, verb, title, running, doneIds, failIds, skipIds, stopRequested, stopped, barEl, subEl}
 var lastCompletedBulkJob = null; // most recent finished update job, for Undo
+var selbarUndoArmed = false; // Update button is currently acting as Undo
 var bulkDoneIds = {}; // ids tinted green after the last bulk update finished
 var bulkFailIds = {}; // ids tinted red after the last bulk update finished
 var bulkBars = {}; // id -> .bulkbar element, rebuilt on every renderTransactions
@@ -3683,11 +3683,15 @@ function setTxnSelectMode(on){
   updateSelbar();
 }
 function updateSelbar(){
+  var btn = $('selbar-update');
+  if(!btn) return;
+  if(selbarUndoArmed && undoAvailable()){
+    btn.textContent = 'Undo Bulk Update';
+    return;
+  }
+  selbarUndoArmed = false;
   var n = txnSelCount();
-  var c = $('selbar-count');
-  c.textContent = n + ' selected';
-  c.style.display = n ? 'none' : ''; // count is redundant once the Update button shows it
-  $('selbar-update').textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's');
+  btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + '…';
 }
 /* Row state across all in-flight bulk jobs: 'done' | 'failed' | 'pending' | null */
 function bulkJobRowState(id){
@@ -4225,6 +4229,7 @@ function renderTransactions(){
     if(txnSelectMode){
       b.addEventListener('click', function(){
         if(txnSelected[t.id]) delete txnSelected[t.id]; else txnSelected[t.id]=true;
+        selbarUndoArmed = false; // new selection: back to the Update button
         cb.checked = !!txnSelected[t.id];
         b.classList.toggle('checked', !!txnSelected[t.id]);
         updateSelbar();
@@ -5085,14 +5090,16 @@ async function undoBulkUpdate(){
   if(!ok) return;
   runBulkJob(buildUndoJob(job), {verb:'Restored'}); // not awaited: stays out of the user's way
 }
-function refreshUndoButtons(){
-  // Undo is offered only when no bulk job is running, and only for the most
-  // recently completed update.
+function undoAvailable(){
   var job = lastCompletedBulkJob;
-  var show = activeBulkJobs.length===0 &&
+  return activeBulkJobs.length===0 &&
     !!(job && job.kind==='update' && job.rows && job.rows.length);
-  var u = $('selbar-undo');
-  if(u) u.hidden = !show;
+}
+function refreshUndoButtons(){
+  // The Update button doubles as Undo while an undoable bulk update exists
+  // and the selection hasn't changed since it completed.
+  selbarUndoArmed = undoAvailable();
+  updateSelbar();
 }
 /* After a reload with unfinished jobs, offer to resume them. */
 async function maybeResumeBulkJob(){
