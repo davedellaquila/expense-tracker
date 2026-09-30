@@ -2377,7 +2377,9 @@ document.addEventListener('DOMContentLoaded', function(){
         timer = null;
         tip.textContent = b.getAttribute('data-tip');
         var r = b.getBoundingClientRect();
-        var x = Math.min(Math.max(r.left + r.width/2, 70), window.innerWidth - 70);
+        /* clamp the centered pill by its real rendered width, not a guess */
+        var half = tip.offsetWidth/2 + 8;
+        var x = Math.min(Math.max(r.left + r.width/2, half), window.innerWidth - half);
         tip.style.left = x + 'px';
         tip.classList.add('show');
       }, 500);

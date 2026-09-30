@@ -9,6 +9,8 @@ documentation. Newest first.
 - Tab-bar buttons now use a custom tooltip with a 500ms hover delay
   (native title timing isn't controllable). Mouse-only; touch taps still
   navigate immediately.
+- Fixed the tooltip overflowing the screen edge: its position is now
+  clamped using its real rendered width.
 
 ### Sheet drag-to-resize + longer tab tooltips
 - Bottom sheets can now be resized by dragging the thumb at the top: the
