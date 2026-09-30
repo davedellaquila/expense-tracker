@@ -11,6 +11,12 @@ documentation. Newest first.
   period while the Transactions page (Type + Category must both match)
   correctly showed none. Transfers are now filtered by their own category,
   matching the Transactions page.
+- Fixed the related drill-through bug: tapping a Transfers donut slice or
+  its title carried the Home category selection into the Transactions
+  category dropdown, which then conflicted with the drill's own category
+  and showed zero transactions. The title/center drill now carries the
+  donut's actual transfer categories, so it shows exactly what the donut
+  showed (an empty donut drills to an empty list, not all transfers).
 ### Footer tooltip delay
 - Tab-bar buttons now use a custom tooltip with a 1000ms hover delay
   (native title timing isn't controllable; was 500ms). Mouse-only; touch

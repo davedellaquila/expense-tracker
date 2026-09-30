@@ -3378,7 +3378,11 @@ function renderDashChartBody(pick, box, c){
     }
     donutAllDrill('inc', {type:'income'});
     donutAllDrill('exp', {type:'expense'});
-    donutAllDrill('xfer', {type:'', xferOnly:true});
+    // The Transfers title/center drill carries the donut's own transfer
+    // categories: the donut now follows the Home category filter, so the
+    // drill must show exactly those transfers (not every transfer in the
+    // period). rawCats is keyed by raw category, matching byCatXfer.
+    donutAllDrill('xfer', {type:'', xferOnly:true, rawCats: catsX.slice()});
   } else if(pick==='catmixtable'){
     var tE = 0, tI = 0, kk;
     for(kk in d.byCatExp) tE += d.byCatExp[kk];
@@ -4054,7 +4058,7 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
       var ddc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
       if(dd.dispCats.indexOf(ddc)===-1) return false;
     }
-    if(dd.rawCats && dd.rawCats.length && dd.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
+    if(dd.rawCats && dd.rawCats.indexOf(t.category||'Uncategorized')===-1) return false;
     if(dd.xferOnly && !txnIsTransfer(t)) return false;
     if(dd.noXfer && txnIsTransfer(t)) return false;
     if(dd.weekday!=null && weekdayIdx(t.date)!==dd.weekday) return false;
@@ -4272,8 +4276,8 @@ function exportVisibleTxns(){
    override the period in txnVisible; dateless drills keep it in effect).
    o.carryCats (the source page's active chip selection)
    is intersected with the tapped element's own categories so an active
-   filter is never dropped. Transfers are exempt from chip filtering, so
-   xferOnly drills never carry categories. */
+   filter is never dropped. Transfers follow chip filtering on Home, so
+   xferOnly drills carry the tapped transfer categories via rawCats. */
 /* Does a drill context carry any filter dimension besides categories? Used to
    decide whether a single-category drill still needs its pill. */
 function drillHasDims(d){
