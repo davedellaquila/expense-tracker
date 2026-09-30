@@ -828,7 +828,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
-              <button class="linkbtn" id="f-select" type="button" style="flex:none">Bulk update</button>
+              <button class="linkbtn" id="f-select" type="button" style="flex:none" title="Select transactions to update or delete in bulk">Bulk update</button>
               <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
               <button class="linkbtn" id="f-export" type="button" style="flex:none">Export CSV</button>
               <button class="linkbtn" id="f-reset" type="button" style="flex:none;margin-left:auto" title="Reset all filters (shortcut: Esc)">Reset</button>
@@ -857,7 +857,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
-          <button class="linkbtn" id="f-select-stick" type="button" style="flex:none">Bulk update</button>
+          <button class="linkbtn" id="f-select-stick" type="button" style="flex:none" title="Select transactions to update or delete in bulk">Bulk update</button>
           <button class="linkbtn" id="f-tidy-stick" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
           <button class="linkbtn" id="f-export-stick" type="button" style="flex:none">Export CSV</button>
           <button class="linkbtn" id="f-reset-stick" type="button" style="flex:none;margin-left:auto" title="Reset all filters (shortcut: Esc)">Reset</button>
@@ -877,7 +877,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       <div id="txn-list"></div>
-      <button class="fab" id="txn-add" aria-label="Add transaction">+</button>
+      <button class="fab" id="txn-add" aria-label="Add transaction" title="Add transaction">+</button>
     </section>
 
     <!-- IMPORT -->
@@ -1223,14 +1223,14 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     <div id="float-totals-one"></div>
   </div>
   <nav class="tabbar" id="tabbar">
-    <button data-screen="dashboard" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
-    <button data-screen="transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
-    <button data-screen="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
-    <button data-screen="import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
-    <button data-screen="budgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
-    <button data-screen="bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
-    <button data-screen="tax"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
-    <button data-screen="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
+    <button data-screen="dashboard" class="on" title="Home (shortcut: 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
+    <button data-screen="transactions" title="Transactions (shortcut: 2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
+    <button data-screen="reports" title="Reports (shortcut: 3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reports</button>
+    <button data-screen="import" title="Import (shortcut: 4)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Import</button>
+    <button data-screen="budgets" title="Budget (shortcut: 5)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
+    <button data-screen="bills" title="Bills (shortcut: 6)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
+    <button data-screen="tax" title="Tax (shortcut: 7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
+    <button data-screen="settings" title="Setup (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
   </nav>
 </div>
 
@@ -1487,7 +1487,10 @@ function toast(msg, isErr){
   t.textContent = msg;
   t.className = (isErr ? 'err show top' : 'show top');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.className=''; }, 3400);
+  // dismiss by dropping only `show`: the toast fades in place. Clearing the
+  // whole className would also strip `top`, making it jump to the bottom
+  // for a split second while fading out.
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3400);
 }
 /* toast summary for a saved transaction: "Saved. Whole Foods · −$82.15 · Groceries" */
 function txnToast(verb, rd, nUpdated){
@@ -3736,6 +3739,8 @@ function setTxnSelectMode(on){
   $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
   $('f-select').classList.toggle('on', on);
   $('f-select-stick').classList.toggle('on', on);
+  var selTip = on ? 'Exit bulk update mode' : 'Select transactions to update or delete in bulk';
+  $('f-select').title = selTip; $('f-select-stick').title = selTip;
   $('selbar').hidden = !on;
   if(on) softInBar();
   $('txn-add').style.display = on ? 'none' : '';

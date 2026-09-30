@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-29
 
+### Toast ghost + tooltips
+- Fixed the toast's brief ghost at the bottom of the screen: dismissing no
+  longer strips its position class mid-fade, so it fades out in place.
+- Tooltips: Bulk update link buttons (dynamic: describes the mode, flips
+  to "Exit bulk update mode" while active), all 8 tab-bar icons (with
+  their 1–8 keyboard shortcuts), and the add-transaction + button.
+
 ### Filter card Reset position
 - Reset moved to the bottom-right edge of the Transactions filter card
   (mirrored in the floating sticky card).
