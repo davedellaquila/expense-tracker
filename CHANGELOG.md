@@ -6,10 +6,12 @@ documentation. Newest first.
 ## 2026-09-29
 
 ### Layout
-- New tablet tier (iPad, 761–1199px): the content column widens to 1000px and
-  bottom sheets to 880px, so the app uses the tablet's width instead of the
-  narrow phone-width column. Type stays full-size (the shrunken desktop zoom
-  still applies only at 1200px and up).
+- New tablet tier (iPad): the content column widens to 1000px and bottom
+  sheets to 880px, so the app uses the tablet's width instead of the narrow
+  phone-width column, at full-size type. Applies to every iPad size, including
+  large tablets (e.g. 12.9") that previously fell into the shrunken desktop
+  zoom tier — that tier now applies only to fine-pointer (mouse/trackpad)
+  screens 1200px and up.
 
 ### Home
 - New Bank filter in the first row of the Home filters (Period, Account, Bank).
