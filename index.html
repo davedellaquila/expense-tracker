@@ -2824,7 +2824,7 @@ function renderDashboard(){
     if(wd>=0) byDay[wd] += num(t.amount);
   });
   // stash computed data, then render whichever chart is picked
-  dashData = {from:from, to:to, acct:acct, bpVal:bpVal, rows:rows, rangeLabel:rangeLabel,
+  dashData = {from:from, to:to, acct:acct, bpVal:bpVal, bank:dashBank, rows:rows, rangeLabel:rangeLabel,
               byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth};
   renderDashCharts();
   saveDashCache(); // persist filters + data so the home page restores instantly
@@ -3106,7 +3106,7 @@ function renderDashCharts(){
   if(!wrap) return;
   wrap.innerHTML = '';
   if(!d) return;
-  var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel;
+  var from=d.from, to=d.to, bpVal=d.bpVal, rangeLabel=d.rangeLabel, dashBank=d.bank||'all';
   function dashDrill(extra){
     var o = {type:'expense', bp:bpVal, carryCats:dashCatSel};
     if(dashBank!=='all') o.banks = [dashBank];

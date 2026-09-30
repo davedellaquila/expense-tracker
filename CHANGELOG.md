@@ -10,6 +10,9 @@ documentation. Newest first.
   All Home charts, stat tiles, and category chips respect it; it persists across
   reloads and appears in the sticky filter summary; tile and chart
   drill-throughs carry it to Transactions.
+- Fixed: chart drills (e.g. Top merchants bars) went dead after the Bank filter
+  was added — the drill function reads its context from shared dashboard data,
+  which didn't include the new filter yet.
 
 ### Bulk update (Transactions)
 - Fields reordered: Merchant name, Type, Account (Personal/Business), Category,
