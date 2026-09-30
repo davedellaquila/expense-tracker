@@ -1041,6 +1041,10 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
               <option value="Business">Business</option>
             </select>
           </div>
+          <div style="flex:1; min-width:130px">
+            <label class="f" style="margin-top:0" for="rep-bank">Bank</label>
+            <select id="rep-bank"><option value="all">All</option></select>
+          </div>
           <button class="btn" id="rep-print">🖨 Print / PDF</button>
         </div>
         <div style="margin-top:10px">
@@ -3915,7 +3919,7 @@ function saveRepFilters(){
   try{
     localStorage.setItem(REP_FILTERS_KEY, JSON.stringify({
       preset: $('rep-preset').value, from: $('rep-from').value, to: $('rep-to').value,
-      acct: $('rep-acct').value, cats: repCatSel.slice()
+      acct: $('rep-acct').value, bank: $('rep-bank').value, cats: repCatSel.slice()
     }));
   }catch(e){}
 }
@@ -3928,6 +3932,7 @@ function restoreRepFilters(){
     $('rep-from').value = validYM(f.from) ? f.from : '';
     $('rep-to').value = validYM(f.to) ? f.to : '';
     restoreSel('rep-acct', f.acct, KNOWN_ACCTS);
+    ensureSelOption('rep-bank', f.bank); // bank list is data-driven; keep a saved pick even if unseen yet
     if(Array.isArray(f.cats)) repCatSel = f.cats.filter(function(c){ return typeof c==='string'; });
     /* renderReports prunes repCatSel against categories present in the period. */
   }catch(e){}
@@ -9094,7 +9099,7 @@ function repHeatmap(el, cats, months, matrix, monthKeys, onCell){
   }
 }
 function wireReports(){
-  ['rep-preset','rep-acct'].forEach(function(id){
+  ['rep-preset','rep-acct','rep-bank'].forEach(function(id){
     $(id).addEventListener('change', function(){ saveRepFilters(); renderReports(); });
   });
   $('rep-preset').addEventListener('change', function(){
@@ -9137,6 +9142,20 @@ function renderReports(){
   var bpVal = acct==='all' ? '' : acct;
   var repRange = presetRange('rep-preset','rep-from','rep-to'), from = repRange.from, to = repRange.to;
   var rows = txnsForRange(from, to, acct);
+  // Bank filter: options rebuilt from current data with the selection preserved.
+  var repBank = (function(){
+    var rb = $('rep-bank'), keepB = rb.value;
+    rb.innerHTML = '';
+    rb.appendChild(el('option',{value:'all'},'All'));
+    allBanks().forEach(function(b){
+      var o = el('option',{value:b},b);
+      if(b===keepB) o.selected = true;
+      rb.appendChild(o);
+    });
+    return rb.value;
+  })();
+  if(repBank!=='all') rows = rows.filter(function(t){ return txnBank(t)===repBank; });
+  var repBanks = repBank==='all' ? null : [repBank]; // chart drill-throughs carry the bank filter
   // --- category filter chips (multi-select, Capital One tracker pattern) ---
   var _catSeen = {}, _allCats = [];
   rows.forEach(function(t){
@@ -9195,14 +9214,14 @@ function renderReports(){
     : [];
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   $('rep-title').textContent = 'Expense report';
-  $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + ' · ' + rows.length + ' transactions';
+  $('rep-sub').textContent = rangeLabel + ' · ' + (acct==='all'?'Personal + Business':acct) + (repBank==='all' ? '' : ' · '+repBank) + ' · ' + rows.length + ' transactions';
   // sticky filter summary panel (shown once the filter card scrolls off-screen)
   var rfsT = $('repfilterstick-text');
   if(rfsT){
     var rfsCats = !repCatSel.length ? 'All categories'
       : repCatSel.length===1 ? repCatSel[0]
       : repCatSel[0]+' + '+(repCatSel.length-1)+' more';
-    rfsT.textContent = rangeLabel + ' · ' + rfsCats + (acct==='all' ? '' : ' · '+acct) + ' · ' + rows.length + ' transactions';
+    rfsT.textContent = rangeLabel + ' · ' + rfsCats + (acct==='all' ? '' : ' · '+acct) + (repBank==='all' ? '' : ' · '+repBank) + ' · ' + rows.length + ' transactions';
   }
   $('rep-stats').innerHTML =
     statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions', 'data-reptile="income"') +
@@ -9228,7 +9247,7 @@ function renderReports(){
   var cc = $('rep-catchart');
   var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
   repDonut(cc, cats.map(function(c){ return {name:c, value:byCat[c]}; }), function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
       dispCats: (it.names && it.names.length ? it.names : [it.name])});
   });
   // --- category table ---
@@ -9241,7 +9260,7 @@ function renderReports(){
   for(var rri=0; rri<repCatRows.length; rri++)(function(n){
     n.addEventListener('click', function(){
       var c = n.getAttribute('data-catrow'), ct = n.getAttribute('data-cattype')||'expense';
-      drillToTransactions({from:from, to:to, type:ct, bp:bpVal, carryCats:repCatSel, dispCats:[c]});
+      drillToTransactions({banks: repBanks,from:from, to:to, type:ct, bp:bpVal, carryCats:repCatSel, dispCats:[c]});
     });
   })(repCatRows[rri]);
   wireCatMixSorting($('rep-cattable'));
@@ -9258,7 +9277,7 @@ function renderReports(){
   });
   var bItems = bCats.map(function(c){ return {name:c, budget:bMap[c], actual:bSpend[c]||0}; });
   repBudgetActual($('rep-budgetchart'), bItems, function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
+    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
   });
   var btbl = $('rep-budgettable');
   if(!bCats.length){ btbl.innerHTML = ''; }
@@ -9284,7 +9303,7 @@ function renderReports(){
     for(var bi=0; bi<bRows.length; bi++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-bcat');
-        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
+        drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
       });
     })(bRows[bi]);
   }
@@ -9303,14 +9322,14 @@ function renderReports(){
         return s;
       })};
     }), mLabels, function(si, mi){
-      drillToTransactions({singleMonth:months[mi], type:'expense', bp:bpVal,
+      drillToTransactions({banks: repBanks,singleMonth:months[mi], type:'expense', bp:bpVal,
         carryCats:repCatSel, dispCats:[mselExp[si]]});
     });
   } else {
     repTrend(mc, months.map(function(m){
       return {key:m, label: m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5), exp: byMonth[m].exp};
     }), function(it){
-      drillToTransactions({singleMonth: it.key, type:'expense', bp:bpVal, carryCats:repCatSel});
+      drillToTransactions({banks: repBanks,singleMonth: it.key, type:'expense', bp:bpVal, carryCats:repCatSel});
     });
   }
   var mt = $('rep-monthtable');
@@ -9323,14 +9342,14 @@ function renderReports(){
   var mtRows = mt.querySelectorAll('[data-mmonth]');
   for(var mri=0; mri<mtRows.length; mri++)(function(n){
     n.addEventListener('click', function(){
-      drillToTransactions({singleMonth:n.getAttribute('data-mmonth'), type:'expense', bp:bpVal, carryCats:repCatSel});
+      drillToTransactions({banks: repBanks,singleMonth:n.getAttribute('data-mmonth'), type:'expense', bp:bpVal, carryCats:repCatSel});
     });
   })(mtRows[mri]);
 
   // --- top merchants (horizontal bars) ---
   var merch = Object.keys(byMerch).sort(function(a,b){ return byMerch[b]-byMerch[a]; }).slice(0,10);
   repHBars($('rep-merchchart'), merch.map(function(k){ return {name:k, value:byMerch[k]}; }), REP_CORAL, 'No expenses in this period.', function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, q: it.name});
+    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, q: it.name});
   });
 
   // --- weekday pattern: grouped per selected category when multi-selecting ---
@@ -9344,12 +9363,12 @@ function renderReports(){
         return s;
       })};
     }), WD_NAMES.map(function(w){ return w.slice(0,3); }), function(si, wi){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal,
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal,
         carryCats:repCatSel, dispCats:[mselExp[si]], weekday:wi});
     });
   } else {
     repWeekday($('rep-weekchart'), byDay, function(i){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, weekday:i});
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, weekday:i});
     });
   }
 
@@ -9386,7 +9405,7 @@ function renderReports(){
     for(var ici=0; ici<icRows.length; ici++)(function(n){
       n.addEventListener('click', function(){
         var c = n.getAttribute('data-icat');
-        drillToTransactions({from:from, to:to, type:'income', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
+        drillToTransactions({banks: repBanks,from:from, to:to, type:'income', bp:bpVal, carryCats:repCatSel, dispCats:[c]});
       });
     })(icRows[ici]);
   }
@@ -9414,7 +9433,7 @@ function renderReports(){
       })};
     }), BANDS.map(function(b){ return b[0]; }), function(si, bi){
       var lo = bi===0 ? 0 : BANDS[bi-1][1], hi = BANDS[bi][1];
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
         dispCats:[mselExp[si]], band:BANDS[bi][0], minAmt:lo, maxAmt:hi});
     });
   } else {
@@ -9424,7 +9443,7 @@ function renderReports(){
         var bi=0;
         while(bi<BANDS.length && BANDS[bi][0]!==it.name) bi++;
         var lo = bi===0 ? 0 : BANDS[bi-1][1], hi = BANDS[bi][1];
-        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
           band:it.name, minAmt:lo, maxAmt:hi});
       });
   }
@@ -9447,13 +9466,13 @@ function renderReports(){
         return s;
       })};
     }), ownerKeys, function(si, li){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
         dispCats:[mselExp[si]], owners:[ownerKeys[li]]});
     });
   } else {
     repDonut($('rep-ownersplit'), ownerKeys.map(function(o){ return {name:o, value:byOwner[o]}; }),
       function(it){
-        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
           owners:(it.names && it.names.length ? it.names : [it.name])});
       }, 'No expenses in this period.');
   }
@@ -9482,7 +9501,7 @@ function renderReports(){
   } else {
     repDonut($('rep-cardsplit'), bankKeys.map(function(b){ return {name:b, value:byBank[b]}; }),
       function(it){
-        drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
           banks:(it.names && it.names.length ? it.names : [it.name])});
       }, 'No expenses in this period.');
   }
@@ -9491,14 +9510,14 @@ function renderReports(){
   var volCats = Object.keys(byCatN).sort(function(a,b){ return byCatN[b]-byCatN[a]; }).slice(0,12);
   repHBarsCount($('rep-catvol'), volCats.map(function(c){ return {name:c, value:byCatN[c]}; }),
     '#f6c85f', 'No expenses in this period.', function(it){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
     });
 
   // --- average ticket (avg amount by category) ---
   var avgCats = Object.keys(byCat).sort(function(a,b){ return (byCat[b]/byCatN[b])-(byCat[a]/byCatN[a]); }).slice(0,12);
   repHBars($('rep-avgticket'), avgCats.map(function(c){ return {name:c, value:byCat[c]/byCatN[c]}; }),
     '#a78bfa', 'No expenses in this period.', function(it){
-      drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
     });
 
   // --- category spend trend (monthly stacked by top categories) ---
@@ -9517,7 +9536,7 @@ function renderReports(){
     return {name:c, color:REP_PALETTE[ci%REP_PALETTE.length], values:vals};
   });
   repStackedVBars($('rep-cattrend'), trendSeries, trendLabels, function(si, mi){
-    drillToTransactions({singleMonth:trendMonths[mi], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[trendCats[si]]});
+    drillToTransactions({banks: repBanks,singleMonth:trendMonths[mi], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[trendCats[si]]});
   });
 
   // --- owner vs category (grouped bars: top 5 categories × owners) ---
@@ -9536,7 +9555,7 @@ function renderReports(){
     return {name:o, color:REP_PALETTE[oi%REP_PALETTE.length], values:vals};
   });
   repGroupedVBars($('rep-ownercat'), ocSeries, ocCats, function(si, li){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
       dispCats:[ocCats[li]], owners:[ocOwners[si]]});
   });
 
@@ -9544,7 +9563,7 @@ function renderReports(){
   var paretoItems = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; })
     .map(function(c){ return {name:c, value:byCat[c]}; });
   repPareto($('rep-pareto'), paretoItems, function(it){
-    drillToTransactions({from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
+    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
   });
 
   // --- category × month heatmap ---
@@ -9562,7 +9581,7 @@ function renderReports(){
     });
   });
   repHeatmap($('rep-heatmap'), hmCats, hmLabels, hmMatrix, hmMonths, function(ri, ci){
-    drillToTransactions({singleMonth:hmMonths[ci], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[hmCats[ri]]});
+    drillToTransactions({banks: repBanks,singleMonth:hmMonths[ci], type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[hmCats[ri]]});
   });
   wireRepChartCards();
 }
