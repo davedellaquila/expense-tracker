@@ -161,6 +161,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-badge{font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-faint); color:var(--accent);}
 .bill-badge.over{background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger);}
 .bill-badge.soon{background:color-mix(in srgb, #f6c85f 20%, transparent); color:#b8860b;}
+.bill-days{text-align:center; min-width:52px;}
+.bill-days .bd-n{font-size:19px; font-weight:800; line-height:1.05;}
+.bill-days .bd-l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
 /* Mark-paid confirmation sheet */
 .paid-card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin:12px 0;}
 .paid-card-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -7890,18 +7893,11 @@ function renderBillCalendar(){
 function billRow(b, showDate, maxAmt, dueMin, dueMax){
   var st = billStatus(b);
   var row = el('div',{class:'bill-row'});
-  // Fill: width = amount relative to the priciest bill; color = urgency,
-  // red (due soonest) → green (due latest) across the range of bills.
+  var hue = billUrgencyHue(b, dueMin, dueMax); // 0=red (due soonest) … 120=green (latest)
+  // Fill: width = amount relative to the priciest bill; color = urgency.
   if(maxAmt > 0){
     var pct = Math.max(0, Math.min(100, Math.round(num(b.amount)/maxAmt*100)));
-    if(pct > 0){
-      var hue = 120; // green when there is no date range to compare
-      if(dueMin != null && dueMax > dueMin){
-        var t = Date.parse(String(b.dueDate||'')+'T12:00:00');
-        if(!isNaN(t)) hue = Math.round(Math.max(0, Math.min(1, (t-dueMin)/(dueMax-dueMin)))*120);
-      }
-      row.style.background = 'linear-gradient(to right, hsla('+hue+',70%,45%,0.30) '+pct+'%, transparent '+pct+'%)';
-    }
+    if(pct > 0) row.style.background = 'linear-gradient(to right, hsla('+hue+',70%,45%,0.30) '+pct+'%, transparent '+pct+'%)';
   }
   var info = el('div',{class:'bi'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
@@ -7921,6 +7917,17 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
   row.appendChild(info);
   var badge = billBadge(st);
   if(badge) row.appendChild(badge);
+  var days = billDaysUntil(b);
+  if(days !== null){
+    var chip = el('div',{class:'bill-days'});
+    var big = el('div',{class:'bd-n'}), lab = el('div',{class:'bd-l'});
+    big.style.color = 'hsl('+hue+',70%,38%)';
+    if(days < 0){ big.textContent = Math.abs(days); lab.textContent = 'days overdue'; }
+    else if(days === 0){ big.textContent = 'today'; lab.textContent = 'due'; }
+    else { big.textContent = days; lab.textContent = days===1 ? 'day left' : 'days left'; }
+    chip.appendChild(big); chip.appendChild(lab);
+    row.appendChild(chip);
+  }
   row.appendChild(el('div',{class:'amt'},money(num(b.amount))));
   var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
   paidBtn.addEventListener('click', function(){ openBillPaidSheet(b); });
@@ -7942,6 +7949,22 @@ function billDueRange(){
   });
   if(!vals.length) return null;
   return { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals) };
+}
+// Urgency hue for a bill: 0 (red, due soonest) … 120 (green, due latest).
+function billUrgencyHue(b, dueMin, dueMax){
+  var hue = 120; // green when there is no date range to compare
+  if(dueMin != null && dueMax > dueMin){
+    var t = Date.parse(String(b.dueDate||'')+'T12:00:00');
+    if(!isNaN(t)) hue = Math.round(Math.max(0, Math.min(1, (t-dueMin)/(dueMax-dueMin)))*120);
+  }
+  return hue;
+}
+// Whole days from today until the bill's due date (negative = overdue).
+function billDaysUntil(b){
+  var t = Date.parse(String(b.dueDate||'')+'T12:00:00');
+  if(isNaN(t)) return null;
+  var d1 = Date.parse(todayLocal()+'T12:00:00');
+  return Math.round((t-d1)/86400000);
 }
 
 function renderBillDay(){
