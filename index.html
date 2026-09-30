@@ -9224,6 +9224,10 @@ function renderReports(){
     if(!_catSeen[cc]){ _catSeen[cc] = 1; _allCats.push(cc); }
   });
   _allCats.sort();
+  // Snapshot the selection before pruning: the Budget vs Actual chart honors what
+  // was selected even for budgeted categories with no transactions in the period
+  // (pruning would otherwise silently reset it to All, e.g. combined with the bank filter).
+  var repCatSelBudget = repCatSel.slice();
   repCatSel = repCatSel.filter(function(c){ return !!_catSeen[c]; }); // prune cats absent this period
   var _sel = {};
   repCatSel.forEach(function(c){ _sel[c] = 1; });
@@ -9328,7 +9332,9 @@ function renderReports(){
   // --- budget vs actual: paired bars + variance table, follows the report period ---
   var bMap = budgetsForRange(from, to);
   var bCats = Object.keys(bMap).sort(function(a,b){ return bMap[b]-bMap[a]; });
-  if(repCatSel.length) bCats = bCats.filter(function(c){ return repCatSel.indexOf(c)>=0; });
+  // Only the selected categories (pre-prune snapshot, so a budgeted category with
+  // no transactions this period still shows instead of resetting to All).
+  if(repCatSelBudget.length) bCats = bCats.filter(function(c){ return repCatSelBudget.indexOf(c)>=0; });
   var bSpend = {};
   rows.forEach(function(t){
     if(t.txn_type!=='expense') return;
@@ -9336,9 +9342,13 @@ function renderReports(){
     if(bMap[bc]!=null) bSpend[bc] = (bSpend[bc]||0)+num(t.amount);
   });
   var bItems = bCats.map(function(c){ return {name:c, budget:bMap[c], actual:bSpend[c]||0}; });
-  repBudgetActual($('rep-budgetchart'), bItems, function(it){
-    drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
-  });
+  if(!bItems.length && repCatSelBudget.length && Object.keys(bMap).length){
+    emptyInto($('rep-budgetchart'),'🎯','No budgets for the selected categories.');
+  }else{
+    repBudgetActual($('rep-budgetchart'), bItems, function(it){
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel, dispCats:[it.name]});
+    });
+  }
   var btbl = $('rep-budgettable');
   if(!bCats.length){ btbl.innerHTML = ''; }
   else{

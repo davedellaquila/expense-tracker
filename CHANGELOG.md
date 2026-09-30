@@ -66,6 +66,11 @@ documentation. Newest first.
   budget shows 3× on a 3-month report instead of one month against three months
   of actuals. Applies to the Home budget card too.
 - Income by category table gained a % of total column.
+- Budget vs Actual now honors the selected categories even when a selected
+  category has no transactions in the period: previously the selection was
+  silently pruned (e.g. combined with the bank filter) and the chart reset to
+  all budgeted categories. Selecting categories with no budgets shows an
+  honest "No budgets for the selected categories" empty state.
 
 ### Transactions
 - Export CSV button: exports the filtered, sorted list with all fields,
