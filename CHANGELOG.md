@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Navigating to the Transactions page with a new filter selection (including chart drill-throughs) now starts the list at the first row instead of restoring the previous scroll position; returning with the selection unchanged still restores where you were.
 - The 🔔 bill-reminder badge now sits right before the amount in the transaction list, and tapping it opens the linked bill reminder.
 - Each tab now reopens at its previous scroll position after a page refresh (positions are saved per tab, throttled while scrolling, on tab switch, and on refresh/close).
 - Transactions with a bill reminder set now show a 🔔 badge in the list (bills created via "Add bill reminder" link back to their source transaction; deleting the bill clears the badge).
