@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Bills calendar: day background green deepens with the day's bill total — under $100 a whisper, $100+ light, $500+ medium, $2,000+ full.
 - Bills calendar: tapping the month title jumps back to the current month.
 - Bills calendar: days with bills get a light-green background; dots are bigger (multiple dots per day were already shown).
 - Bills page: scrolling the upcoming list now pins a sticky header under the app header showing the current month, its total, and an Add bill button.
