@@ -742,6 +742,9 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
   border:1px solid var(--border); border-radius:10px; font-size:13.5px;}
 .splitparts-h{font-weight:700; margin-bottom:6px;}
 .splitparts-r{display:flex; justify-content:space-between; gap:8px; padding:2px 0;}
+.splitparts-r.rep-click{border-radius:6px; margin:0 -6px; padding:2px 6px;}
+.splitparts-r.rep-click:hover{ background:rgba(140,140,140,.12); }
+.splitparts-r.rep-click:active{ background:rgba(140,140,140,.22); }
 .splitparts-a{font-variant-numeric:tabular-nums; font-weight:600; flex:none;}
 .splitparts-r.thisone .splitparts-a{color:var(--blue);}
 </style>
@@ -5927,6 +5930,13 @@ function openTxnForm(t){
           line.appendChild(el('span',null,(x.category||'Uncategorized')));
           line.appendChild(el('span',{class:'splitparts-a'},
             money(num(x.amount)) + (x.id===t.id ? ' · this one' : '')));
+          if(x.id!==t.id){
+            /* Tapping a sibling part opens that part's transaction. */
+            line.classList.add('rep-click');
+            line.setAttribute('role','button');
+            line.setAttribute('title','Open this part');
+            line.addEventListener('click', function(){ close(); openTxnForm(x); });
+          }
           spBox.appendChild(line);
         });
         sh.appendChild(spBox);
