@@ -431,12 +431,12 @@ textarea{resize:vertical; min-height:64px;}
    centered in the sticky bar with big tap targets. */
 .bud-monthnav{display:flex; align-items:center; justify-content:center; gap:8px; flex:none;}
 .bud-monthnav .btn{padding:10px 18px; font-size:20px; line-height:1;}
-#bud-month{border:1px solid transparent; background:transparent; font-size:15px;
+#bud-month{border:1px solid transparent; background:transparent; font-size:18px;
   font-weight:600; color:var(--text); padding:5px 4px; border-radius:8px; width:auto;}
 #bud-month:hover{border-color:var(--border);}
 /* Live budget-vs-income totals pill: second row of the sticky bar, always a
    single line (truncates instead of wrapping over the buttons below). */
-.bud-totals{margin:0; text-align:left; font-size:14px; color:var(--muted);
+.bud-totals{margin:0; text-align:right; font-size:14px; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .bud-totals b{color:var(--text); font-variant-numeric:tabular-nums; font-size:16px;}
 .bud-totals b.neg{color:var(--danger);}
@@ -445,6 +445,17 @@ textarea{resize:vertical; min-height:64px;}
    slider) so nothing can push the row past the card's right edge. */
 .bot-row>*{min-width:0;}
 .bot-row input[type=range]{max-width:100%;}
+/* Planner rows: two-line layout at every width so category names are always
+   fully readable and the padlock can never overlap the stats — line 1:
+   check + name + padlock; line 2: labeled YTD avg + This month group,
+   amount, remove; line 3: the adjust slider (already full-width).
+   (grid template is inline in JS, so !important overrides it here.) */
+.bot-row, .bot-head{grid-template-columns:40px minmax(0,1fr) 84px 40px !important; gap:8px 6px !important;}
+.bot-row > :nth-child(1), .bot-head > :nth-child(1){grid-column:1; grid-row:1;}
+.bot-row > :nth-child(2), .bot-head > :nth-child(2){grid-column:2/-1; grid-row:1;}
+.bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2;}
+.bot-row > :nth-child(4), .bot-head > :nth-child(4){grid-column:3; grid-row:2;}
+.bot-row > :nth-child(5), .bot-head > :nth-child(5){grid-column:4; grid-row:2;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -579,17 +590,7 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   .filters .allchip{display:none;}
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
-  /* budget planner rows: two-line layout on phones so category names are
-     fully readable — line 1: ✓ + name + padlock; line 2: labeled
-     YTD avg + Actual group, amount, remove; line 3: the adjust slider
-     (already full-width).
-     (grid is inline in JS, so !important overrides it here.) */
-  .bot-row, .bot-head{grid-template-columns:40px minmax(0,1fr) 84px 40px !important; gap:8px 6px !important;}
-  .bot-row > :nth-child(1), .bot-head > :nth-child(1){grid-column:1; grid-row:1;}
-  .bot-row > :nth-child(2), .bot-head > :nth-child(2){grid-column:2/-1; grid-row:1;}
-  .bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2;}
-  .bot-row > :nth-child(4), .bot-head > :nth-child(4){grid-column:3; grid-row:2;}
-  .bot-row > :nth-child(5), .bot-head > :nth-child(5){grid-column:4; grid-row:2;}
+  /* budget planner rows: taller padlock/check tap targets on phones */
   .bot-row .lockbtn{min-height:44px; min-width:40px;}
   /* bills calendar: taller day cells so dots don't crowd the date */
   .bill-cal .day{min-height:52px;}
@@ -8030,7 +8031,7 @@ function botRenderTable(){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',null,'YTD avg · Actual'));
+    head.appendChild(el('span',null,'YTD avg · This month'));
     head.appendChild(el('span',null,'Budget'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -8072,7 +8073,7 @@ function botRenderTable(){
     var over = num(r.amount)>0 && actual>num(r.amount);
     var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
     stats.appendChild(botStat('YTD avg', money(Math.round(ytd)), ''));
-    stats.appendChild(botStat('Actual', money(Math.round(actual)), over?'color:var(--danger);font-weight:700':''));
+    stats.appendChild(botStat('This month', money(Math.round(actual)), over?'color:var(--danger);font-weight:700':''));
     line.appendChild(stats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
@@ -8388,7 +8389,7 @@ function incBotRenderTable(){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',null,'YTD avg · Actual'));
+    head.appendChild(el('span',null,'YTD avg · This month'));
     head.appendChild(el('span',null,'Target'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -8428,7 +8429,7 @@ function incBotRenderTable(){
     var imet = num(r.amount)>0 && iactual>=num(r.amount);
     var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
     istats.appendChild(botStat('YTD avg', money(Math.round((r.ytd||0)/months))+'/mo', ''));
-    istats.appendChild(botStat('Actual', money(Math.round(iactual)), imet?'color:var(--accent);font-weight:700':''));
+    istats.appendChild(botStat('This month', money(Math.round(iactual)), imet?'color:var(--accent);font-weight:700':''));
     line.appendChild(istats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
