@@ -549,8 +549,9 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 
 /* ---------- tab bar ---------- */
 .tabbar{
-  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  position:fixed; left:0; right:0; bottom:var(--kb-h, 0px); z-index:40;
   transform:translateZ(0); /* own compositing layer: stays glued to the viewport on iOS */
+  transition:bottom .22s ease-out; /* glide above the iOS keyboard while typing */
   height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom:env(safe-area-inset-bottom);
   background:var(--tabbar-bg); backdrop-filter:blur(8px);
@@ -636,6 +637,7 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 .overlay{
   position:fixed; inset:0; z-index:60; background:rgba(15,20,25,.5);
   display:flex; align-items:flex-end; justify-content:center; animation:fade .15s;
+  transition:bottom .22s ease-out; /* bottom sheets glide above the iOS keyboard */
 }
 .sheet{
   background:var(--card); width:100%; max-width:760px; max-height:92dvh; overflow-y:auto;
@@ -654,7 +656,7 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 /* ---------- toast / spinner ---------- */
 #toast{
   position:fixed; left:50%; transform:translateX(-50%) translateY(20px); z-index:80;
-  bottom:calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
+  bottom:calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom) + var(--kb-h, 0px));
   background:#20262d; color:#fff; padding:11px 18px; border-radius:12px; font-size:15.5px;
   opacity:0; pointer-events:none; transition:all .25s; max-width:92vw; text-align:center;
 }
@@ -1055,14 +1057,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Live budget — every change saves instantly. Drag ⋮⋮ to reorder.</p>
-        <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
-          <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
-          <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
-        </div>
-        <div id="bot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your budget. Tap the padlock to fix a category's amount.</div>
-        <div id="bot-table" style="margin-top:12px"></div>
-        <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
+        <div id="bot-table" style="margin-top:12px"><div id="bot-rows"></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
           <label class="f" for="bot-goal-type" style="margin-top:0">Financial goal</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -1076,6 +1071,8 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
           <div id="bot-suggestions" style="margin-top:10px"></div>
         </div>
+        </div>
+        <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1085,12 +1082,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="ibot-propose" type="button" style="width:auto" title="Recalculate from year-to-date income">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Live income targets — every change saves instantly. Drag ⋮⋮ to reorder.</p>
-        <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
-          <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
-          <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
-        </div>
-        <div id="ibot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your income target. Tap the padlock to fix a category's amount.</div>
         <div id="ibot-table" style="margin-top:12px"></div>
       </div>
       </div>
@@ -1661,6 +1652,31 @@ function wireSheetResize(sh){
     grab.addEventListener('pointercancel', done);
   });
 }
+/* Keep the tab bar pinned above the iOS keyboard while typing, and lift
+   bottom sheets so their buttons stay reachable. The layout viewport doesn't
+   shrink when the keyboard opens, so without this the fixed tab bar and the
+   bottom-anchored sheets end up behind the keyboard. --kb-h holds the
+   keyboard overlap height (0 when closed). */
+function kbHeightNow(){
+  var vv = window.visualViewport;
+  if(!vv) return 0;
+  var kb = window.innerHeight - vv.height - (vv.offsetTop||0);
+  return kb > 40 ? Math.round(kb) : 0; /* ignore pinch-zoom / rounding noise */
+}
+function applyKbOffset(){
+  var kb = kbHeightNow();
+  document.documentElement.style.setProperty('--kb-h', kb+'px');
+  var ovs = document.querySelectorAll('#modal-root .overlay');
+  for(var i=0;i<ovs.length;i++){ ovs[i].style.bottom = kb ? kb+'px' : ''; }
+}
+(function(){
+  var vv = window.visualViewport;
+  if(!vv || !vv.addEventListener) return;
+  vv.addEventListener('resize', applyKbOffset);
+  vv.addEventListener('scroll', applyKbOffset);
+  window.addEventListener('orientationchange', function(){ setTimeout(applyKbOffset, 350); });
+  applyKbOffset();
+})();
 function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
@@ -1676,6 +1692,7 @@ function openSheet(build, onDismiss){
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
+  applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
 }
 /* Stacked variant: lays a sheet above the current one instead of replacing
@@ -1695,6 +1712,7 @@ function openSheetStacked(build, onDismiss){
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
+  applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
 }
 function confirmDialog(message, okLabel){
@@ -5688,7 +5706,11 @@ function openSplitSheet(t, baseRow, closeEditForm){
       });
       close();
       closeEditForm();
-      if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
+      /* The persist below must run even if the re-render throws — otherwise
+         the split would silently vanish on the next reload. */
+      try{
+        if(state.screen==='transactions') renderTransactions(); else showScreen('transactions');
+      }catch(rErr){}
       withSaveLock(async function(){
         try{
           await getStore().remove('Transactions', t.id);
@@ -7532,10 +7554,6 @@ function wireBudgets(){
   $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
   $('bot-suggest').addEventListener('click', botSuggest);
   $('ibot-propose').addEventListener('click', ibotRecalculate);
-  $('bot-enable-all').addEventListener('click', function(){ botSetAllLocked(true); });
-  $('bot-disable-all').addEventListener('click', function(){ botSetAllLocked(false); });
-  $('ibot-enable-all').addEventListener('click', function(){ incBotSetAllLocked(true); });
-  $('ibot-disable-all').addEventListener('click', function(){ incBotSetAllLocked(false); });
   $('bot-copy').addEventListener('click', function(){ openBudgetCopySheet('exp'); });
   $('ibot-copy').addEventListener('click', function(){ openBudgetCopySheet('inc'); });
   window.addEventListener('pagehide', botFlushWrites);
@@ -7694,6 +7712,7 @@ function openBudgetCopySheet(mode){
       var src = inSrc.value;
       if(!src || src===targetYm) return;
       go.disabled = true;
+      go.innerHTML = '<span class="spin"></span> Copying…';
       try{
         var rows = state.budgets.filter(function(b){
           return String(b.month)===src &&
@@ -7705,7 +7724,7 @@ function openBudgetCopySheet(mode){
           upsertStateBudget(rows[i].category, targetYm, amt);
         }
         toast((isInc?'Income targets':'Budget')+' copied from '+fmtMonthPretty(src)+'.');
-      }catch(e){ toast('Copy failed.', true); go.disabled = false; refreshInfo(); return; }
+      }catch(e){ toast('Copy failed.', true); go.disabled = false; go.textContent = 'Copy'; refreshInfo(); return; }
       /* Locks follow the copied budget: the target month's fixed map is
          replaced with the source month's, matching the amount replacement. */
       try{
@@ -7916,15 +7935,6 @@ function botPaintRowState(r, line, check, fill){
     check.style.opacity = '0.35';
   }
 }
-function botUpdateHint(){
-  if(!botBudget || !botBudget.rows.length){ $('bot-hint').style.display = 'none'; return; }
-  $('bot-hint').style.display = botBudget.rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
-}
-function ibotUpdateHint(){
-  if(!incBotBudget || !incBotBudget.rows.length){ $('ibot-hint').style.display = 'none'; return; }
-  $('ibot-hint').style.display = incBotBudget.rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
-}
-
 function botNiceRound(avg){
   if(avg>=100) return Math.round(avg/10)*10;
   if(avg>=25) return Math.round(avg/5)*5;
@@ -8135,27 +8145,11 @@ function botEnableRow(r, line, check){
   r.locked = true;
   check.title = 'Uncheck — bot may suggest trims';
   botPaintRowState(r, line, check, 'var(--danger-soft)');
-  botUpdateHint();
-}
-/* Bulk enable/disable for bot proposal rows (expense and income). */
-function botSetAllLocked(locked){
-  if(!botBudget || !botBudget.rows.length) return;
-  var ym = botBudget.month;
-  botBudget.rows.forEach(function(r){ r.locked = locked; botWriteNow(ym, r.category, locked ? r.amount : 0); });
-  botRenderTable();
-}
-function incBotSetAllLocked(locked){
-  if(!incBotBudget || !incBotBudget.rows.length) return;
-  var ym = incBotBudget.month;
-  incBotBudget.rows.forEach(function(r){ r.locked = locked; botWriteNow(ym, INC_BUDGET_PREFIX+r.category, locked ? r.amount : 0); });
-  incBotRenderTable();
 }
 function botRenderTable(){
-  var host = $('bot-table'); host.innerHTML = '';
-  if(!botBudget){ $('bot-bulk-row').style.display = 'none'; $('bot-hint').style.display = 'none'; return; }
+  var host = $('bot-rows'); host.innerHTML = '';
+  if(!botBudget){ return; }
   var rows = botBudget.rows, ym = botBudget.month;
-  $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  botUpdateHint();
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
@@ -8443,8 +8437,7 @@ function botSuggest(){
 
 function botReset(){
   botBudget = null;
-  $('bot-table').innerHTML = '';
-  $('bot-bulk-row').style.display = 'none';
+  $('bot-rows').innerHTML = '';
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
 }
@@ -8542,10 +8535,8 @@ function incBotTotal(){
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
-  if(!incBotBudget){ $('ibot-bulk-row').style.display = 'none'; $('ibot-hint').style.display = 'none'; return; }
+  if(!incBotBudget){ return; }
   var rows = incBotBudget.rows, ym = incBotBudget.month;
-  $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  ibotUpdateHint();
   var months = incBotBudget.months||1;
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
@@ -8663,8 +8654,6 @@ function incBotRenderTotal(){
 function incBotReset(){
   incBotBudget = null;
   $('ibot-table').innerHTML = '';
-  $('ibot-bulk-row').style.display = 'none';
-  $('ibot-hint').style.display = 'none';
 }
 
 /* ================= bills =================

@@ -5,6 +5,29 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget planner: declutter + Financial goal scrolls with the list
+- Removed the "Live income targets…" / "Live budget…" intro paragraphs, the
+  Enable all / Disable all buttons, and the "Dimmed rows are suggestions…"
+  hints from both planners.
+- The Financial goal section now sits at the bottom of the Budget planner's
+  scrolling list instead of pinned at the card bottom — scroll through the
+  categories to reach it.
+
+### Tab bar and sheets stay above the iOS keyboard
+- While the keyboard is open, the footer tab bar rides above it (it was
+  getting hidden behind it while typing), and bottom sheets lift so their
+  buttons stay reachable.
+
+### Split save is now guaranteed to persist
+- Split saving now finishes writing the new rows to the store even if the
+  list re-render hits an error, so a split can no longer silently vanish.
+
+### Copy-from shows a spinner
+- The Copy button in the "Copy budget / Copy income targets" sheet shows a
+  spinner while the copy runs, so it's clear work is happening.
+
+## 2026-10-01
+
 ### Budget page: drag-reorder fix, independent column scroll, itemized bills
 - Fixed drag-to-reorder: a math bug meant dragged rows could never actually
   change position on drop. Rows now reorder live as you drag and the order
