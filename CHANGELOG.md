@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Sticky % of income now actually turns red/green
+- The "% of income" figure in the sticky bar was supposed to go red over
+  100% and green otherwise, but a pill style was overriding the colors —
+  fixed so the red/green now shows.
+
 ### Bot cards: Propose buttons moved up, row fill removed
 - "Propose my budget" / "Propose my income" now sit in the card header
   next to the title instead of below the description.
