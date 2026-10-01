@@ -8271,7 +8271,10 @@ function botWhy(r, cut){
 /* Pure core: given proposal rows and a savings gap, suggest trims — most
    cuttable categories first, at most 35% per category, locked rows skipped. */
 function botAllocateCuts(rows, gap){
-  var cands = rows.filter(function(r){ return !r.locked && r.amount>0; }).sort(function(a,b){
+  /* Cut checked (in-budget) rows that aren't padlocked. `locked` used to mean
+     "fixed amount" in the old Budget Bot; since the planner refactor it means
+     "checked / included in the budget", and the padlock is `fixed`. */
+  var cands = rows.filter(function(r){ return r.locked && !r.fixed && r.amount>0; }).sort(function(a,b){
     return (botCuttability(b.category)-botCuttability(a.category)) || (b.amount-a.amount);
   });
   var list = [], remaining = Math.round(gap);
@@ -8734,7 +8737,8 @@ function botSuggest(){
     if(!(pct>0 && pct<100)){ toast('Enter a percent between 1 and 99.', true); return; }
     var r = botBudget.rows.filter(function(x){ return x.category===cat; })[0];
     if(!r) return;
-    if(r.locked){ toast(cat+' is locked — unlock it first.', true); return; }
+    if(!r.locked){ toast(cat+' is not checked — check it first to include it in the budget.', true); return; }
+    if(r.fixed){ toast(cat+' is padlocked — unlock it first.', true); return; }
     var to = Math.max(0, Math.round(r.amount*(1-pct/100)));
     res = {list:[{category:cat, from:r.amount, to:to, cut:r.amount-to,
                   why:'Direct '+pct+'% cut as requested.'}], remaining:0};
