@@ -726,7 +726,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 .scanattach{display:flex; align-items:center; gap:10px; margin:2px 0 8px;}
 .scanattach img{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex:none;}
 .scanbadge{font-size:13px; flex:none;}
-.billbadge{font-size:13px; flex:none;}
+.billbadge{font-size:13px; flex:none; cursor:pointer;}
 .splitbadge{font-size:10.5px; font-weight:700; color:var(--blue); background:var(--blue-soft);
   border-radius:8px; padding:2px 7px; flex:none; letter-spacing:.02em;}
 /* Split-parts breakdown shown on a split transaction's detail sheet. */
@@ -4542,8 +4542,17 @@ function renderTransactions(){
     var tmRow = typeMeta(t.txn_type);
     var amt = el('span',{class:'amt '+tmRow.amtCls},
       tmRow.sign + money(num(t.amount)));
-    if(billTxnIds[t.id])
-      b.appendChild(el('span',{class:'billbadge', title:'Bill reminder set'},'\uD83D\uDD14'));
+    if(billTxnIds[t.id]){
+      /* Tapping the bell opens the linked bill reminder. stopPropagation keeps
+         the tap from also opening the transaction (or toggling selection). */
+      var bell = el('span',{class:'billbadge', role:'button', title:'Open bill reminder'},'\uD83D\uDD14');
+      bell.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        var linked = state.bills.filter(function(bd){ return bd.sourceTxnId===t.id; });
+        if(linked.length) openBillForm(linked[0]);
+      });
+      b.appendChild(bell);
+    }
     b.appendChild(amt);
     if(t.scanPath || t.scanDataUrl)
       b.appendChild(el('span',{class:'scanbadge', title:'Receipt scan attached'},'\uD83D\uDCF7'));
