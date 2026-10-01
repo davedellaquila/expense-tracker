@@ -4542,11 +4542,11 @@ function renderTransactions(){
     var tmRow = typeMeta(t.txn_type);
     var amt = el('span',{class:'amt '+tmRow.amtCls},
       tmRow.sign + money(num(t.amount)));
+    if(billTxnIds[t.id])
+      b.appendChild(el('span',{class:'billbadge', title:'Bill reminder set'},'\uD83D\uDD14'));
     b.appendChild(amt);
     if(t.scanPath || t.scanDataUrl)
       b.appendChild(el('span',{class:'scanbadge', title:'Receipt scan attached'},'\uD83D\uDCF7'));
-    if(billTxnIds[t.id])
-      b.appendChild(el('span',{class:'billbadge', title:'Bill reminder set'},'\uD83D\uDD14'));
     if(t.split_group)
       b.appendChild(el('span',{class:'splitbadge', title:'Split transaction'},'split'));
     if(txnSelectMode){
