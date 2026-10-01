@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Budget page: the sticky totals pill now wraps on narrow screens instead of cutting figures off with "…".
 - Budget planner: manual row order, removed-category memory, and 🔒 padlocks now sync through Firebase — the Budget page looks the same on every machine.
 - Split transactions: in a transaction's detail sheet, the split-parts breakdown rows are now tappable — tapping a sibling part opens that part's transaction (the part you're viewing stays inert).
 - Financial goal: fixed the suggestion engine to respect the planner's ✓/🔒 distinction. Since the planner refactor, "locked" means checked/included-in-budget and the padlock is a separate flag — but the goal code still used the old meaning, so trim suggestions were proposed on unchecked rows (which save as $0 and can't move the total) and "cut a category" refused checked categories. Suggestions now target checked, unpadlocked rows.
