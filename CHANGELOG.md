@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Planner rows: YTD avg + Actual grouped with labels
+- Each planner row now shows YTD avg and the selected month's actual
+  side by side as a labeled pair (tiny "YTD AVG" / "ACTUAL" labels),
+  instead of the YTD figure sitting alone and the actual tucked under
+  the amount field. Over-budget actuals still turn red; income targets
+  met still turn green.
+
 ### Planner row colors: red expenses, green income
 - Enabled expense rows now use a soft red fill and enabled income rows a
   soft green fill (previously both were green), so the two planners are
