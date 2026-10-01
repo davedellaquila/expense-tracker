@@ -5,6 +5,10 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Bill notes field auto-resizes
+- The Notes field on the add/edit bill form now grows and shrinks to fit
+  its contents (also refits when a scan pre-fills or clears payment info).
+
 ### Tap a reference stat to fill the budget amount
 - Tapping the YTD avg or Prev month value on a budget/income planner row
   copies it into that category's amount field, enables the row (like the

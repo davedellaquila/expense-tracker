@@ -9363,6 +9363,7 @@ function openBillForm(b){
       if(lastBillScan.paymentInfo && inNotes.value.indexOf(lastBillScan.paymentInfo) !== -1){
         inNotes.value = inNotes.value.split(lastBillScan.paymentInfo).join('')
           .replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
+        inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
         unmarkScanned(inNotes);
       }
       lastBillScan = null;
@@ -9382,6 +9383,7 @@ function openBillForm(b){
         if(res.values.paymentInfo){
           snap.paymentInfo = res.values.paymentInfo;
           inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + snap.paymentInfo;
+          inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
           markScanned(inNotes);
         }
         lastBillScan = snap;
@@ -9426,7 +9428,8 @@ function openBillForm(b){
     bBiz.onclick = function(){ curBp='Business'; paintBp(); };
     paintBp();
     sh.appendChild(bpSeg);
-    var inNotes = el('textarea',{rows:'2',placeholder:'Optional',style:'width:100%'});
+    var inNotes = autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',style:'width:100%'}));
+    if(b&&b.notes) inNotes.value = b.notes;
     if(b&&b.notes) inNotes.value = b.notes;
     sh.appendChild(el('label',{class:'f'},'Notes')); sh.appendChild(inNotes);
     var bar = el('div',{class:'btnrow stickybar-page'});
