@@ -138,6 +138,8 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* Pin the Propose buttons to the bottom so both bot cards line up */
 .bot-actions{margin-top:auto; padding-top:12px;}
 @media (max-width:560px){ .duo-grid{grid-template-columns:1fr;} }
+/* Large desktop: budget + income source-of-truth cards side by side */
+@media (min-width:1200px){ .bud-duo{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;} }
 .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center;}
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 .stat .value{font-size:21px; font-weight:800; margin:4px 0 2px; letter-spacing:-.3px;}
@@ -1083,6 +1085,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
       </div>
       </div>
+      <div class="bud-duo">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <h2 style="margin:0">Category budgets</h2>
@@ -1091,6 +1094,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <div id="budget-list"></div>
       </div>
       <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
+      </div>
     </section>
 
     <!-- BILLS -->

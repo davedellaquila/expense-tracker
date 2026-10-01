@@ -5,6 +5,10 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: expenses and income side by side on large desktop
+- Category budgets and Income targets cards now sit side by side on
+  desktop (1200px and up); stacked everywhere else.
+
 ### Sticky % of income now actually turns red/green
 - The "% of income" figure in the sticky bar was supposed to go red over
   100% and green otherwise, but a pill style was overriding the colors —
