@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Planner row colors: red expenses, green income
+- Enabled expense rows now use a soft red fill and enabled income rows a
+  soft green fill (previously both were green), so the two planners are
+  instantly distinguishable. Suggestion rows stay dimmed.
+
 ### Budget sticky bar: centered month picker, bigger prev/next
 - The month stepper (‹ September 2026 ›) is now centered in the sticky
   bar, and the prev/next buttons are bigger tap targets.
