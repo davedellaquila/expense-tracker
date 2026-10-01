@@ -5,6 +5,19 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget page: drag-reorder fix, independent column scroll, itemized bills
+- Fixed drag-to-reorder: a math bug meant dragged rows could never actually
+  change position on drop. Rows now reorder live as you drag and the order
+  sticks. The ⋮⋮ grip is a slightly bigger tap target, and both planners
+  note "Drag ⋮⋮ to reorder."
+- The side-by-side Budget/Income columns now scroll independently — each
+  column's row list is capped below the sticky month bar and above the tab
+  bar, so a long expense list no longer pushes the income planner away.
+- The "Bills due" cash-flow line under the budget planner now lists each
+  bill due in the selected month (name, due date, category, amount) with
+  overdue / due-soon badges, above the after-bills-and-budget remaining
+  figure.
+
 ### Planner rows: drag to reorder
 - Each Budget and Income planner row now has a ⋮⋮ grip handle beside the
   category name. Drag it (mouse or touch) to move the row; the list
