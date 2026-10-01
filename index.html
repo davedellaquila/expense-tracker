@@ -9150,6 +9150,52 @@ function ocrPhoto(blob, onProgress){
     }});
   }).then(function(r){ return (r && r.data && r.data.text) || ''; });
 }
+/* PDF.js (for bill/receipt PDF upload): lazy-loaded from CDN like Tesseract,
+   renders on-device — nothing is uploaded for recognition. */
+var PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var _pdfjsP = null;
+function loadPdfJs(){
+  if(_pdfjsP) return _pdfjsP;
+  _pdfjsP = new Promise(function(res, rej){
+    if(typeof pdfjsLib !== 'undefined' && pdfjsLib.getDocument){ res(pdfjsLib); return; }
+    var s = document.createElement('script');
+    s.src = PDFJS_CDN; s.async = true;
+    var done = false;
+    function ok(){ if(!done){ done = true;
+      try{ pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; }catch(e){}
+      res(pdfjsLib); } }
+    function bad(){ if(!done){ done = true; _pdfjsP = null; rej(new Error('scanner-load')); } }
+    s.onload = ok; s.onerror = bad;
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!done) bad(); }, 60000);
+  });
+  return _pdfjsP;
+}
+/* Render the first page of a PDF to a JPEG blob, sized for the OCR pipeline. */
+function pdfFirstPageImage(file, maxDim){
+  maxDim = maxDim || 2200;
+  return loadPdfJs().then(function(pdfjsLib){
+    return file.arrayBuffer().then(function(buf){
+      return pdfjsLib.getDocument({data: buf}).promise;
+    }).then(function(pdf){
+      return pdf.getPage(1);
+    }).then(function(page){
+      var base = page.getViewport({scale: 1});
+      var sc = Math.min(3, maxDim / Math.max(base.width || 1, base.height || 1));
+      var viewport = page.getViewport({scale: sc});
+      var cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(viewport.width));
+      cv.height = Math.max(1, Math.round(viewport.height));
+      return page.render({canvasContext: cv.getContext('2d'), viewport: viewport}).promise.then(function(){
+        return new Promise(function(res, rej){
+          if(cv.toBlob) cv.toBlob(function(b){ b ? res(b) : rej(new Error('encode')); }, 'image/jpeg', 0.9);
+          else rej(new Error('encode'));
+        });
+      });
+    });
+  });
+}
 /* ---- heuristic field extraction (pure functions; unit-tested in Node) ---- */
 function scanLines(text){
   return String(text||'').split(/\n+/).map(function(s){ return s.trim(); }).filter(function(s){ return !!s; });
@@ -9270,28 +9316,33 @@ function parseReceiptScan(text){
   }
   return res;
 }
-/* Scan sheet: pick/take photo -> progress -> editable review -> Use these details.
-   kind: 'bill' | 'receipt'. onDone receives {blob, dataUrl, values}. */
+/* Scan sheet: pick/take photo or upload PDF -> progress -> editable review -> Use these details.
+   kind: 'bill' | 'receipt'. onDone receives {blob, dataUrl, pdfBlob, values}
+   (pdfBlob is the original PDF file when one was uploaded, else null). */
 function openScanSheet(kind, onDone){
   var isBill = kind === 'bill';
   openSheetStacked(function(sh, close){
     sh.appendChild(el('h2', null, isBill ? 'Scan bill' : 'Scan receipt'));
     sh.appendChild(el('p', {class:'muted'},
       'Take a photo of the ' + (isBill ? 'bill' : 'receipt') +
-      ' \u2014 this phone reads it and fills in what it finds. ' +
-      'Check the fields before saving; the photo itself is never uploaded for recognition.'));
+      ' or upload its PDF \u2014 this phone reads the first page and fills in what it finds. ' +
+      'Check the fields before saving; nothing is uploaded for recognition.'));
     var pickBox = el('div');
     var fileCam = el('input', {type:'file', accept:'image/*', capture:'environment', class:'filepick'});
     fileCam.setAttribute('aria-label', 'Take photo');
     var fileLib = el('input', {type:'file', accept:'image/*', class:'filepick'});
     fileLib.setAttribute('aria-label', 'Choose photo');
-    pickBox.appendChild(fileCam); pickBox.appendChild(fileLib);
-    var btnRow = el('div', {class:'btnrow'});
+    var filePdf = el('input', {type:'file', accept:'application/pdf,.pdf', class:'filepick'});
+    filePdf.setAttribute('aria-label', 'Upload PDF');
+    pickBox.appendChild(fileCam); pickBox.appendChild(fileLib); pickBox.appendChild(filePdf);
+    var btnRow = el('div', {class:'btnrow', style:'flex-wrap:wrap'});
     var takeBtn = el('button', {class:'btn', type:'button'}, '\uD83D\uDCF7 Take photo');
     var libBtn = el('button', {class:'btn ghost', type:'button'}, 'Choose photo');
+    var pdfBtn = el('button', {class:'btn ghost', type:'button'}, 'Upload PDF');
     takeBtn.addEventListener('click', function(){ fileCam.click(); });
     libBtn.addEventListener('click', function(){ fileLib.click(); });
-    btnRow.appendChild(takeBtn); btnRow.appendChild(libBtn);
+    pdfBtn.addEventListener('click', function(){ filePdf.click(); });
+    btnRow.appendChild(takeBtn); btnRow.appendChild(libBtn); btnRow.appendChild(pdfBtn);
     pickBox.appendChild(btnRow);
     var cancelBtn = el('button', {class:'btn ghost', type:'button', style:'margin-top:10px'}, 'Cancel');
     cancelBtn.addEventListener('click', close);
@@ -9312,25 +9363,50 @@ function openScanSheet(kind, onDone){
 
     function onFile(file){
       if(!file) return;
-      showProg('Preparing photo\u2026');
-      downscalePhoto(file).then(function(blob){
-        return blobToDataURL(blob).then(function(du){ return {blob:blob, du:du}; });
+      runOcr(Promise.resolve(file), 'Preparing photo\u2026',
+        'Could not read that photo. Try again or enter it manually.');
+      fileCam.value = ''; fileLib.value = '';
+    }
+    /* PDF upload: render page 1 to an image on-device, then run the same OCR
+       pipeline. The original PDF is kept for retention; the rendered page is
+       what gets read and shown as the thumbnail. */
+    function onPdfFile(file){
+      if(!file) return;
+      showProg('Reading PDF\u2026');
+      runOcr(pdfFirstPageImage(file).then(function(pageBlob){
+        return {pageBlob: pageBlob, pdfBlob: file};
+      }), 'Reading PDF\u2026',
+        'Could not read that PDF. Try again or enter it manually.');
+      filePdf.value = '';
+    }
+    /* Shared tail: image blob (or {pageBlob, pdfBlob} for PDFs) -> downscale ->
+       OCR -> review. src is the prepared input promise. */
+    function runOcr(src, prepLabel, failMsg){
+      showProg(prepLabel);
+      src.then(function(prep){
+        var pageBlob = (prep && prep.pageBlob) || prep;
+        var pdfBlob = (prep && prep.pdfBlob) || null;
+        return downscalePhoto(pageBlob).then(function(blob){
+          return blobToDataURL(blob).then(function(du){
+            return {blob: blob, du: du, pdfBlob: pdfBlob};
+          });
+        });
       }).then(function(img){
         showProg('Loading scanner\u2026 (first time only)');
         return ocrPhoto(img.blob, function(p){ progTxt.textContent = 'Reading\u2026 ' + Math.round(p*100) + '%'; })
-          .then(function(text){ return {img:img, text:text}; });
+          .then(function(text){ return {img: img, text: text}; });
       }).then(function(r){ showReview(r.img, r.text); })
       .catch(function(e){
         console.warn('scan failed:', e);
         showPick();
         toast(e && e.message === 'scanner-load'
           ? 'Could not load the scanner \u2014 it needs internet the first time.'
-          : 'Could not read that photo. Try again or enter it manually.', true);
+          : failMsg, true);
       });
-      fileCam.value = ''; fileLib.value = '';
     }
     fileCam.addEventListener('change', function(){ onFile(fileCam.files[0]); });
     fileLib.addEventListener('change', function(){ onFile(fileLib.files[0]); });
+    filePdf.addEventListener('change', function(){ onPdfFile(filePdf.files[0]); });
 
     function fieldRow(labelText, input, foundFlag){
       var wrap = el('div');
@@ -9343,9 +9419,11 @@ function openScanSheet(kind, onDone){
 
     function showReview(img, text){
       var parsed = isBill ? parseBillScan(text) : parseReceiptScan(text);
+      var isPdf = !!(img && img.pdfBlob);
+      var srcWord = isPdf ? 'PDF' : 'photo';
       reviewBox.innerHTML = '';
       pickBox.style.display='none'; progBox.style.display='none'; reviewBox.style.display='';
-      var thumb = el('img', {class:'scanthumb-img', src: img.du, alt:'Scanned photo'});
+      var thumb = el('img', {class:'scanthumb-img', src: img.du, alt: isPdf ? 'First page of PDF' : 'Scanned photo'});
       thumb.addEventListener('click', function(){ window.open(img.du, '_blank'); });
       reviewBox.appendChild(thumb);
       var vals = {}, anyFound = false;
@@ -9377,14 +9455,14 @@ function openScanSheet(kind, onDone){
       }
       if(!anyFound)
         reviewBox.appendChild(el('p', {class:'muted'},
-          "Couldn't pull the details from that photo \u2014 fill them in here, or use the photo for reference and enter everything manually."));
+          "Couldn't pull the details from that " + srcWord + " \u2014 fill them in here, or use the " + srcWord + " for reference and enter everything manually."));
       var bar = el('div', {class:'btnrow stickybar-page'});
       var useBtn = el('button', {class:'btn', type:'button'}, 'Use these details');
       useBtn.addEventListener('click', function(){
         var out = {};
         for(var k in vals) out[k] = vals[k].value.trim();
         close();
-        onDone({blob: img.blob, dataUrl: img.du, values: out});
+        onDone({blob: img.blob, dataUrl: img.du, pdfBlob: img.pdfBlob || null, values: out});
       });
       var retakeBtn = el('button', {class:'btn ghost', type:'button'}, 'Retake');
       retakeBtn.addEventListener('click', showPick);
@@ -9408,13 +9486,13 @@ function unmarkScanned(input){
 }
 /* Store a scan photo with its record. Firebase -> Storage path on the row;
    local backend -> data URL on the row; Sheets backend -> skipped. */
-function uploadScanPhoto(kind, blob){
+function uploadScanPhoto(kind, blob, ext){
   if(!blob || storeKind() !== 'firebase' || !firebaseConfigured()) return Promise.resolve(null);
   return firebaseReady().then(function(r){
     return firebaseStorage().then(function(storage){
       var dir = kind === 'bill' ? 'bill-scans' : 'receipt-scans';
       var path = 'users/' + r.uid + '/' + dir + '/' + Date.now() + '-' +
-        Math.random().toString(36).slice(2, 8) + '.jpg';
+        Math.random().toString(36).slice(2, 8) + (ext || '.jpg');
       return storage.ref(path).put(blob).then(function(){ return path; });
     });
   }).catch(function(e){ console.warn('scan upload failed:', e); return null; });
@@ -9432,20 +9510,23 @@ function openBillForm(b){
   var isEdit = !!b;
   openSheet(function(sh, close){
     sh.appendChild(el('h2',null,isEdit?'Edit bill':'Add bill'));
-    /* Bill scanner: photo -> on-device OCR -> pre-fill name/amount/due date. */
-    var scanPhoto = null; // {blob, dataUrl} from the most recent scan
+    /* Bill scanner: photo/PDF -> on-device OCR -> pre-fill name/amount/due date. */
+    var scanPhoto = null; // {blob, dataUrl, pdfBlob} from the most recent scan
     var scanBox = el('div');
     function renderScanBox(){
       scanBox.innerHTML = '';
       if(scanPhoto){
         var row = el('div',{class:'scanattach'});
-        var im = el('img',{src:scanPhoto.dataUrl, alt:'Scanned bill'});
-        im.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        /* PDF uploads: the thumbnail is the rendered first page, but View opens
+           the original PDF. */
+        var viewUrl = scanPhoto.pdfBlob ? URL.createObjectURL(scanPhoto.pdfBlob) : scanPhoto.dataUrl;
+        var im = el('img',{src:scanPhoto.dataUrl, alt: scanPhoto.pdfBlob ? 'First page of bill PDF' : 'Scanned bill'});
+        im.addEventListener('click', function(){ window.open(viewUrl, '_blank'); });
         row.appendChild(im);
         var vw = el('button',{class:'linkbtn', type:'button'},'View');
-        vw.addEventListener('click', function(){ window.open(scanPhoto.dataUrl, '_blank'); });
+        vw.addEventListener('click', function(){ window.open(viewUrl, '_blank'); });
         row.appendChild(vw);
-        var rt = el('button',{class:'linkbtn', type:'button'},'Retake');
+        var rt = el('button',{class:'linkbtn', type:'button'}, scanPhoto.pdfBlob ? 'Re-upload' : 'Retake');
         rt.addEventListener('click', startBillScan);
         row.appendChild(rt);
         scanBox.appendChild(row);
@@ -9471,7 +9552,7 @@ function openBillForm(b){
     }
     function startBillScan(){
       openScanSheet('bill', function(res){
-        scanPhoto = {blob:res.blob, dataUrl:res.dataUrl};
+        scanPhoto = {blob:res.blob, dataUrl:res.dataUrl, pdfBlob:res.pdfBlob||null};
         // A fresh scan replaces the previous scan: roll back what the last scan
         // set first, so fields the new scan didn't find don't keep stale values
         // (manually typed or previously saved values are restored, not cleared).
@@ -9553,7 +9634,9 @@ function openBillForm(b){
       if(scanPhoto){
         if(storeKind()==='firebase' && firebaseConfigured()){
           saveBtn.disabled = true;
-          var sp = await uploadScanPhoto('bill', scanPhoto.blob);
+          /* A PDF upload keeps the original PDF; a photo keeps the JPEG. */
+          var sp = await uploadScanPhoto('bill', scanPhoto.pdfBlob || scanPhoto.blob,
+            scanPhoto.pdfBlob ? '.pdf' : '.jpg');
           saveBtn.disabled = false;
           if(sp) row.scanPath = sp;
           else toast('Scan photo could not be saved; the bill was saved without it.');
