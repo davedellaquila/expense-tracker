@@ -564,13 +564,14 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
   /* budget planner rows: two-line layout on phones so category names are
-     fully readable — line 1: ✓ + name + padlock; line 2: YTD avg + amount
-     + remove; line 3: the adjust slider (already full-width).
+     fully readable — line 1: ✓ + name + padlock; line 2: labeled
+     YTD avg + Actual group, amount, remove; line 3: the adjust slider
+     (already full-width).
      (grid is inline in JS, so !important overrides it here.) */
   .bot-row, .bot-head{grid-template-columns:40px minmax(0,1fr) 84px 40px !important; gap:8px 6px !important;}
   .bot-row > :nth-child(1), .bot-head > :nth-child(1){grid-column:1; grid-row:1;}
   .bot-row > :nth-child(2), .bot-head > :nth-child(2){grid-column:2/-1; grid-row:1;}
-  .bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2; text-align:left !important;}
+  .bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2;}
   .bot-row > :nth-child(4), .bot-head > :nth-child(4){grid-column:3; grid-row:2;}
   .bot-row > :nth-child(5), .bot-head > :nth-child(5){grid-column:4; grid-row:2;}
   .bot-row .lockbtn{min-height:44px; min-width:40px;}
@@ -7726,6 +7727,13 @@ function botFixedSet(prefix, ym, cat, fixed){
 }
 /* Paint a planner row's enabled/disabled state: enabled rows get a full
    accent fill; disabled (suggestion) rows stay dimmed. */
+/* Labeled mini-stat for planner rows (YTD avg / Actual grouped together). */
+function botStat(label, value, extra){
+  var w = el('div',{style:'min-width:0'});
+  w.appendChild(el('div',{class:'muted',style:'font-size:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap'},label));
+  w.appendChild(el('div',{style:'font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(extra?';'+extra:'')},value));
+  return w;
+}
 function botPaintRowState(r, line, check, fill){
   if(r.locked){
     line.style.background = fill || 'var(--accent-soft)';
@@ -7978,10 +7986,10 @@ function botRenderTable(){
   $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
   botUpdateHint();
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+    head.appendChild(el('span',null,'YTD avg · Actual'));
     head.appendChild(el('span',null,'Budget'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -7990,7 +7998,7 @@ function botRenderTable(){
   }
   rows.forEach(function(r){
     var isInc = ((botBudget.ytdIncSums||{})[r.category]||0) > ((botBudget.ytdSums||{})[r.category]||0);
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -8018,7 +8026,13 @@ function botRenderTable(){
     nm.appendChild(lockBtn);
     line.appendChild(nm);
     var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
-    line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
+    /* YTD average + selected-month actual, grouped with labels for planning. */
+    var actual = (botBudget.monthSums||{})[r.category]||0;
+    var over = num(r.amount)>0 && actual>num(r.amount);
+    var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
+    stats.appendChild(botStat('YTD avg', money(Math.round(ytd)), ''));
+    stats.appendChild(botStat('Actual', money(Math.round(actual)), over?'color:var(--danger);font-weight:700':''));
+    line.appendChild(stats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
@@ -8031,11 +8045,6 @@ function botRenderTable(){
       botRenderTotal();
     });
     amtCell.appendChild(inp);
-    /* Selected-month actual, next to the editable amount, for planning. */
-    var actual = (botBudget.monthSums||{})[r.category]||0;
-    var over = num(r.amount)>0 && actual>num(r.amount);
-    amtCell.appendChild(el('div',{class:'muted',style:'font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(over?';color:var(--danger);font-weight:700':'')},
-      'actual '+money(Math.round(actual))));
     line.appendChild(amtCell);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
@@ -8335,10 +8344,10 @@ function incBotRenderTable(){
   ibotUpdateHint();
   var months = incBotBudget.months||1;
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+    head.appendChild(el('span',null,'YTD avg · Actual'));
     head.appendChild(el('span',null,'Target'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -8346,7 +8355,7 @@ function incBotRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No income targets yet — add categories below or tap Recalculate.'));
   }
   rows.forEach(function(r){
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -8373,7 +8382,13 @@ function incBotRenderTable(){
     });
     nm.appendChild(lockBtn);
     line.appendChild(nm);
-    line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
+    /* YTD average + selected-month actual, grouped with labels for planning. */
+    var iactual = (incBotBudget.mSums||{})[r.category]||0;
+    var imet = num(r.amount)>0 && iactual>=num(r.amount);
+    var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
+    istats.appendChild(botStat('YTD avg', money(Math.round((r.ytd||0)/months))+'/mo', ''));
+    istats.appendChild(botStat('Actual', money(Math.round(iactual)), imet?'color:var(--accent);font-weight:700':''));
+    line.appendChild(istats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
@@ -8386,11 +8401,6 @@ function incBotRenderTable(){
       incBotRenderTotal();
     });
     amtCell.appendChild(inp);
-    /* Selected-month actual, next to the editable target, for planning. */
-    var actual = (incBotBudget.mSums||{})[r.category]||0;
-    var met = num(r.amount)>0 && actual>=num(r.amount);
-    amtCell.appendChild(el('div',{class:'muted',style:'font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(met?';color:var(--accent);font-weight:700':'')},
-      'actual '+money(Math.round(actual))));
     line.appendChild(amtCell);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
