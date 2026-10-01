@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Planner rows: "This month" and "Last month" swapped
+- "This month" now sits under the category name (keeping its red/green
+  over-budget/target-met coloring); "Last month" moved into the grouped
+  stats beside YTD avg, in both the expense and income planners.
+
 ### Planner rows: stacked layout everywhere + "This month" label
 - The two-line planner row layout (name + padlock on line 1, labeled
   YTD avg + This month stats with amount on line 2) is now the base
