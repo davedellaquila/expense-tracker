@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Sticky header shows remaining budget
+- The totals pill under the month picker now ends with the unbudgeted
+  remainder (income minus proposed budget), e.g. "$4,500 remaining" in
+  green — or "$1,000 over" in red when the budget exceeds income — so it's
+  clear at a glance how much is left to allocate to new categories.
+
 ### Bills-due line updates on month change
 - The "Bills due" line at the top of the Budget planner was stuck showing the
   previous month's bills until a row was edited — it now re-renders for the

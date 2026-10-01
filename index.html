@@ -7704,6 +7704,10 @@ function paintBudgetTotals(){
     var pct = bT/iT*100;
     box.appendChild(document.createTextNode(' · '));
     box.appendChild(el('b',{class: pct>100?'neg':'pos'}, Math.round(pct)+'%'));
+    var rem = iT - bT;
+    box.appendChild(document.createTextNode(' · '));
+    if(rem<0) box.appendChild(el('b',{class:'neg'}, money0(-rem)+' over'));
+    else box.appendChild(el('b',{class:'pos'}, money0(rem)+' remaining'));
   }
 }
 /* Copy a month's budget (category budgets + income targets) into the month
