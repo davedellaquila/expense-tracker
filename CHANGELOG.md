@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Bills-due line updates on month change
+- The "Bills due" line at the top of the Budget planner was stuck showing the
+  previous month's bills until a row was edited — it now re-renders for the
+  newly selected month immediately.
+
 ### Bills-due line moves to the top of the Budget planner
 - The "Bills due" cash-flow line now sits at the top of the Budget planner's
   scrolling list instead of pinned at the card bottom — it scrolls away with

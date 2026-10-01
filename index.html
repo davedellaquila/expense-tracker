@@ -8118,6 +8118,7 @@ function botLoadBudget(ym){
   botRenderTable();
   botRenderGoalInputs();
   $('bot-goal').hidden = false;
+  botRenderTotal(); /* refresh the header totals + the bills-due line for the new month */
 }
 /* Recalculate: fresh year-to-date amounts for every row, checks preserved,
    fixed amounts untouched, removed categories stay out. Writes straight
