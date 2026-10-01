@@ -9263,6 +9263,8 @@ function renderBillCalendar(){
 
 function billRow(b, showDate, maxAmt, dueMin, dueMax){
   var tile = el('div',{class:'bill-tile'});
+  tile.style.cursor = 'pointer';
+  tile.addEventListener('click', function(){ openBillForm(b); });
   var hue = billUrgencyHue(b, dueMin, dueMax); // 0=red (due soonest) … 120=green (latest)
   // Fill: width = amount relative to the priciest bill; color = urgency.
   if(maxAmt > 0){
@@ -9278,8 +9280,6 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
   // Line 1: name | due date (aligned column) | amount
   var l1 = el('div',{class:'bill-line1'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
-  nm.style.cursor = 'pointer';
-  nm.addEventListener('click', function(){ openBillForm(b); });
   l1.appendChild(nm);
   l1.appendChild(el('div',{class: showDate ? 'bdue' : 'bdue-sp'}, showDate ? 'due '+fmtBillDate(b.dueDate) : ''));
   l1.appendChild(el('div',{class:'amt'},money(num(b.amount))));
@@ -9307,14 +9307,11 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
     l2.appendChild(dl);
   }
   var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
-  paidBtn.addEventListener('click', function(){ openBillPaidSheet(b); });
+  paidBtn.addEventListener('click', function(e){ e.stopPropagation(); openBillPaidSheet(b); });
   l2.appendChild(paidBtn);
-  var editBtn = el('button',{class:'btn small ghost',type:'button'},'Edit');
-  editBtn.addEventListener('click', function(){ openBillForm(b); });
-  l2.appendChild(editBtn);
   var delBtn = el('button',{class:'btn small ghost',type:'button',title:'Delete bill','aria-label':'Delete '+(b.name||'bill')},'✕');
   delBtn.style.color = 'var(--danger)';
-  delBtn.addEventListener('click', function(){ deleteBill(b); });
+  delBtn.addEventListener('click', function(e){ e.stopPropagation(); deleteBill(b); });
   l2.appendChild(delBtn);
   main.appendChild(l2);
   tile.appendChild(main);
