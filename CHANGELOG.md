@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- The 🔔 bill-reminder badge now sits right before the amount in the transaction list, and tapping it opens the linked bill reminder.
+- Each tab now reopens at its previous scroll position after a page refresh (positions are saved per tab, throttled while scrolling, on tab switch, and on refresh/close).
 - Transactions with a bill reminder set now show a 🔔 badge in the list (bills created via "Add bill reminder" link back to their source transaction; deleting the bill clears the badge).
 - Transactions page now remembers all filter criteria across reload: the Account (Personal/Business) and Tax category filters are persisted alongside category/type/bank and the period. Search text and the drill pill stay transient by design.
 - Transaction detail (edit mode) now has an Add bill reminder button next to Split: it opens the bill form pre-filled from the transaction (name, amount, date as due date, category, Personal/Business), stacked above so unsaved edits are kept; frequency is left for the user to pick before saving.
@@ -611,7 +613,7 @@ documentation. Newest first.
 
 ### Feature list
 - New ideas: Track merchant details, Export transactions to CSV,
-  better app name, user documentation.
+  better app name, user documentation, Test CSV import.
 
 ### Scanners
 - Re-scanning a bill or receipt rolls back what the previous scan set instead
