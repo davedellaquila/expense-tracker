@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Tap "This month" to fill the budget amount
+- Tapping the "This month $X" line on a budget/income planner row copies
+  that actual into the category's amount field (same behavior as the
+  YTD avg / Prev month taps: enables the row and saves).
+
 ### Cancel is always on the left
 - Every sheet with a Cancel + action button pair now puts Cancel first:
   copy-budget, bill form, delete-bill confirm, and the import-log account

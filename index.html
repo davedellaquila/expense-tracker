@@ -8254,7 +8254,10 @@ function botRenderTable(){
     nmText.appendChild(bName);
     var actual = (botBudget.monthSums||{})[r.category]||0;
     var over = num(r.amount)>0 && actual>num(r.amount);
-    nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(over?';color:var(--danger);font-weight:700':'')},'This month '+money(Math.round(actual))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
+    var thisMo = el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer'+(over?';color:var(--danger);font-weight:700':'')},'This month '+money(Math.round(actual))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):''));
+    thisMo.title = 'Tap to use this amount';
+    thisMo.addEventListener('click', function(){ botTapStat(r, inp, sld, line, check, ym, actual, false); });
+    nmText.appendChild(thisMo);
     nm.appendChild(el('span',{class:'bot-grip',title:'Drag to reorder'},'⋮⋮'));
     nm.appendChild(nmText);
     var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
@@ -8642,7 +8645,10 @@ function incBotRenderTable(){
     nmText.appendChild(ibName);
     var iactual = (incBotBudget.mSums||{})[r.category]||0;
     var imet = num(r.amount)>0 && iactual>=num(r.amount);
-    nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(imet?';color:var(--accent);font-weight:700':'')},'This month '+money(Math.round(iactual))));
+    var ithisMo = el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer'+(imet?';color:var(--accent);font-weight:700':'')},'This month '+money(Math.round(iactual)));
+    ithisMo.title = 'Tap to use this amount';
+    ithisMo.addEventListener('click', function(){ botTapStat(r, inp, null, line, check, ym, iactual, true); });
+    nmText.appendChild(ithisMo);
     nm.appendChild(el('span',{class:'bot-grip',title:'Drag to reorder'},'⋮⋮'));
     nm.appendChild(nmText);
     var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
