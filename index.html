@@ -2383,10 +2383,26 @@ function lastScreen(){
   }catch(e){ return null; }
 }
 var scrollPosByScreen = {}; // tab name -> remembered window.scrollY
+/* Persist each tab's scroll position so a refresh restores it. Saved on tab
+   switch, throttled while scrolling, and on pagehide (refresh/close). */
+var SCROLL_POS_KEY = 'expenseTracker.scrollPos';
+function saveScrollPos(){
+  try{ localStorage.setItem(SCROLL_POS_KEY, JSON.stringify(scrollPosByScreen)); }catch(e){}
+}
+function loadScrollPos(){
+  try{
+    var p = JSON.parse(localStorage.getItem(SCROLL_POS_KEY)||'null');
+    if(p && typeof p==='object'){
+      Object.keys(p).forEach(function(k){
+        if(SCREENS.indexOf(k)>=0 && typeof p[k]==='number' && isFinite(p[k]) && p[k]>=0) scrollPosByScreen[k] = Math.round(p[k]);
+      });
+    }
+  }catch(e){}
+}
 function showScreen(name){
   var same = (state.screen === name);
   // remember each tab's vertical scroll; restore it when coming back
-  if(state.screen && !same){ scrollPosByScreen[state.screen] = window.scrollY; }
+  if(state.screen && !same){ scrollPosByScreen[state.screen] = window.scrollY; saveScrollPos(); }
   state.screen = name;
   if(screenPersistOk && SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
   SCREENS.forEach(function(s){
@@ -2416,6 +2432,19 @@ document.addEventListener('DOMContentLoaded', function(){
   });
   wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
   applyTheme();
+  /* Keep each tab's scroll position across reloads: remember it while
+     scrolling (throttled) and make sure it's saved on refresh/close. */
+  var scrollSaveT = null;
+  window.addEventListener('scroll', function(){
+    if(!state.screen) return;
+    scrollPosByScreen[state.screen] = window.scrollY;
+    if(scrollSaveT) return;
+    scrollSaveT = setTimeout(function(){ scrollSaveT = null; saveScrollPos(); }, 800);
+  }, {passive:true});
+  window.addEventListener('pagehide', function(){
+    if(state.screen) scrollPosByScreen[state.screen] = window.scrollY;
+    saveScrollPos();
+  });
   boot();
 });
 /* Keyboard shortcuts: number keys 1-8 jump straight to tabs (browsers reserve
@@ -2562,16 +2591,20 @@ async function enterApp(){
   if(!restoreBudFilters() && !$('bud-month').value) $('bud-month').value = monthLocal();
   if(!$('tax-year').value) $('tax-year').value = String(new Date().getFullYear());
   var targetScreen = lastScreen()||'dashboard';
+  loadScrollPos(); // each tab reopens where it was scrolled
   showScreen(targetScreen); // show the saved tab first — no dashboard flash on refresh
   var instant = loadDashCache(); // fill state from cache if available
   try{
     await loadAll();
     showScreen(targetScreen);
+    // same-tab re-show skips the scroll restore above; content is final now
+    window.scrollTo(0, scrollPosByScreen[targetScreen] || 0);
     maybeResumeBulkJob();
   }catch(err){
     if(instant){
       toast('Could not refresh data — showing your last saved view.', true);
       showScreen(targetScreen);
+      window.scrollTo(0, scrollPosByScreen[targetScreen] || 0);
     }else{
       toast('Could not load data: '+err.message, true);
       showScreen('settings');
