@@ -5,6 +5,17 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget sticky bar: centered month picker, bigger prev/next
+- The month stepper (‹ September 2026 ›) is now centered in the sticky
+  bar, and the prev/next buttons are bigger tap targets.
+
+### Footer tab bar pinned; planner rows show full category names (phones)
+- The footer tab bar gets its own compositing layer so iOS Safari keeps
+  it glued to the bottom of the viewport.
+- On phones, planner rows are now two lines: ✓ + full category name +
+  padlock on the first line, YTD avg + amount + remove on the second,
+  slider below. Category names are no longer truncated to a letter or two.
+
 ### Budget page: locks, enabled fill, selected-month actuals
 - Each planner row now has a padlock button next to the category name.
   Locking fixes the amount: the amount field can't be edited and the
