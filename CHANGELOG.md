@@ -5,6 +5,25 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: planners replace the budget/target cards
+- The separate Category budgets and Income targets cards are gone. The
+  **Budget planner** and **Income planner** are now the only budget editors.
+- Opening a month prefills each planner with that month's saved values
+  (checked); **Recalculate** drafts a fresh year-to-date-based proposal
+  while keeping checked states, so it never silently wipes the budget.
+- Save semantics: checked rows save their amounts, unchecked rows save as
+  $0, and categories removed from a planner (✕) revert to $0 — removed
+  rows stay hidden for the month and the Add menu lists only categories
+  not currently shown, so it's the way to bring one back.
+- Each planner has its own **Copy from…** (budgets and income targets copy
+  independently).
+- Row reference lines now show last month's actual (no more 3-month
+  average) next to the YTD monthly-average column, plus a slim
+  actual-vs-draft bar for the selected month.
+- The sticky totals pill now reflects saved totals for the selected month.
+
+## 2026-09-30
+
 ### Budget page: expenses and income side by side on large desktop
 - Category budgets and Income targets cards now sit side by side on
   desktop (1200px and up); stacked everywhere else.

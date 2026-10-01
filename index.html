@@ -138,8 +138,6 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* Pin the Propose buttons to the bottom so both bot cards line up */
 .bot-actions{margin-top:auto; padding-top:12px;}
 @media (max-width:560px){ .duo-grid{grid-template-columns:1fr;} }
-/* Large desktop: budget + income source-of-truth cards side by side */
-@media (min-width:1200px){ .bud-duo{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;} }
 .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center;}
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 .stat .value{font-size:21px; font-weight:800; margin:4px 0 2px; letter-spacing:-.3px;}
@@ -220,29 +218,6 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .save-state.err{color:var(--danger);}
 /* Budget/income category rows: distinct panels so categories are easy to
    tell apart (replaces the thin divider line inside these two lists). */
-#budget-list .barrow, #income-list .barrow{
-  background:color-mix(in srgb, var(--card) 55%, var(--bg));
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:12px 14px;
-  margin:0 0 10px;
-}
-#budget-list .barrow + .barrow, #income-list .barrow + .barrow{
-  border-top:none;
-  margin-top:0;
-  padding-top:12px;
-}
-/* Expense vs income category panels: red tint for expense budgets,
-   green tint for income targets. */
-#budget-list .barrow{
-  border-color:color-mix(in srgb, var(--danger) 55%, var(--border));
-  background:color-mix(in srgb, var(--danger) 12%, var(--card));
-}
-#income-list .barrow{
-  border-color:color-mix(in srgb, var(--accent) 55%, var(--border));
-  background:color-mix(in srgb, var(--accent) 12%, var(--card));
-}
-
 /* ---------- lists ---------- */
 .txn{position:relative; display:flex; align-items:center; gap:10px; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--border); border-radius:12px;
@@ -1036,16 +1011,16 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         </div>
         <div id="bud-live-totals" class="bud-totals" hidden></div>
       </div>
-      <div class="card">
-        <p class="muted" style="margin-top:0">Set a monthly spending limit per category. Progress shows what you've spent so far.</p>
-      </div>
       <div class="duo-grid">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <h2 style="margin:0">Budget Bot</h2>
-          <button class="btn" id="bot-propose" type="button" style="width:auto">Propose my budget</button>
+          <h2 style="margin:0">Budget planner</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn small ghost" id="bot-copy" type="button">Copy from…</button>
+            <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
+          </div>
         </div>
-        <p class="muted">Studies your spending so far this year and drafts a monthly budget. Edit any number, check the categories you don't want the bot to touch, then set a financial goal and let the bot suggest the trims.</p>
+        <p class="muted">Plans your monthly budget. Prefilled with your saved budget when you have one — edit any amount, check the categories to keep, set a savings goal for trim suggestions, then save.</p>
         <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
@@ -1071,10 +1046,13 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <h2 style="margin:0">Income Bot</h2>
-          <button class="btn" id="ibot-propose" type="button" style="width:auto">Propose my income</button>
+          <h2 style="margin:0">Income planner</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn small ghost" id="ibot-copy" type="button">Copy from…</button>
+            <button class="btn small" id="ibot-propose" type="button" style="width:auto" title="Recalculate from year-to-date income">Recalculate</button>
+          </div>
         </div>
-        <p class="muted">Studies your income so far this year and drafts monthly targets. Edit any number, lock categories you don't want touched, then save them as the month's income targets.</p>
+        <p class="muted">Plans your monthly income targets. Prefilled with your saved targets when you have them — edit any amount, check the categories to keep, then save.</p>
         <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
@@ -1084,16 +1062,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="btn" id="ibot-save" type="button">Save as <span id="ibot-save-month"></span> income targets</button>
         </div>
       </div>
-      </div>
-      <div class="bud-duo">
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h2 style="margin:0">Category budgets</h2>
-          <button class="btn small ghost" id="bud-copy" type="button">Copy from…</button>
-        </div>
-        <div id="budget-list"></div>
-      </div>
-      <div class="card"><h2>Income targets</h2><p class="muted">Set a monthly income target per category. Progress shows what you've received so far.</p><div id="income-list"></div></div>
       </div>
     </section>
 
@@ -7518,78 +7486,28 @@ function wireBudgets(){
   $('bot-disable-all').addEventListener('click', function(){ botSetAllLocked(false); });
   $('ibot-enable-all').addEventListener('click', function(){ incBotSetAllLocked(true); });
   $('ibot-disable-all').addEventListener('click', function(){ incBotSetAllLocked(false); });
-  $('bud-copy').addEventListener('click', openBudgetCopySheet);
+  $('bot-copy').addEventListener('click', function(){ openBudgetCopySheet('exp'); });
+  $('ibot-copy').addEventListener('click', function(){ openBudgetCopySheet('inc'); });
 }
 /* Income targets live in the same Budgets store as spending budgets, namespaced
    with this prefix so no backend changes are needed on any of the three stores. */
 var INC_BUDGET_PREFIX = 'income:';
+/* Saved budgets/targets for a month as {category: amount}, expense or income
+   side. Used to prefill the planners and to keep recalculated drafts complete. */
+function savedBudgetsFor(ym, isInc){
+  var map = {};
+  state.budgets.forEach(function(b){
+    if(String(b.month)!==ym) return;
+    var k = String(b.category||''), a = num(b.amount);
+    if(!(a>0)) return;
+    var inc = k.indexOf(INC_BUDGET_PREFIX)===0;
+    if(inc!==isInc) return;
+    map[isInc ? k.slice(INC_BUDGET_PREFIX.length) : k] = a;
+  });
+  return map;
+}
 /* Slider scale for a budget/target row: headroom past the current amount or
    what's been spent/received, on a round number. */
-function budSliderScale(base){
-  var m = Math.max(num(base)*1.5, 200);
-  var nice = m<=500 ? 50 : m<=2000 ? 100 : 500;
-  var max = Math.ceil(m/nice)*nice;
-  return {max:max, step: max<=500 ? 5 : max<=2000 ? 10 : 25};
-}
-/* Budget/target control: a drag slider synced with a compact number input,
-   plus Save. o = {label, placeholder, value, base, aria, onSave(inp, sv)}. */
-/* Budget/target amount control: slider + compact number input with auto-save.
-   o.save(v) persists the value (may return a promise); it fires debounced
-   after edits and immediately when the slider is released or the number
-   field is committed. The Save button is gone — a small status note shows
-   Saving… / Saved ✓ instead. o.onInput(v) still fires on every tick for
-   live previews. */
-function budControl(o){
-  var ctl = el('div',{class:'bud-ctl'});
-  ctl.appendChild(el('span',{class:'blab'},o.label));
-  var sc = budSliderScale(o.base);
-  var startVal = Math.max(0, Math.min(num(o.value), sc.max));
-  var slider = el('input',{type:'range',min:'0',max:String(sc.max),step:String(sc.step),
-    value:String(startVal),'aria-label':o.aria});
-  var inp = el('input',{type:'number',class:'amt',min:'0',step:'1',
-    placeholder:o.placeholder, inputmode:'decimal'});
-  if(o.value>0) inp.value = o.value;
-  var st = el('span',{class:'save-state','aria-live':'polite'});
-  st.style.flex='none';
-  var timer = null, pending = null;
-  function setState(s){
-    st.textContent = s==='saving' ? 'Saving…' : s==='saved' ? 'Saved ✓' : s==='error' ? 'Save failed' : '';
-    st.className = 'save-state' + (s==='error' ? ' err' : s==='saved' ? ' ok' : '');
-    if(s==='saved') setTimeout(function(){
-      if(st.textContent==='Saved ✓'){ st.textContent=''; st.className='save-state'; }
-    }, 2000);
-  }
-  async function doSave(v){
-    if(!o.save) return;
-    setState('saving');
-    try{
-      await withSaveLock(function(){ return o.save(v); });
-      setState('saved');
-    }catch(err){ setState('error'); toast('Save failed: '+((err&&err.message)||err), true); }
-  }
-  function schedule(v){
-    pending = v;
-    clearTimeout(timer);
-    timer = setTimeout(function(){ timer=null; var p=pending; pending=null; doSave(p); }, 800);
-  }
-  function flush(){
-    if(timer){ clearTimeout(timer); timer=null; }
-    if(pending!==null){ var p=pending; pending=null; doSave(p); }
-  }
-  function push(v){
-    if(o.onInput) o.onInput(v);
-    if(o.save) schedule(v);
-  }
-  slider.addEventListener('input', function(){ inp.value = slider.value; push(num(slider.value)); });
-  slider.addEventListener('change', flush);
-  inp.addEventListener('input', function(){
-    var v = num(inp.value);
-    if(v>=0 && v<=sc.max){ slider.value = v; push(v); }
-  });
-  inp.addEventListener('change', flush);
-  ctl.appendChild(slider); ctl.appendChild(inp); ctl.appendChild(st);
-  return ctl;
-}
 /* Keep the in-memory budget list in sync after an auto-save, so Reports and
    the bots see the new value without a full reload/re-render. */
 function upsertStateBudget(cat, ym, amount){
@@ -7600,19 +7518,20 @@ function upsertStateBudget(cat, ym, amount){
   if(found) found.amount = amount;
   else state.budgets.push({month:ym, category:cat, amount:amount});
 }
-/* Live budget/income drafts: mirrors the stored budgets/targets, updated on
-   every slider tick so the sticky totals pill and the row bars reflect
-   unsaved edits in real time. Rebuilt from storage on each render. */
-var liveDrafts = {bud:{}, inc:{}};
-function sumDrafts(d){
-  return Object.keys(d).reduce(function(s,k){ return s+num(d[k]); }, 0);
-}
-/* Sticky totals pill next to the month picker: live budget total vs income
-   total, with the budget-as-percent-of-income figure. */
+/* Sticky totals pill next to the month picker: saved budget total vs saved
+   income-target total for the selected month, with the budget as a percent
+   of income (red when over 100%). */
 function paintBudgetTotals(){
   var box = document.getElementById('bud-live-totals');
   if(!box) return;
-  var bT = sumDrafts(liveDrafts.bud), iT = sumDrafts(liveDrafts.inc);
+  var ym = ($('bud-month') && $('bud-month').value) || monthLocal();
+  var bT = 0, iT = 0;
+  state.budgets.forEach(function(b){
+    if(String(b.month)!==ym) return;
+    var a = num(b.amount);
+    if(!(a>0)) return;
+    if(String(b.category||'').indexOf(INC_BUDGET_PREFIX)===0) iT += a; else bT += a;
+  });
   if(!(bT>0) && !(iT>0)){ box.hidden = true; return; }
   box.hidden = false;
   box.innerHTML = '';
@@ -7626,87 +7545,19 @@ function paintBudgetTotals(){
     box.appendChild(el('b',{class: pct>100?'neg':'pos'}, Math.round(pct)+'% of income'));
   }
 }
-function renderIncomeTargets(ym){
-  var list = $('income-list'); list.innerHTML='';
-  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
-  var incSet = {};
-  state.transactions.forEach(function(t){
-    if(t.txn_type!=='income' || !t.category) return;
-    if(!t.date || t.date<y0 || t.date>=yEnd) return;
-    incSet[t.category] = true;
-  });
-  var tmap = {};
-  state.budgets.forEach(function(b){
-    if(String(b.month)!==ym) return;
-    var k = String(b.category||'');
-    if(k.indexOf(INC_BUDGET_PREFIX)===0) tmap[k.slice(INC_BUDGET_PREFIX.length)] = num(b.amount);
-  });
-  Object.keys(tmap).forEach(function(c){ incSet[c] = true; });
-  var cats = Object.keys(incSet).sort();
-  if(!cats.length){ emptyInto(list,'💰','No income recorded this year — targets will appear here once there is some.'); return; }
-  liveDrafts.inc = {};
-  Object.keys(tmap).forEach(function(c){ liveDrafts.inc[c] = num(tmap[c]); });
-  var mrows = txnsForMonth(ym);
-  var rowRefs = [];
-  function paintIncomeRows(){
-    var total = sumDrafts(liveDrafts.inc);
-    rowRefs.forEach(function(r){
-      var tgt = num(liveDrafts.inc[r.c]);
-      r.lbl.textContent = money(r.got)+(tgt>0?' of '+money(tgt):'');
-      r.lbl.className = (tgt>0 && r.got>=tgt) ? 'pos' : '';
-      var show = tgt>0;
-      r.barlab1.style.display = show?'':'none';
-      r.bar.style.display = show?'':'none';
-      r.barlab2.style.display = show?'':'none';
-      r.sh.style.display = show?'':'none';
-      if(show){
-        r.fill.style.width = Math.min(100, r.got/tgt*100)+'%';
-        var share = total>0 ? tgt/total : 0;
-        r.barlab2.textContent = 'Share of total income target · '+Math.round(share*100)+'% of '+money(total);
-        r.sh.title = Math.round(share*100)+'% of total income target';
-        r.shf.style.width = Math.max(share*100, 1.5)+'%';
-      }
-    });
-    paintBudgetTotals();
-  }
-  cats.forEach(function(c){
-    if(!(c in liveDrafts.inc)) liveDrafts.inc[c] = 0;
-    var got = 0;
-    mrows.forEach(function(t){ if(t.txn_type==='income' && t.category===c) got += num(t.amount); });
-    var tgt = liveDrafts.inc[c];
-    var wrap = el('div',{class:'barrow'});
-    var top = el('div',{class:'top'});
-    var iListName = el('b',{class:'rep-click',title:'Show transactions'},c);
-    iListName.addEventListener('click', function(){ botDrillCategory(c, 'income'); });
-    top.appendChild(iListName);
-    var lbl = el('span'); top.appendChild(lbl); wrap.appendChild(top);
-    var barlab1 = el('div',{class:'barlab'},'Received vs monthly target'); wrap.appendChild(barlab1);
-    var bar = el('div',{class:'bar'}); var fill = el('div'); bar.appendChild(fill); wrap.appendChild(bar);
-    var barlab2 = el('div',{class:'barlab'}); wrap.appendChild(barlab2);
-    var sh = el('div',{class:'sharebar'}); var shf = el('div'); sh.appendChild(shf); wrap.appendChild(sh);
-    rowRefs.push({c:c, got:got, lbl:lbl, barlab1:barlab1, bar:bar, fill:fill, barlab2:barlab2, sh:sh, shf:shf});
-    wrap.appendChild(budControl({
-      label:'Target:', placeholder:'Monthly target', value:tgt, base:Math.max(tgt,got),
-      aria:'Monthly income target for '+c,
-      onInput:function(v){ liveDrafts.inc[c]=v; paintIncomeRows(); },
-      save:function(v){
-        var amt = Math.round(v*100)/100;
-        return getStore().setBudget(INC_BUDGET_PREFIX+c, ym, amt).then(function(){
-          upsertStateBudget(INC_BUDGET_PREFIX+c, ym, amt);
-        });
-      }
-    }));
-    list.appendChild(wrap);
-  });
-  paintIncomeRows();
-}
 /* Copy a month's budget (category budgets + income targets) into the month
    selected in the sticky bar. Source defaults to the previous month. */
-function openBudgetCopySheet(){
+/* Copy a month's saved budgets (mode 'exp') or income targets (mode 'inc')
+   into the month selected in the sticky bar. Source defaults to the
+   previous month. After copying, renderBudgets re-opens the matching
+   planner prefilled from the fresh saved values. */
+function openBudgetCopySheet(mode){
+  var isInc = mode==='inc';
   var targetYm = $('bud-month').value || monthLocal();
+  var noun = isInc ? 'income targets' : 'budgets';
   openSheet(function(sh, close){
-    sh.appendChild(el('h2',null,'Copy budget'));
-    sh.appendChild(el('p',{class:'muted'},'Copy category budgets and income targets into '+fmtMonthPretty(targetYm)+'.'));
+    sh.appendChild(el('h2',null,isInc?'Copy income targets':'Copy budget'));
+    sh.appendChild(el('p',{class:'muted'},'Copy '+noun+' into '+fmtMonthPretty(targetYm)+'.'));
     var inSrc = el('input',{type:'month',value:monthAdd(targetYm,-1),style:'width:100%'});
     sh.appendChild(el('label',{class:'f'},'From month'));
     sh.appendChild(inSrc);
@@ -7717,14 +7568,16 @@ function openBudgetCopySheet(){
       var src = inSrc.value;
       if(!src){ info.textContent = 'Pick a source month.'; go.disabled = true; return; }
       if(src===targetYm){ info.textContent = 'That is the month shown above — pick a different source month.'; go.disabled = true; return; }
-      var nb = 0, ni = 0;
+      var n = 0;
       state.budgets.forEach(function(b){
         if(String(b.month)!==src) return;
-        if(String(b.category||'').indexOf(INC_BUDGET_PREFIX)===0) ni++; else nb++;
+        var inc = String(b.category||'').indexOf(INC_BUDGET_PREFIX)===0;
+        if(inc===isInc) n++;
       });
-      if(nb+ni===0){ info.textContent = 'No budgets saved for '+fmtMonthPretty(src)+'.'; go.disabled = true; return; }
+      if(n===0){ info.textContent = 'No '+noun+' saved for '+fmtMonthPretty(src)+'.'; go.disabled = true; return; }
       go.disabled = false;
-      info.textContent = 'Copy '+nb+' categor'+(nb===1?'y':'ies')+' and '+ni+' income target'+(ni===1?'':'s')+
+      var unit = isInc ? (n===1?'income target':'income targets') : (n===1?'category':'categories');
+      info.textContent = 'Copy '+n+' '+unit+
         ' from '+fmtMonthPretty(src)+' to '+fmtMonthPretty(targetYm)+
         '. This replaces anything already set for '+fmtMonthPretty(targetYm)+'.';
     }
@@ -7733,13 +7586,16 @@ function openBudgetCopySheet(){
       if(!src || src===targetYm) return;
       go.disabled = true;
       try{
-        var rows = state.budgets.filter(function(b){ return String(b.month)===src; });
+        var rows = state.budgets.filter(function(b){
+          return String(b.month)===src &&
+            (String(b.category||'').indexOf(INC_BUDGET_PREFIX)===0)===isInc;
+        });
         for(var i=0;i<rows.length;i++){
           var amt = Math.round(num(rows[i].amount)*100)/100;
           await getStore().setBudget(rows[i].category, targetYm, amt);
           upsertStateBudget(rows[i].category, targetYm, amt);
         }
-        toast('Budget copied from '+fmtMonthPretty(src)+'.');
+        toast((isInc?'Income targets':'Budget')+' copied from '+fmtMonthPretty(src)+'.');
       }catch(e){ toast('Copy failed.', true); go.disabled = false; refreshInfo(); return; }
       close(); renderBudgets();
     });
@@ -7753,101 +7609,19 @@ function openBudgetCopySheet(){
     refreshInfo();
   });
 }
+/* Budgets screen: the two planners are the budget editors now. Each opens on
+   the month's saved values when they exist; Recalculate drafts a fresh
+   year-to-date-based proposal. */
 function renderBudgets(){
   var ym = $('bud-month').value || monthLocal();
-  renderIncomeTargets(ym);
-  var list = $('budget-list'); list.innerHTML='';
-  var rows = txnsForMonth(ym);
-  var cats = allCategories().filter(function(c){
-    // budgets are for spending; include all known categories
-    return true;
-  });
-  if(!cats.length){ emptyInto(list,'🎯','No categories yet. Add transactions or check your Categories tab.'); return; }
-  var bmap = {};
-  state.budgets.forEach(function(b){
-    if(String(b.month)!==ym) return;
-    var k = String(b.category||'');
-    if(k.indexOf(INC_BUDGET_PREFIX)!==0) bmap[k]=num(b.amount); // income targets are namespaced out
-  });
-  liveDrafts.bud = {};
-  Object.keys(bmap).forEach(function(c){ liveDrafts.bud[c] = num(bmap[c]); });
-  // Year-to-date per-category expense totals (same convention as the Budget
-  // Bot): Jan 1 of the budget year through the selected month, transfers out.
-  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
-  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdByCat = {};
-  var mShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][ytdMonths-1];
-  state.transactions.forEach(function(t){
-    if(!t.date || t.date<y0 || t.date>=yEnd) return;
-    if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
-    if(t.txn_type!=='expense') return;
-    var c = t.category || 'Uncategorized';
-    ytdByCat[c] = (ytdByCat[c]||0) + num(t.amount);
-  });
-  var browRefs = [];
-  function paintBudgetRows(){
-    var total = sumDrafts(liveDrafts.bud);
-    browRefs.forEach(function(r){
-      var amt = num(liveDrafts.bud[r.c]);
-      r.lbl.textContent = money(r.spent)+(amt>0?' of '+money(amt):'');
-      r.lbl.className = (amt>0 && r.spent>amt) ? 'neg' : '';
-      var show = amt>0;
-      r.barlab1.style.display = show?'':'none';
-      r.bar.style.display = show?'':'none';
-      r.barlab2.style.display = show?'':'none';
-      r.sh.style.display = show?'':'none';
-      if(show){
-        r.bar.className = 'bar'+(r.spent>amt?' over':'');
-        r.fill.style.width = Math.min(100, r.spent/amt*100)+'%';
-        var share = total>0 ? amt/total : 0;
-        r.barlab2.textContent = 'Share of total budget · '+Math.round(share*100)+'% of '+money(total);
-        r.sh.title = Math.round(share*100)+'% of total budget';
-        r.shf.style.width = Math.max(share*100, 1.5)+'%';
-      }
-    });
-    paintBudgetTotals();
-  }
-  cats.forEach(function(c){
-    if(!(c in liveDrafts.bud)) liveDrafts.bud[c] = 0;
-    var spent = 0;
-    rows.forEach(function(t){ if(t.txn_type==='expense' && t.category===c) spent += num(t.amount); });
-    var amt = liveDrafts.bud[c];
-    var wrap = el('div',{class:'barrow'});
-    var top = el('div',{class:'top'});
-    var bListName = el('b',{class:'rep-click',title:'Show transactions'},c);
-    bListName.addEventListener('click', function(){ botDrillCategory(c, 'expense'); });
-    top.appendChild(bListName);
-    var lbl = el('span'); top.appendChild(lbl); wrap.appendChild(top);
-    var ytd = ytdByCat[c]||0;
-    wrap.appendChild(el('div',{class:'muted',style:'font-size:12.5px;margin:2px 0 8px'},
-      'Jan–'+mShort+' YTD '+money0(ytd)+' · avg '+money0(ytd/ytdMonths)+'/mo'));
-    var barlab1 = el('div',{class:'barlab'},'Spent vs monthly budget'); wrap.appendChild(barlab1);
-    var bar = el('div',{class:'bar'}); var fill = el('div'); bar.appendChild(fill); wrap.appendChild(bar);
-    // relative size of this category's budget vs the whole month's budget
-    var barlab2 = el('div',{class:'barlab'}); wrap.appendChild(barlab2);
-    var sh = el('div',{class:'sharebar'}); var shf = el('div'); sh.appendChild(shf); wrap.appendChild(sh);
-    browRefs.push({c:c, spent:spent, lbl:lbl, barlab1:barlab1, bar:bar, fill:fill, barlab2:barlab2, sh:sh, shf:shf});
-    wrap.appendChild(budControl({
-      label:'Budget:', placeholder:'Monthly limit', value:amt, base:Math.max(amt,spent),
-      aria:'Monthly budget for '+c,
-      onInput:function(v){ liveDrafts.bud[c]=v; paintBudgetRows(); },
-      save:function(v){
-        var amt = Math.round(v*100)/100;
-        return getStore().setBudget(c, ym, amt).then(function(){
-          upsertStateBudget(c, ym, amt);
-        });
-      }
-    }));
-    list.appendChild(wrap);
-  });
-  paintBudgetRows();
-  restoreBotDraft(ym); // bring back the bot draft for this month, if one was saved
-  botRecalc(); // refresh calculated values from current transactions; keeps edits/locks
-  incBotRestore(ym); // same for the income bot
-  incBotRecalc();
+  paintBudgetTotals();
+  botEnsureProposal(ym);
+  incBotEnsureProposal(ym);
 }
 
-/* ================= budget bot ================= */
+/* ================= budget planner ================= */
 var botProposal = null; // {month, rows:[{category, avg, last, amount, locked}], avgIncome}
+var botBarRefs = []; // [{r, fill}] actual-vs-draft bars in the expense planner
 
 /* Draft persistence: the bot proposal (edited amounts, locks) survives a hard
    refresh. Stored per budget month in localStorage; switching months restores
@@ -7872,7 +7646,9 @@ function restoreBotDraft(ym){
     $('bot-goal').hidden = false;
     $('bot-save-row').hidden = false;
     $('bot-save-month').textContent = fmtMonthPretty(ym);
+    return true;
   }catch(e){}
+  return false;
 }
 
 /* Removed-category memory: categories deleted from a bot proposal stay deleted
@@ -7976,8 +7752,8 @@ function botCompute(ym){
   // divided by the calendar months elapsed. Transfers excluded throughout.
   // Income counts paychecks only (category or payroll-like text), so Daily Cash
   // and refunds don't inflate it.
-  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
-  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncSums = {}, ytdIncome = 0;
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01', mStart = ym+'-01';
+  var ytdMonths = parseInt(ym.slice(5,7),10)||1, ytdSums = {}, ytdIncSums = {}, ytdIncome = 0, monthSums = {};
   state.transactions.forEach(function(t){
     if(!t.date || t.date<y0 || t.date>=yEnd) return;
     if(repDisplayCat(t)==='Transfers' || t.txn_type==='transfer') return;
@@ -7989,6 +7765,7 @@ function botCompute(ym){
     }
     if(t.txn_type!=='expense') return;
     ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
+    if(t.date>=mStart) monthSums[c] = (monthSums[c]||0) + num(t.amount);
   });
   // Draft amounts come from the YTD monthly average (nice-rounded). The 3-month
   // average and last month stay on as reference only.
@@ -8017,7 +7794,7 @@ function botCompute(ym){
     }
   });
   rows.sort(function(a,b){ return b.amount-a.amount; });
-  return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths, billFloors:billFloors};
+  return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths, monthSums:monthSums, billFloors:billFloors};
 }
 /* Refresh a proposal's calculated values from current transactions, keeping the
    user's edits and locks: rows they typed (or accepted from a suggestion) keep
@@ -8051,20 +7828,76 @@ function botRecalc(){
   botProposal.ytdSums = fresh.ytdSums;
   botProposal.ytdIncSums = fresh.ytdIncSums;
   botProposal.ytdMonths = fresh.ytdMonths;
+  botProposal.monthSums = fresh.monthSums;
   botProposal.billFloors = fresh.billFloors;
   botRenderTable();
 }
+/* Recalculate: fresh year-to-date-based amounts over the union of YTD
+   categories and saved-budget categories (minus removed ones). Checked
+   states are preserved so a recalculation never silently wipes the budget. */
 function botPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = botCompute(ym);
-  botProposal = {v:2, month:ym, rows:botFilterRemoved(BOT_REMOVED_LS, ym, c.rows), avgIncome:c.avgIncome, ytdSums:c.ytdSums, ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, billFloors:c.billFloors};
+  var saved = savedBudgetsFor(ym, false);
+  var prevLocked = {};
+  if(botProposal && botProposal.month===ym){
+    botProposal.rows.forEach(function(r){ prevLocked[r.category] = !!r.locked; });
+  }
+  var byCat = {};
+  c.rows.forEach(function(r){ byCat[r.category] = true; });
+  var rows = c.rows.map(function(r){
+    return {category:r.category, avg:r.avg, last:r.last, amount:r.amount,
+      locked:!!prevLocked[r.category], touched:true, billFloored:!!r.billFloored};
+  });
+  Object.keys(saved).forEach(function(cat){
+    if(!byCat[cat]) rows.push({category:cat, avg:0, last:0, amount:saved[cat],
+      locked:!!prevLocked[cat], touched:true});
+  });
+  rows = botFilterRemoved(BOT_REMOVED_LS, ym, rows);
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  botProposal = {v:2, month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
+    ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums, billFloors:c.billFloors};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
   $('bot-goal').hidden = false;
   $('bot-save-row').hidden = false;
   $('bot-save-month').textContent = fmtMonthPretty(ym);
-  toast(c.rows.length ? 'Budget drafted from your year-to-date spending.' : 'No spending this year — nothing to base a budget on.');
+  toast('Budget recalculated from year-to-date spending.');
+}
+/* Planner open: bring back the in-progress draft if there is one; otherwise
+   prefill from the month's saved budgets; otherwise draft a fresh proposal. */
+function botEnsureProposal(ym){
+  if(botProposal && botProposal.month===ym){ botRecalc(); return; }
+  botProposal = null;
+  if(restoreBotDraft(ym)){ botRecalc(); return; }
+  if(botPrefillFromSaved(ym)){ botRecalc(); return; }
+  botPropose();
+}
+function botPrefillFromSaved(ym){
+  var saved = savedBudgetsFor(ym, false);
+  var cats = Object.keys(saved);
+  if(!cats.length) return false;
+  var c = botCompute(ym);
+  var removed = botRemovedGet(BOT_REMOVED_LS, ym);
+  var byCat = {};
+  c.rows.forEach(function(r){ byCat[r.category] = r; });
+  var rows = cats.filter(function(cat){ return removed.indexOf(cat)<0; }).map(function(cat){
+    var fr = byCat[cat];
+    return {category:cat, avg:fr?fr.avg:0, last:fr?fr.last:0, amount:saved[cat],
+      locked:true, touched:true, billFloored:fr?!!fr.billFloored:false};
+  });
+  if(!rows.length) return false;
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  botProposal = {v:2, month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
+    ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums, billFloors:c.billFloors};
+  $('bot-suggestions').innerHTML = '';
+  botRenderTable();
+  botRenderGoalInputs();
+  $('bot-goal').hidden = false;
+  $('bot-save-row').hidden = false;
+  $('bot-save-month').textContent = fmtMonthPretty(ym);
+  return true;
 }
 /* Budget page: tapping a category name opens the Transactions page filtered to
    that category for the budget month selected in the sticky bar. */
@@ -8104,37 +7937,38 @@ function incBotSetAllLocked(locked){
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
+  botBarRefs = [];
   if(!botProposal){ $('bot-bulk-row').style.display = 'none'; return; }
   var rows = botProposal.rows;
   $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  if(!rows.length){
-    host.appendChild(el('p',{class:'muted'},'No spending this year — nothing to base a budget on.'));
-    return;
+  if(rows.length){
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    head.appendChild(el('span'));
+    head.appendChild(el('span',null,'Category'));
+    head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+    head.appendChild(el('span',null,'Budget'));
+    head.appendChild(el('span'));
+    host.appendChild(head);
+  }else{
+    host.appendChild(el('p',{class:'muted'},'No budget rows yet — add categories below or tap Recalculate.'));
   }
-  var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
-  head.appendChild(el('span'));
-  head.appendChild(el('span',null,'Category'));
-  head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
-  head.appendChild(el('span',null,'Budget'));
-  head.appendChild(el('span'));
-  host.appendChild(head);
   rows.forEach(function(r){
     var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — bot may suggest trims':'Check — bot will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this budget',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
     line.appendChild(check);
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
     nm.appendChild(bName);
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'3-mo avg '+money(Math.round(r.avg))+' · last mo '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'Last month '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
     line.appendChild(nm);
     var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max)); botRenderTotal(); persistBotDraft(); });
+    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max)); botRenderTotal(); botPaintBars(); persistBotDraft(); });
     line.appendChild(inp);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
@@ -8157,9 +7991,15 @@ function botRenderTable(){
       r.amount = v; r.touched = true;
       inp.value = v;
       botEnableRow(r, line, check);
-      botRenderTotal(); persistBotDraft();
+      botRenderTotal(); botPaintBars(); persistBotDraft();
     });
     line.appendChild(sld);
+    /* Slim actual-vs-budget bar for the selected month. */
+    var bfill = el('div',{style:'height:100%;border-radius:99px;background:var(--accent);width:0%'});
+    var btrack = el('div',{style:'grid-column:1/-1;height:6px;border-radius:99px;background:var(--track);overflow:hidden;margin:0 0 8px'});
+    btrack.appendChild(bfill);
+    line.appendChild(btrack);
+    botBarRefs.push({r:r, fill:bfill});
     host.appendChild(line);
   });
   var have = {};
@@ -8179,23 +8019,38 @@ function botRenderTable(){
     addRow.appendChild(sel); addRow.appendChild(addBtn);
     host.appendChild(addRow);
   }
-  var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
-  tot.appendChild(el('span',null,'Proposed total'));
-  tot.appendChild(el('span',{id:'bot-total'},money(botProposalTotal())));
-  host.appendChild(tot);
-  var sub = el('div',{class:'muted',style:'display:flex;justify-content:space-between;margin-top:2px;font-size:12px'});
-  sub.appendChild(el('span',null,'Paycheck '+money(Math.round(botProposal.avgIncome||0))+'/mo'));
-  sub.appendChild(el('span',{id:'bot-pct'},botPctText()));
-  host.appendChild(sub);
-  if(botProposal.avgIncome > 0){
-    host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
-      'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
+  if(rows.length){
+    var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
+    tot.appendChild(el('span',null,'Planned total'));
+    tot.appendChild(el('span',{id:'bot-total'},money(botProposalTotal())));
+    host.appendChild(tot);
+    var sub = el('div',{class:'muted',style:'display:flex;justify-content:space-between;margin-top:2px;font-size:12px'});
+    sub.appendChild(el('span',null,'Paycheck '+money(Math.round(botProposal.avgIncome||0))+'/mo'));
+    sub.appendChild(el('span',{id:'bot-pct'},botPctText()));
+    host.appendChild(sub);
+    if(botProposal.avgIncome > 0){
+      host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
+        'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
+    }
   }
   var nRemoved = botRemovedGet(BOT_REMOVED_LS, botProposal.month).length;
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this proposal — re-add above to bring one back.'));
+  botPaintBars();
   persistBotDraft();
   updateFloatTotals();
+}
+/* Actual-vs-budget bars for the selected month: filled width = spent/budget,
+   red when spent exceeds the draft amount. */
+function botPaintBars(){
+  var sums = (botProposal && botProposal.monthSums) || {};
+  (botBarRefs||[]).forEach(function(o){
+    var actual = sums[o.r.category]||0, amt = num(o.r.amount);
+    var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
+    o.fill.style.width = pct+'%';
+    o.fill.style.background = (amt>0 && actual>amt) ? 'var(--danger)' : 'var(--accent)';
+    o.fill.title = money(Math.round(actual))+' spent of '+money(Math.round(amt))+' planned';
+  });
 }
 function botPctText(){
   if(!botProposal) return '';
@@ -8208,6 +8063,7 @@ function botRenderTotal(){
   if(t) t.textContent = money(botProposalTotal());
   var p = $('bot-pct');
   if(p) p.textContent = botPctText();
+  botPaintBars();
   renderBotBillsLine();
   updateFloatTotals();
 }
@@ -8322,21 +8178,32 @@ function botSuggest(){
     host.appendChild(el('p',{style:'font-weight:bold;margin:8px 0 0'},'These changes free '+money(saved)+'/mo.'));
   }
 }
+/* Save: checked rows write their amounts; unchecked rows save as $0.
+   Categories removed from the planner (or otherwise no longer listed)
+   revert to $0 so stale saved budgets can't linger. */
 async function botSave(){
   var ym = $('bud-month').value || monthLocal();
   var btn = $('bot-save'); btn.disabled = true;
   await withSaveLock(async function(){
   try{
-    var n = 0;
+    var inRows = {}, n = 0;
     for(var i=0;i<botProposal.rows.length;i++){
       var r = botProposal.rows[i];
-      if(r.amount>0){
-        await getStore().setBudget(r.category, ym, Math.round(r.amount*100)/100);
-        n++;
-      }
+      inRows[r.category] = true;
+      var amt = r.locked ? Math.round(num(r.amount)*100)/100 : 0;
+      await getStore().setBudget(r.category, ym, amt);
+      if(r.locked && amt>0) n++;
     }
+    var had = {};
+    state.budgets.forEach(function(b){
+      if(String(b.month)!==ym) return;
+      var k = String(b.category||'');
+      if(k.indexOf(INC_BUDGET_PREFIX)!==0 && num(b.amount)!==0) had[k] = true;
+    });
+    var stale = Object.keys(had).filter(function(k){ return !inRows[k]; });
+    for(var j=0;j<stale.length;j++) await getStore().setBudget(stale[j], ym, 0);
     await loadAll(); renderBudgets();
-    toast('Saved '+n+' category budgets for '+fmtMonthPretty(ym)+'.');
+    toast('Budget saved for '+fmtMonthPretty(ym)+': '+n+' categor'+(n===1?'y':'ies')+'.');
   }catch(err){ toast('Save failed: '+err.message, true); }
   });
   btn.disabled = false;
@@ -8352,27 +8219,31 @@ function botReset(){
   updateFloatTotals();
 }
 
-/* ================= income bot =================
-   Mirrors the Budget Bot for income: drafts monthly income targets from
+/* ================= income planner =================
+   Mirrors the Budget planner for income: drafts monthly income targets from
    year-to-date income, with editable amounts, locks, per-row delete, draft
    persistence per budget month, and save into namespaced income budgets. */
-var incBotProposal = null; // {v, month, rows:[{category, ytd, amount, locked, touched}], months}
+var incBotProposal = null; // {v, month, rows:[{category, ytd, lastMo, amount, locked, touched}], months, mSums}
+var ibotBarRefs = []; // [{r, fill}] received-vs-target bars in the income planner
 var INC_BOT_DRAFT_LS = 'expTrackerBotIncomeDraft:';
 function incBotCompute(ym){
-  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01';
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01', mStart = ym+'-01';
+  var prevStart = monthAdd(ym,-1)+'-01';
   var months = parseInt(ym.slice(5,7),10)||1;
-  var sums = {};
+  var sums = {}, lasts = {}, mSums = {};
   state.transactions.forEach(function(t){
     if(t.txn_type!=='income') return;
     if(!t.date || t.date<y0 || t.date>=yEnd) return;
     var c = t.category || 'Uncategorized';
     sums[c] = (sums[c]||0) + num(t.amount);
+    if(t.date>=prevStart && t.date<mStart) lasts[c] = (lasts[c]||0) + num(t.amount);
+    if(t.date>=mStart) mSums[c] = (mSums[c]||0) + num(t.amount);
   });
   var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
     var avg = sums[c]/months;
-    return {category:c, ytd:sums[c], amount:botNiceRound(avg), locked:false, touched:false};
+    return {category:c, ytd:sums[c], lastMo:lasts[c]||0, amount:botNiceRound(avg), locked:false, touched:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
-  return {rows:rows, months:months};
+  return {rows:rows, months:months, mSums:mSums};
 }
 function incBotPersist(){
   try{
@@ -8391,7 +8262,9 @@ function incBotRestore(ym){
     incBotRenderTable();
     $('ibot-save-row').hidden = false;
     $('ibot-save-month').textContent = fmtMonthPretty(ym);
+    return true;
   }catch(e){}
+  return false;
 }
 /* Refresh a proposal's calculated values from current transactions, keeping the
    user's edits and locks: rows they typed keep their amounts; untouched rows
@@ -8410,27 +8283,73 @@ function incBotRecalc(){
     freshCats[fr.category] = true;
     var old = oldByCat[fr.category];
     if(old){
-      return {category:fr.category, ytd:fr.ytd,
+      return {category:fr.category, ytd:fr.ytd, lastMo:fr.lastMo,
         amount: old.touched ? old.amount : fr.amount,
         locked: !!old.locked, touched: !!old.touched};
     }
     return fr;
   });
   incBotProposal.rows.forEach(function(r){
-    if(!freshCats[r.category]) merged.push({category:r.category, ytd:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
+    if(!freshCats[r.category]) merged.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
   });
   incBotProposal.rows = merged;
   incBotProposal.months = fresh.months;
+  incBotProposal.mSums = fresh.mSums;
   incBotRenderTable();
 }
 function incBotPropose(){
   var ym = $('bud-month').value || monthLocal();
   var c = incBotCompute(ym);
-  incBotProposal = {v:2, month:ym, rows:botFilterRemoved(INC_BOT_REMOVED_LS, ym, c.rows), months:c.months};
+  var saved = savedBudgetsFor(ym, true);
+  var prevLocked = {};
+  if(incBotProposal && incBotProposal.month===ym){
+    incBotProposal.rows.forEach(function(r){ prevLocked[r.category] = !!r.locked; });
+  }
+  var byCat = {};
+  c.rows.forEach(function(r){ byCat[r.category] = true; });
+  var rows = c.rows.map(function(r){
+    return {category:r.category, ytd:r.ytd, lastMo:r.lastMo, amount:r.amount,
+      locked:!!prevLocked[r.category], touched:true};
+  });
+  Object.keys(saved).forEach(function(cat){
+    if(!byCat[cat]) rows.push({category:cat, ytd:0, lastMo:0, amount:saved[cat],
+      locked:!!prevLocked[cat], touched:true});
+  });
+  rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, rows);
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  incBotProposal = {v:2, month:ym, rows:rows, months:c.months, mSums:c.mSums};
   incBotRenderTable();
   $('ibot-save-row').hidden = false;
   $('ibot-save-month').textContent = fmtMonthPretty(ym);
-  toast(c.rows.length ? 'Income targets drafted from your year-to-date income.' : 'No income this year — nothing to base targets on.');
+  toast('Income targets recalculated from year-to-date income.');
+}
+function incBotEnsureProposal(ym){
+  if(incBotProposal && incBotProposal.month===ym){ incBotRecalc(); return; }
+  incBotProposal = null;
+  if(incBotRestore(ym)){ incBotRecalc(); return; }
+  if(incBotPrefillFromSaved(ym)){ incBotRecalc(); return; }
+  incBotPropose();
+}
+function incBotPrefillFromSaved(ym){
+  var saved = savedBudgetsFor(ym, true);
+  var cats = Object.keys(saved);
+  if(!cats.length) return false;
+  var c = incBotCompute(ym);
+  var removed = botRemovedGet(INC_BOT_REMOVED_LS, ym);
+  var byCat = {};
+  c.rows.forEach(function(r){ byCat[r.category] = r; });
+  var rows = cats.filter(function(cat){ return removed.indexOf(cat)<0; }).map(function(cat){
+    var fr = byCat[cat];
+    return {category:cat, ytd:fr?fr.ytd:0, lastMo:fr?fr.lastMo:0, amount:saved[cat],
+      locked:true, touched:true};
+  });
+  if(!rows.length) return false;
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  incBotProposal = {v:2, month:ym, rows:rows, months:c.months, mSums:c.mSums};
+  incBotRenderTable();
+  $('ibot-save-row').hidden = false;
+  $('ibot-save-month').textContent = fmtMonthPretty(ym);
+  return true;
 }
 function incBotTotal(){
   if(!incBotProposal) return 0;
@@ -8438,31 +8357,32 @@ function incBotTotal(){
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
+  ibotBarRefs = [];
   if(!incBotProposal){ $('ibot-bulk-row').style.display = 'none'; return; }
   var rows = incBotProposal.rows;
   $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  if(!rows.length){
-    host.appendChild(el('p',{class:'muted'},'No income this year — nothing to base targets on.'));
-    return;
-  }
   var months = incBotProposal.months||1;
-  var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
-  head.appendChild(el('span'));
-  head.appendChild(el('span',null,'Category'));
-  head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
-  head.appendChild(el('span',null,'Target'));
-  head.appendChild(el('span'));
-  host.appendChild(head);
+  if(rows.length){
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    head.appendChild(el('span'));
+    head.appendChild(el('span',null,'Category'));
+    head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
+    head.appendChild(el('span',null,'Target'));
+    head.appendChild(el('span'));
+    host.appendChild(head);
+  }else{
+    host.appendChild(el('p',{class:'muted'},'No income targets yet — add categories below or tap Recalculate.'));
+  }
   rows.forEach(function(r){
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — recalculation may change this':'Check — recalculation will not touch',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
     line.appendChild(check);
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
     ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
     nm.appendChild(ibName);
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'YTD '+money(Math.round(r.ytd||0))+' total'));
+    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'Last month '+money(Math.round(r.lastMo||0))));
     line.appendChild(nm);
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
@@ -8476,6 +8396,12 @@ function incBotRenderTable(){
       incBotRenderTable(); incBotPersist();
     });
     line.appendChild(del);
+    /* Slim received-vs-target bar for the selected month. */
+    var bfill = el('div',{style:'height:100%;border-radius:99px;background:var(--accent);width:0%'});
+    var btrack = el('div',{style:'grid-column:1/-1;height:6px;border-radius:99px;background:var(--track);overflow:hidden;margin:0 0 8px'});
+    btrack.appendChild(bfill);
+    line.appendChild(btrack);
+    ibotBarRefs.push({r:r, fill:bfill});
     host.appendChild(line);
   });
   var have = {};
@@ -8488,27 +8414,43 @@ function incBotRenderTable(){
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
       botForgetRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, sel.value);
-      incBotProposal.rows.push({category:sel.value, ytd:0, amount:0, locked:false, touched:false});
+      incBotProposal.rows.push({category:sel.value, ytd:0, lastMo:0, amount:0, locked:false, touched:false});
       incBotProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
       incBotRenderTable(); incBotPersist();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
     host.appendChild(addRow);
   }
-  var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
-  tot.appendChild(el('span',null,'Expected total'));
-  tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
-  host.appendChild(tot);
-  host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},'Total of locked rows only.'));
+  if(rows.length){
+    var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
+    tot.appendChild(el('span',null,'Expected total'));
+    tot.appendChild(el('span',{id:'ibot-total'},money(incBotTotal())));
+    host.appendChild(tot);
+    host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},'Total of checked rows only.'));
+  }
   var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, incBotProposal.month).length;
   if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
+  ibotPaintBars();
   incBotPersist();
   updateFloatTotals();
+}
+/* Received-vs-target bars for the selected month: filled width =
+   received/target, red when received exceeds the target. */
+function ibotPaintBars(){
+  var sums = (incBotProposal && incBotProposal.mSums) || {};
+  (ibotBarRefs||[]).forEach(function(o){
+    var actual = sums[o.r.category]||0, amt = num(o.r.amount);
+    var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
+    o.fill.style.width = pct+'%';
+    o.fill.style.background = (amt>0 && actual>amt) ? 'var(--danger)' : 'var(--accent)';
+    o.fill.title = money(Math.round(actual))+' received of '+money(Math.round(amt))+' targeted';
+  });
 }
 function incBotRenderTotal(){
   var t = $('ibot-total');
   if(t) t.textContent = money(incBotTotal());
+  ibotPaintBars();
   updateFloatTotals();
 }
 async function incBotSave(){
@@ -8516,16 +8458,24 @@ async function incBotSave(){
   var btn = $('ibot-save'); btn.disabled = true;
   await withSaveLock(async function(){
   try{
-    var n = 0;
+    var inRows = {}, n = 0;
     for(var i=0;i<incBotProposal.rows.length;i++){
       var r = incBotProposal.rows[i];
-      if(r.amount>0){
-        await getStore().setBudget(INC_BUDGET_PREFIX+r.category, ym, Math.round(r.amount*100)/100);
-        n++;
-      }
+      inRows[r.category] = true;
+      var amt = r.locked ? Math.round(num(r.amount)*100)/100 : 0;
+      await getStore().setBudget(INC_BUDGET_PREFIX+r.category, ym, amt);
+      if(r.locked && amt>0) n++;
     }
+    var had = {};
+    state.budgets.forEach(function(b){
+      if(String(b.month)!==ym) return;
+      var k = String(b.category||'');
+      if(k.indexOf(INC_BUDGET_PREFIX)===0 && num(b.amount)!==0) had[k] = true;
+    });
+    var stale = Object.keys(had).filter(function(k){ return !inRows[k.slice(INC_BUDGET_PREFIX.length)]; });
+    for(var j=0;j<stale.length;j++) await getStore().setBudget(stale[j], ym, 0);
     await loadAll(); renderBudgets();
-    toast('Saved '+n+' income targets for '+fmtMonthPretty(ym)+'.');
+    toast('Income targets saved for '+fmtMonthPretty(ym)+': '+n+' categor'+(n===1?'y':'ies')+'.');
   }catch(err){ toast('Save failed: '+err.message, true); }
   });
   btn.disabled = false;
@@ -8550,7 +8500,7 @@ function updateFloatTotals(){
   one.innerHTML = '';
   if(expOn){
     var d1 = el('div');
-    d1.appendChild(document.createTextNode('Proposed total '));
+    d1.appendChild(document.createTextNode('Planned total '));
     var b = el('b'); b.textContent = money(botProposalTotal()); d1.appendChild(b);
     var pct = botPctText();
     if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; d1.appendChild(s); }
@@ -8589,7 +8539,7 @@ function billsForDay(ymd){
     .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
 }
 /* Sum of active bills due in a calendar month, optionally filtered by category
-   and account. Used by Budget Bot flooring and the cash-flow check. */
+   and account. Used by Budget planner flooring and the cash-flow check. */
 function billsDueInMonth(ym, category, account){
   var total = 0;
   billsActive().forEach(function(b){
