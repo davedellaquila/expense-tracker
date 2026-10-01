@@ -471,8 +471,14 @@ textarea{resize:vertical; min-height:64px;}
   color:var(--muted); opacity:.55; font-size:14px; letter-spacing:2px; line-height:1;
   padding:12px 9px; margin-left:-9px;}
 .bot-grip:active{cursor:grabbing;}
-.bot-row.bot-dragging{position:relative; z-index:30; box-shadow:0 12px 28px rgba(0,0,0,.35); opacity:.96;}
+/* While dragging, the row becomes a fixed ghost that follows the pointer
+   exactly; a dashed .bot-drop-ph placeholder holds its spot in the list
+   and marks the drop position as it moves. */
+.bot-row.bot-dragging{position:fixed; z-index:70; pointer-events:none; opacity:.96;
+  box-shadow:0 12px 28px rgba(0,0,0,.35); margin:0 !important;}
 .bot-row.bot-dragging .bot-grip{cursor:grabbing; opacity:1;}
+.bot-drop-ph{border:2px dashed var(--accent); border-radius:10px; margin-bottom:4px;
+  background:rgba(127,127,127,.08);}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -8113,8 +8119,11 @@ function botScrollParent(elm){
   return null;
 }
 /* Pointer-based drag reorder for planner rows. The grip handle (.bot-grip)
-   starts the drag; rows live-reorder in the DOM as the pointer moves; on
-   release the new order is saved for the month. Works with mouse and touch
+   starts the drag; on activation the row becomes a fixed ghost that follows
+   the pointer exactly (grab offset preserved, so it never jumps), while a
+   dashed placeholder (.bot-drop-ph) holds its spot and slides to mark the
+   drop position. On release the row lands where the placeholder is and the
+   new order is saved for the month. Works with mouse and touch
    (the grip's touch-action:none keeps touch drags from scrolling the page).
    opts: {host, rowsFn (live rows array), ymFn, prefix}. Bound once per host. */
 function botMakeRowsDraggable(opts){
@@ -8127,48 +8136,71 @@ function botMakeRowsDraggable(opts){
     if(!grip || !host.contains(grip)) return;
     var row = grip.closest('.bot-row');
     if(!row) return;
+    if(e.pointerType==='mouse' && e.button!==0) return;
     e.preventDefault();
-    drag = {row:row, grip:grip, pointerId:e.pointerId, startY:e.clientY,
-      dy:0, active:false};
+    drag = {row:row, grip:grip, pointerId:e.pointerId,
+      startX:e.clientX, startY:e.clientY, active:false, ph:null};
     try{ grip.setPointerCapture(e.pointerId); }catch(err){}
   });
   host.addEventListener('pointermove', function(e){
     if(!drag || e.pointerId!==drag.pointerId) return;
-    var dy = e.clientY - drag.startY;
+    var dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
     if(!drag.active){
-      if(Math.abs(dy) < 8) return;
+      if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+      /* Activate: float the row as a fixed ghost under the pointer and put
+         a dashed placeholder where the row was. */
       drag.active = true;
-      drag.row.classList.add('bot-dragging');
-      drag.scroller = botScrollParent(drag.row);
+      var row = drag.row, rect = row.getBoundingClientRect();
+      var ph = document.createElement('div');
+      ph.className = 'bot-drop-ph';
+      ph.style.height = rect.height+'px';
+      row.parentNode.insertBefore(ph, row);
+      drag.ph = ph;
+      drag.grabDX = drag.startX-rect.left;
+      drag.grabDY = drag.startY-rect.top;
+      row.classList.add('bot-dragging');
+      row.style.width = rect.width+'px';
+      row.style.left = rect.left+'px';
+      row.style.top = rect.top+'px';
+      drag.scroller = botScrollParent(row);
       document.body.style.userSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
     }
-    drag.dy = dy;
-    drag.row.style.transform = 'translateY('+dy+'px)';
+    drag.row.style.left = (e.clientX-drag.grabDX)+'px';
+    drag.row.style.top = (e.clientY-drag.grabDY)+'px';
     var tgt = drag.scroller || window;
     if(e.clientY < 72) tgt.scrollBy(0, -14);
     else if(e.clientY > window.innerHeight - 72) tgt.scrollBy(0, 14);
-    /* Live reorder: first sibling whose midpoint sits below the dragged
-       row's untransformed center takes the dragged row before it. */
-    var rect = drag.row.getBoundingClientRect();
-    var centerY = rect.top + rect.height/2;
+    /* Move the dashed placeholder (not the row): it goes before the first
+       row whose midpoint sits below the pointer. */
     var sibs = Array.prototype.filter.call(host.children, function(ch){
       return ch!==drag.row && ch.classList && ch.classList.contains('bot-row');
     });
     if(sibs.length){
-      var placed = false;
+      var placed = false, ph2 = drag.ph;
       for(var i=0;i<sibs.length;i++){
         var r = sibs[i].getBoundingClientRect();
-        if(centerY < r.top + r.height/2){ host.insertBefore(drag.row, sibs[i]); placed = true; break; }
+        if(e.clientY < r.top + r.height/2){ host.insertBefore(ph2, sibs[i]); placed = true; break; }
       }
-      if(!placed) host.insertBefore(drag.row, sibs[sibs.length-1].nextSibling);
+      if(!placed){
+        /* After the last row: include the ghost itself in the row list so
+           the placeholder lands after it (not wedged before it). */
+        var allRows = Array.prototype.filter.call(host.children, function(ch){
+          return ch.classList && ch.classList.contains('bot-row');
+        });
+        host.insertBefore(ph2, allRows[allRows.length-1].nextSibling);
+      }
     }
   });
   function endDrag(e){
     if(!drag || (e && e.pointerId!=null && e.pointerId!==drag.pointerId)) return;
-    var wasActive = drag.active, row = drag.row;
+    var wasActive = drag.active, row = drag.row, ph = drag.ph;
+    if(wasActive && ph && ph.parentNode){
+      ph.parentNode.insertBefore(row, ph);
+      ph.parentNode.removeChild(ph);
+    }
     row.classList.remove('bot-dragging');
-    row.style.transform = '';
+    row.style.width=''; row.style.left=''; row.style.top='';
     document.body.style.userSelect = '';
     document.body.style.webkitUserSelect = '';
     if(wasActive){
