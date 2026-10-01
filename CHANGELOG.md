@@ -5,6 +5,24 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Budget page: planners are now the live budget (no more drafts)
+- The draft/Save model is gone. The **Budget planner** and **Income
+  planner** are the live budget — every check, amount edit, add, and
+  remove saves straight to the store the moment it happens (amount
+  typing/dragging debounces ~0.6s so slider drags stay smooth).
+- The sticky totals pill now follows the live budget: the income target
+  is the sum of the checked income categories, updating as you edit.
+- **Recalculate** rebuilds fresh year-to-date amounts in place, keeps
+  checked states, and writes straight through; it also zeroes any stale
+  saved amounts on unchecked rows.
+- Opening a month still restores that month's saved budget (checked rows
+  with their saved amounts); everything else is an unchecked YTD
+  suggestion. Removed categories stay hidden for the month.
+- One-time cleanup: old per-month draft keys are swept from localStorage
+  on load; removed-category memory is kept.
+
+## 2026-09-30
+
 ### Budget page: planners replace the budget/target cards
 - The separate Category budgets and Income targets cards are gone. The
   **Budget planner** and **Income planner** are now the only budget editors.

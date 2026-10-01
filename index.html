@@ -1020,7 +1020,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Plans your monthly budget. Prefilled with your saved budget when you have one — edit any amount, check the categories to keep, set a savings goal for trim suggestions, then save.</p>
+        <p class="muted">This is your live budget — every change saves instantly. Edit any amount, check the categories to keep, set a savings goal for trim suggestions, or tap Recalculate to rebuild from year-to-date spending.</p>
         <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
@@ -1040,9 +1040,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           </div>
           <div id="bot-suggestions" style="margin-top:10px"></div>
         </div>
-        <div id="bot-save-row" hidden style="margin-top:14px">
-          <button class="btn" id="bot-save" type="button">Save as <span id="bot-save-month"></span> budget</button>
-        </div>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1052,15 +1049,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="ibot-propose" type="button" style="width:auto" title="Recalculate from year-to-date income">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Plans your monthly income targets. Prefilled with your saved targets when you have them — edit any amount, check the categories to keep, then save.</p>
+        <p class="muted">These are your live income targets — every change saves instantly. Edit any amount, check the categories to keep, or tap Recalculate to rebuild from year-to-date income.</p>
         <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
         </div>
         <div id="ibot-table" style="margin-top:12px"></div>
-        <div id="ibot-save-row" hidden style="margin-top:14px">
-          <button class="btn" id="ibot-save" type="button">Save as <span id="ibot-save-month"></span> income targets</button>
-        </div>
       </div>
       </div>
     </section>
@@ -7473,27 +7467,38 @@ function budMonthStep(d){
   m.dispatchEvent(new Event('change'));
 }
 function wireBudgets(){
-  $('bud-month').addEventListener('change', function(){ saveBudFilters(); botReset(); incBotReset(); renderBudgets(); });
+  $('bud-month').addEventListener('change', function(){ saveBudFilters(); botFlushWrites(); botReset(); incBotReset(); renderBudgets(); });
   $('bud-prev').addEventListener('click', function(){ budMonthStep(-1); });
   $('bud-next').addEventListener('click', function(){ budMonthStep(1); });
-  $('bot-propose').addEventListener('click', botPropose);
+  $('bot-propose').addEventListener('click', botRecalculate);
   $('bot-goal-type').addEventListener('change', botRenderGoalInputs);
   $('bot-suggest').addEventListener('click', botSuggest);
-  $('bot-save').addEventListener('click', botSave);
-  $('ibot-propose').addEventListener('click', incBotPropose);
-  $('ibot-save').addEventListener('click', incBotSave);
+  $('ibot-propose').addEventListener('click', ibotRecalculate);
   $('bot-enable-all').addEventListener('click', function(){ botSetAllLocked(true); });
   $('bot-disable-all').addEventListener('click', function(){ botSetAllLocked(false); });
   $('ibot-enable-all').addEventListener('click', function(){ incBotSetAllLocked(true); });
   $('ibot-disable-all').addEventListener('click', function(){ incBotSetAllLocked(false); });
   $('bot-copy').addEventListener('click', function(){ openBudgetCopySheet('exp'); });
   $('ibot-copy').addEventListener('click', function(){ openBudgetCopySheet('inc'); });
+  window.addEventListener('pagehide', botFlushWrites);
+  /* One-time sweep: drop pre-live-budget draft keys. Removed-category memory
+     (expTrackerBotRemoved:/expTrackerIncBotRemoved:) stays — still in use. */
+  try{
+    var dead = [];
+    for(var i=0;i<localStorage.length;i++){ var k = localStorage.key(i); if(k) dead.push(k); }
+    dead.forEach(function(k){
+      if(k.indexOf('expTrackerBotDraft:')===0 || k.indexOf('expTrackerBotIncomeDraft:')===0){
+        try{ localStorage.removeItem(k); }catch(e){}
+      }
+    });
+  }catch(e){}
 }
+
 /* Income targets live in the same Budgets store as spending budgets, namespaced
    with this prefix so no backend changes are needed on any of the three stores. */
 var INC_BUDGET_PREFIX = 'income:';
 /* Saved budgets/targets for a month as {category: amount}, expense or income
-   side. Used to prefill the planners and to keep recalculated drafts complete. */
+   side. Used to load the planners and to keep recalculated budgets complete. */
 function savedBudgetsFor(ym, isInc){
   var map = {};
   state.budgets.forEach(function(b){
@@ -7518,7 +7523,53 @@ function upsertStateBudget(cat, ym, amount){
   if(found) found.amount = amount;
   else state.budgets.push({month:ym, category:cat, amount:amount});
 }
-/* Sticky totals pill next to the month picker: saved budget total vs saved
+/* Live-budget writes: the planners ARE the budget — every change persists
+   straight to the store. No draft, no Save button. Amount edits debounce
+   (slider drags and typing); checks, adds, removes and recalculates write
+   immediately. The sticky pill reads state.budgets, so it stays live too. */
+var botPendingWrites = {}; // key -> {t, ym, cat, amt}
+var __botWriteSeq = 0;
+function botWriteNow(ym, storeCat, amt){
+  Object.keys(botPendingWrites).forEach(function(k){
+    var r = botPendingWrites[k];
+    if(r.ym===ym && r.cat===storeCat){ clearTimeout(r.t); delete botPendingWrites[k]; }
+  });
+  amt = Math.round(num(amt)*100)/100;
+  upsertStateBudget(storeCat, ym, amt);
+  paintBudgetTotals();
+  getStore().setBudget(storeCat, ym, amt).catch(function(){
+    toast("Couldn't save "+storeCat.replace(/^income:/,'')+' — check your connection.', true);
+  });
+}
+function botWriteSoon(ym, storeCat, amt){
+  amt = Math.round(num(amt)*100)/100;
+  upsertStateBudget(storeCat, ym, amt);
+  paintBudgetTotals();
+  var key = null, rec = null;
+  Object.keys(botPendingWrites).forEach(function(k){
+    var r = botPendingWrites[k];
+    if(r.ym===ym && r.cat===storeCat){ key = k; rec = r; }
+  });
+  if(!rec){ key = 'w'+(++__botWriteSeq); rec = botPendingWrites[key] = {}; }
+  rec.ym = ym; rec.cat = storeCat; rec.amt = amt;
+  if(rec.t) clearTimeout(rec.t);
+  rec.t = setTimeout(function(){
+    delete botPendingWrites[key];
+    getStore().setBudget(storeCat, ym, amt).catch(function(){
+      toast("Couldn't save "+storeCat.replace(/^income:/,'')+' — check your connection.', true);
+    });
+  }, 600);
+}
+/* Flush debounced writes (month switch, page hide) so no edit is lost. */
+function botFlushWrites(){
+  Object.keys(botPendingWrites).forEach(function(k){
+    var r = botPendingWrites[k];
+    clearTimeout(r.t);
+    delete botPendingWrites[k];
+    getStore().setBudget(r.cat, r.ym, r.amt).catch(function(){});
+  });
+}
+/* Sticky totals pill next to the month picker: live budget total vs live
    income-target total for the selected month, with the budget as a percent
    of income (red when over 100%). */
 function paintBudgetTotals(){
@@ -7609,52 +7660,26 @@ function openBudgetCopySheet(mode){
     refreshInfo();
   });
 }
-/* Budgets screen: the two planners are the budget editors now. Each opens on
-   the month's saved values when they exist; Recalculate drafts a fresh
-   year-to-date-based proposal. */
+/* Budgets screen: the planners are the live budget. Opening a month builds
+   each planner from that month's saved budgets over year-to-date figures. */
 function renderBudgets(){
+  botFlushWrites();
   var ym = $('bud-month').value || monthLocal();
+  botLoadBudget(ym);
+  ibotLoadBudget(ym);
   paintBudgetTotals();
-  botEnsureProposal(ym);
-  incBotEnsureProposal(ym);
 }
 
-/* ================= budget planner ================= */
-var botProposal = null; // {month, rows:[{category, avg, last, amount, locked}], avgIncome}
-var botBarRefs = []; // [{r, fill}] actual-vs-draft bars in the expense planner
+/* ================= budget planner =================
+   The planner IS the budget: every edit writes straight through to the
+   store — no draft, no Save button. botBudget.rows is the live budget. */
+var botBudget = null; // {month, rows:[{category, avg, last, amount, locked, billFloored}], ...refs}
+var botBarRefs = []; // [{r, fill}] actual-vs-budget bars in the expense planner
 
-/* Draft persistence: the bot proposal (edited amounts, locks) survives a hard
-   refresh. Stored per budget month in localStorage; switching months restores
-   that month's draft if one was left behind. */
-var BOT_DRAFT_LS = 'expTrackerBotDraft:';
-function persistBotDraft(){
-  try{
-    if(botProposal) localStorage.setItem(BOT_DRAFT_LS+botProposal.month, JSON.stringify(botProposal));
-  }catch(e){}
-}
-function restoreBotDraft(ym){
-  if(botProposal) return;
-  try{
-    var raw = localStorage.getItem(BOT_DRAFT_LS+ym);
-    if(!raw) return;
-    var d = JSON.parse(raw);
-    if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
-    d.rows = botFilterRemoved(BOT_REMOVED_LS, ym, d.rows);
-    botProposal = d;
-    botRenderTable();
-    botRenderGoalInputs();
-    $('bot-goal').hidden = false;
-    $('bot-save-row').hidden = false;
-    $('bot-save-month').textContent = fmtMonthPretty(ym);
-    return true;
-  }catch(e){}
-  return false;
-}
-
-/* Removed-category memory: categories deleted from a bot proposal stay deleted
-   for that budget month — recalc, re-propose, and draft restore all filter them
-   out. Re-adding a category via Add category un-remembers it. Stored per month
-   in localStorage, like the drafts. */
+/* Removed-category memory: categories deleted from a planner stay deleted
+   for that budget month — loading and Recalculate both filter them out.
+   Re-adding a category via Add category un-remembers it. Stored per month
+   in localStorage. */
 var BOT_REMOVED_LS = 'expTrackerBotRemoved:';
 var INC_BOT_REMOVED_LS = 'expTrackerIncBotRemoved:';
 function botRemovedGet(prefix, ym){
@@ -7724,8 +7749,8 @@ function botAllocateCuts(rows, gap){
   });
   return {list:list, remaining:remaining};
 }
-function botProposalTotal(){
-  return botProposal.rows.reduce(function(s,r){ return s + (r.locked ? num(r.amount) : 0); }, 0);
+function botBudgetTotal(){
+  return botBudget.rows.reduce(function(s,r){ return s + (r.locked ? num(r.amount) : 0); }, 0);
 }
 /* Paycheck or not? Category wins; otherwise look for payroll-like text in the
    merchant/description. Anything else typed as income (Daily Cash, refunds)
@@ -7767,11 +7792,11 @@ function botCompute(ym){
     ytdSums[c] = (ytdSums[c]||0) + num(t.amount);
     if(t.date>=mStart) monthSums[c] = (monthSums[c]||0) + num(t.amount);
   });
-  // Draft amounts come from the YTD monthly average (nice-rounded). The 3-month
+  // Budget amounts come from the YTD monthly average (nice-rounded). The 3-month
   // average and last month stay on as reference only.
   var rows = Object.keys(ytdSums).filter(function(c){ return ytdSums[c]>0; }).map(function(c){
     var ytdAvg = ytdSums[c]/ytdMonths;
-    return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false, touched:false};
+    return {category:c, avg:(sums[c]||0)/3, last:lasts[c]||0, amount:botNiceRound(ytdAvg), locked:false};
   }).sort(function(a,b){ return b.amount-a.amount; });
   // Floor each category at its recurring bills due this month — the budget
   // must at least cover known bills. Dave's rule: auto-adjust + warn.
@@ -7790,115 +7815,76 @@ function botCompute(ym){
   // Categories that have bills but no YTD spending still need a row.
   Object.keys(billFloors).forEach(function(c){
     if(billFloors[c]>0 && !rows.some(function(r){ return r.category===c; })){
-      rows.push({category:c, avg:0, last:0, amount:Math.ceil(billFloors[c]), locked:false, touched:false, billFloored:true});
+      rows.push({category:c, avg:0, last:0, amount:Math.ceil(billFloors[c]), locked:false, billFloored:true});
     }
   });
   rows.sort(function(a,b){ return b.amount-a.amount; });
   return {rows:rows, avgIncome:ytdIncome/ytdMonths, ytdSums:ytdSums, ytdIncSums:ytdIncSums, ytdMonths:ytdMonths, monthSums:monthSums, billFloors:billFloors};
 }
-/* Refresh a proposal's calculated values from current transactions, keeping the
-   user's edits and locks: rows they typed (or accepted from a suggestion) keep
-   their amounts; untouched rows follow the fresh YTD average. New categories
-   appear; user-added rows with no YTD spend are kept as-is. */
-function botRecalc(){
-  if(!botProposal) return;
-  var ym = $('bud-month').value || monthLocal();
-  if(botProposal.month!==ym) return;
-  var fresh = botCompute(ym);
-  var freshRows = botFilterRemoved(BOT_REMOVED_LS, botProposal.month, fresh.rows);
-  var oldByCat = {};
-  botProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
-  var freshCats = {};
-  var merged = freshRows.map(function(fr){
-    freshCats[fr.category] = true;
-    var old = oldByCat[fr.category];
-    if(old){
-      return {category:fr.category, avg:fr.avg, last:fr.last,
-        amount: old.touched ? old.amount : fr.amount,
-        locked: !!old.locked, touched: !!old.touched,
-        billFloored: !!fr.billFloored};
-    }
-    return fr;
-  });
-  botProposal.rows.forEach(function(r){
-    if(!freshCats[r.category]) merged.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
-  });
-  botProposal.rows = merged;
-  botProposal.avgIncome = fresh.avgIncome;
-  botProposal.ytdSums = fresh.ytdSums;
-  botProposal.ytdIncSums = fresh.ytdIncSums;
-  botProposal.ytdMonths = fresh.ytdMonths;
-  botProposal.monthSums = fresh.monthSums;
-  botProposal.billFloors = fresh.billFloors;
-  botRenderTable();
-}
-/* Recalculate: fresh year-to-date-based amounts over the union of YTD
-   categories and saved-budget categories (minus removed ones). Checked
-   states are preserved so a recalculation never silently wipes the budget. */
-function botPropose(){
-  var ym = $('bud-month').value || monthLocal();
+/* Load the live budget for a month: the month's saved budgets overlaid on
+   fresh year-to-date figures. Saved rows come back checked with their saved
+   amounts; everything else is an unchecked YTD suggestion. Removed categories
+   stay out (re-add them via Add category). */
+function botLoadBudget(ym){
   var c = botCompute(ym);
   var saved = savedBudgetsFor(ym, false);
-  var prevLocked = {};
-  if(botProposal && botProposal.month===ym){
-    botProposal.rows.forEach(function(r){ prevLocked[r.category] = !!r.locked; });
-  }
-  var byCat = {};
-  c.rows.forEach(function(r){ byCat[r.category] = true; });
-  var rows = c.rows.map(function(r){
-    return {category:r.category, avg:r.avg, last:r.last, amount:r.amount,
-      locked:!!prevLocked[r.category], touched:true, billFloored:!!r.billFloored};
-  });
-  Object.keys(saved).forEach(function(cat){
-    if(!byCat[cat]) rows.push({category:cat, avg:0, last:0, amount:saved[cat],
-      locked:!!prevLocked[cat], touched:true});
-  });
-  rows = botFilterRemoved(BOT_REMOVED_LS, ym, rows);
-  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
-  botProposal = {v:2, month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
-    ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums, billFloors:c.billFloors};
-  $('bot-suggestions').innerHTML = '';
-  botRenderTable();
-  botRenderGoalInputs();
-  $('bot-goal').hidden = false;
-  $('bot-save-row').hidden = false;
-  $('bot-save-month').textContent = fmtMonthPretty(ym);
-  toast('Budget recalculated from year-to-date spending.');
-}
-/* Planner open: bring back the in-progress draft if there is one; otherwise
-   prefill from the month's saved budgets; otherwise draft a fresh proposal. */
-function botEnsureProposal(ym){
-  if(botProposal && botProposal.month===ym){ botRecalc(); return; }
-  botProposal = null;
-  if(restoreBotDraft(ym)){ botRecalc(); return; }
-  if(botPrefillFromSaved(ym)){ botRecalc(); return; }
-  botPropose();
-}
-function botPrefillFromSaved(ym){
-  var saved = savedBudgetsFor(ym, false);
-  var cats = Object.keys(saved);
-  if(!cats.length) return false;
-  var c = botCompute(ym);
   var removed = botRemovedGet(BOT_REMOVED_LS, ym);
   var byCat = {};
   c.rows.forEach(function(r){ byCat[r.category] = r; });
-  var rows = cats.filter(function(cat){ return removed.indexOf(cat)<0; }).map(function(cat){
-    var fr = byCat[cat];
-    return {category:cat, avg:fr?fr.avg:0, last:fr?fr.last:0, amount:saved[cat],
-      locked:true, touched:true, billFloored:fr?!!fr.billFloored:false};
+  var rows = c.rows.map(function(r){
+    var s = saved[r.category];
+    return {category:r.category, avg:r.avg, last:r.last,
+      amount:(s!=null ? s : r.amount),
+      locked:(s!=null ? s>0 : false),
+      billFloored:!!r.billFloored};
   });
-  if(!rows.length) return false;
+  Object.keys(saved).forEach(function(cat){
+    if(!byCat[cat]) rows.push({category:cat, avg:0, last:0, amount:saved[cat], locked:saved[cat]>0});
+  });
+  rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
-  botProposal = {v:2, month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
-    ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums, billFloors:c.billFloors};
+  botBudget = {month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
+    ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums,
+    billFloors:c.billFloors};
   $('bot-suggestions').innerHTML = '';
   botRenderTable();
   botRenderGoalInputs();
   $('bot-goal').hidden = false;
-  $('bot-save-row').hidden = false;
-  $('bot-save-month').textContent = fmtMonthPretty(ym);
-  return true;
 }
+/* Recalculate: fresh year-to-date amounts for every row, checks preserved,
+   removed categories stay out. Writes straight through — this is the budget. */
+function botRecalculate(){
+  if(!botBudget) return;
+  var ym = botBudget.month;
+  var c = botCompute(ym);
+  var saved = savedBudgetsFor(ym, false);
+  var oldByCat = {};
+  botBudget.rows.forEach(function(r){ oldByCat[r.category] = r; });
+  var freshCats = {};
+  var rows = botFilterRemoved(BOT_REMOVED_LS, ym, c.rows).map(function(fr){
+    freshCats[fr.category] = true;
+    var old = oldByCat[fr.category];
+    return {category:fr.category, avg:fr.avg, last:fr.last, amount:fr.amount,
+      locked:old ? !!old.locked : false, billFloored:!!fr.billFloored};
+  });
+  botBudget.rows.forEach(function(r){
+    if(!freshCats[r.category]) rows.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked});
+  });
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  botBudget.rows = rows;
+  botBudget.avgIncome = c.avgIncome; botBudget.ytdSums = c.ytdSums;
+  botBudget.ytdIncSums = c.ytdIncSums; botBudget.ytdMonths = c.ytdMonths;
+  botBudget.monthSums = c.monthSums; botBudget.billFloors = c.billFloors;
+  rows.forEach(function(r){
+    if(r.locked) botWriteNow(ym, r.category, r.amount);
+    else if((saved[r.category]||0) > 0) botWriteNow(ym, r.category, 0);
+  });
+  $('bot-suggestions').innerHTML = '';
+  botRenderTable();
+  botRenderGoalInputs();
+  toast('Budget recalculated from year-to-date spending.');
+}
+
 /* Budget page: tapping a category name opens the Transactions page filtered to
    that category for the budget month selected in the sticky bar. */
 function botDrillCategory(cat, type){
@@ -7926,20 +7912,22 @@ function botEnableRow(r, line, check){
 }
 /* Bulk enable/disable for bot proposal rows (expense and income). */
 function botSetAllLocked(locked){
-  if(!botProposal || !botProposal.rows.length) return;
-  botProposal.rows.forEach(function(r){ r.locked = locked; });
-  botRenderTable(); persistBotDraft();
+  if(!botBudget || !botBudget.rows.length) return;
+  var ym = botBudget.month;
+  botBudget.rows.forEach(function(r){ r.locked = locked; botWriteNow(ym, r.category, locked ? r.amount : 0); });
+  botRenderTable();
 }
 function incBotSetAllLocked(locked){
-  if(!incBotProposal || !incBotProposal.rows.length) return;
-  incBotProposal.rows.forEach(function(r){ r.locked = locked; });
-  incBotRenderTable(); incBotPersist();
+  if(!incBotBudget || !incBotBudget.rows.length) return;
+  var ym = incBotBudget.month;
+  incBotBudget.rows.forEach(function(r){ r.locked = locked; botWriteNow(ym, INC_BUDGET_PREFIX+r.category, locked ? r.amount : 0); });
+  incBotRenderTable();
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
   botBarRefs = [];
-  if(!botProposal){ $('bot-bulk-row').style.display = 'none'; return; }
-  var rows = botProposal.rows;
+  if(!botBudget){ $('bot-bulk-row').style.display = 'none'; return; }
+  var rows = botBudget.rows, ym = botBudget.month;
   $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
@@ -7953,10 +7941,14 @@ function botRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No budget rows yet — add categories below or tap Recalculate.'));
   }
   rows.forEach(function(r){
-    var isInc = ((botProposal.ytdIncSums||{})[r.category]||0) > ((botProposal.ytdSums||{})[r.category]||0);
+    var isInc = ((botBudget.ytdIncSums||{})[r.category]||0) > ((botBudget.ytdSums||{})[r.category]||0);
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this budget',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
-    check.addEventListener('click', function(){ r.locked = !r.locked; botRenderTable(); persistBotDraft(); });
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    check.addEventListener('click', function(){
+      r.locked = !r.locked;
+      botWriteNow(ym, r.category, r.locked ? r.amount : 0);
+      botRenderTable();
+    });
     line.appendChild(check);
     var nm = el('div');
     var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
@@ -7964,22 +7956,27 @@ function botRenderTable(){
     nm.appendChild(bName);
     nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'Last month '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
     line.appendChild(nm);
-    var ytd = (botProposal.ytdSums && botProposal.ytdMonths) ? (botProposal.ytdSums[r.category]||0)/botProposal.ytdMonths : 0;
+    var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max)); botRenderTotal(); botPaintBars(); persistBotDraft(); });
+    inp.addEventListener('change', function(){
+      r.amount = Math.max(0, num(inp.value));
+      inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max));
+      botWriteSoon(ym, r.category, r.locked ? r.amount : 0);
+      botRenderTotal(); botPaintBars();
+    });
     line.appendChild(inp);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
-      botRememberRemoved(BOT_REMOVED_LS, botProposal.month, r.category);
-      botProposal.rows = botProposal.rows.filter(function(x){ return x!==r; });
-      botRenderTable(); botRenderGoalInputs(); persistBotDraft();
+      botRememberRemoved(BOT_REMOVED_LS, ym, r.category);
+      botWriteNow(ym, r.category, 0);
+      botBudget.rows = botBudget.rows.filter(function(x){ return x!==r; });
+      botRenderTable(); botRenderGoalInputs();
     });
     line.appendChild(del);
-    /* Per-row adjust slider: proposed amount sits in the middle of the range;
-       moving it enables the row (as if the ✓ was clicked) and updates the
-       row's amount field live. */
+    /* Per-row adjust slider: moving it enables the row (as if the ✓ was
+       clicked) and updates the row's amount field live. Every change saves. */
     var sMax = botSliderCeil(Math.max(2*Math.max(0, num(r.amount)), num(r.amount)*1.2));
     var sld = el('input',{type:'range',min:'0',max:String(sMax),
       step:String(Math.max(1, Math.round(sMax/200))),
@@ -7988,10 +7985,11 @@ function botRenderTable(){
       'aria-label':'Adjust budget for '+r.category});
     sld.addEventListener('input', function(){
       var v = num(sld.value);
-      r.amount = v; r.touched = true;
+      r.amount = v;
       inp.value = v;
       botEnableRow(r, line, check);
-      botRenderTotal(); botPaintBars(); persistBotDraft();
+      botWriteSoon(ym, r.category, v);
+      botRenderTotal(); botPaintBars();
     });
     line.appendChild(sld);
     /* Slim actual-vs-budget bar for the selected month. */
@@ -8011,10 +8009,10 @@ function botRenderTable(){
     var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
-      botForgetRemoved(BOT_REMOVED_LS, botProposal.month, sel.value);
-      botProposal.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false, touched:false});
-      botProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
-      botRenderTable(); botRenderGoalInputs(); persistBotDraft();
+      botForgetRemoved(BOT_REMOVED_LS, ym, sel.value);
+      botBudget.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false});
+      botBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
+      botRenderTable(); botRenderGoalInputs();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
     host.appendChild(addRow);
@@ -8022,28 +8020,28 @@ function botRenderTable(){
   if(rows.length){
     var tot = el('div',{style:'display:flex;justify-content:space-between;margin-top:10px;font-weight:bold'});
     tot.appendChild(el('span',null,'Planned total'));
-    tot.appendChild(el('span',{id:'bot-total'},money(botProposalTotal())));
+    tot.appendChild(el('span',{id:'bot-total'},money(botBudgetTotal())));
     host.appendChild(tot);
     var sub = el('div',{class:'muted',style:'display:flex;justify-content:space-between;margin-top:2px;font-size:12px'});
-    sub.appendChild(el('span',null,'Paycheck '+money(Math.round(botProposal.avgIncome||0))+'/mo'));
+    sub.appendChild(el('span',null,'Paycheck '+money(Math.round(botBudget.avgIncome||0))+'/mo'));
     sub.appendChild(el('span',{id:'bot-pct'},botPctText()));
     host.appendChild(sub);
-    if(botProposal.avgIncome > 0){
+    if(botBudget.avgIncome > 0){
       host.appendChild(el('p',{class:'muted',style:'margin:6px 0 0'},
-        'Your paycheck averages about '+money(Math.round(botProposal.avgIncome))+'/mo. This draft leaves about '+money(Math.round(botProposal.avgIncome-botProposalTotal()))+'/mo unspent.'));
+        'Your paycheck averages about '+money(Math.round(botBudget.avgIncome))+'/mo. This budget leaves about '+money(Math.round(botBudget.avgIncome-botBudgetTotal()))+'/mo unspent.'));
     }
   }
-  var nRemoved = botRemovedGet(BOT_REMOVED_LS, botProposal.month).length;
+  var nRemoved = botRemovedGet(BOT_REMOVED_LS, ym).length;
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
-    nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this proposal — re-add above to bring one back.'));
+    nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this budget — re-add above to bring one back.'));
   botPaintBars();
-  persistBotDraft();
   updateFloatTotals();
 }
+
 /* Actual-vs-budget bars for the selected month: filled width = spent/budget,
-   red when spent exceeds the draft amount. */
+   red when spent exceeds the budget amount. */
 function botPaintBars(){
-  var sums = (botProposal && botProposal.monthSums) || {};
+  var sums = (botBudget && botBudget.monthSums) || {};
   (botBarRefs||[]).forEach(function(o){
     var actual = sums[o.r.category]||0, amt = num(o.r.amount);
     var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
@@ -8053,14 +8051,14 @@ function botPaintBars(){
   });
 }
 function botPctText(){
-  if(!botProposal) return '';
-  var inc = num(botProposal.avgIncome), t = botProposalTotal();
+  if(!botBudget) return '';
+  var inc = num(botBudget.avgIncome), t = botBudgetTotal();
   if(!(inc>0)) return '';
   return Math.round(t/inc*100)+'% of income';
 }
 function botRenderTotal(){
   var t = $('bot-total');
-  if(t) t.textContent = money(botProposalTotal());
+  if(t) t.textContent = money(botBudgetTotal());
   var p = $('bot-pct');
   if(p) p.textContent = botPctText();
   botPaintBars();
@@ -8071,13 +8069,13 @@ function botRenderTotal(){
 function renderBotBillsLine(){
   var host = $('bot-bills-line');
   if(!host) return;
-  if(!botProposal || !botProposal.rows.length){ host.hidden = true; return; }
+  if(!botBudget || !botBudget.rows.length){ host.hidden = true; return; }
   host.hidden = false;
   host.innerHTML = '';
-  var ym = botProposal.month;
+  var ym = botBudget.month;
   var bills = billsDueInMonth(ym);
-  var total = botProposalTotal();
-  var income = botProposal.avgIncome||0;
+  var total = botBudgetTotal();
+  var income = botBudget.avgIncome||0;
   var remaining = income - bills - total;
   var l1 = el('div',{class:'muted'},'Bills due '+fmtMonthPretty(ym)+': '+money(Math.round(bills)));
   host.appendChild(l1);
@@ -8093,11 +8091,11 @@ function renderBotBillsLine(){
 }
 function botRenderGoalInputs(){
   var host = $('bot-goal-inputs'); host.innerHTML = '';
-  if(!botProposal) return;
+  if(!botBudget) return;
   var type = $('bot-goal-type').value;
   if(type==='cut'){
     var sel = el('select',{id:'bot-goal-cat'});
-    botProposal.rows.forEach(function(r){ sel.appendChild(el('option',{value:r.category},r.category)); });
+    botBudget.rows.forEach(function(r){ sel.appendChild(el('option',{value:r.category},r.category)); });
     host.appendChild(sel);
     host.appendChild(el('input',{type:'number',min:'1',max:'99',step:'1',placeholder:'%',inputmode:'decimal',id:'bot-goal-pct',style:'width:76px'}));
   }else{
@@ -8105,41 +8103,41 @@ function botRenderGoalInputs(){
   }
 }
 function botApplySuggestion(s, btn){
-  var r = botProposal.rows.filter(function(x){ return x.category===s.category; })[0];
-  if(r){ r.amount = s.to; r.touched = true; }
+  var r = botBudget.rows.filter(function(x){ return x.category===s.category; })[0];
+  if(r){ r.amount = s.to; botWriteNow(botBudget.month, r.category, r.locked ? r.amount : 0); }
   botRenderTable();
   if(btn){ btn.disabled = true; btn.textContent = 'Applied'; }
 }
 function botSuggest(){
   var host = $('bot-suggestions'); host.innerHTML = '';
-  if(!botProposal || !botProposal.rows.length){ toast('Propose a budget first.', true); return; }
+  if(!botBudget || !botBudget.rows.length){ toast('Add a category below or tap Recalculate first.', true); return; }
   var type = $('bot-goal-type').value;
-  var total = botProposalTotal();
+  var total = botBudgetTotal();
   var res = null, note = '';
   if(type==='save'){
     var want = num($('bot-goal-amt').value);
     if(!(want>0)){ toast('Enter how much you want to save per month.', true); return; }
-    var projected = botProposal.avgIncome - total;
+    var projected = botBudget.avgIncome - total;
     var gap = want - Math.max(0, projected);
-    note = 'Your paycheck averages ~'+money(Math.round(botProposal.avgIncome))+'/mo; this draft spends '+money(Math.round(total))+'/mo.';
+    note = 'Your paycheck averages ~'+money(Math.round(botBudget.avgIncome))+'/mo; this budget spends '+money(Math.round(total))+'/mo.';
     if(gap<=0){
-      host.appendChild(el('p',{style:'margin:0'},'Good news — this draft already leaves about '+money(Math.round(projected))+'/mo unspent, which covers your '+money(want)+' goal.'));
+      host.appendChild(el('p',{style:'margin:0'},'Good news — this budget already leaves about '+money(Math.round(projected))+'/mo unspent, which covers your '+money(want)+' goal.'));
       return;
     }
-    res = botAllocateCuts(botProposal.rows, gap);
+    res = botAllocateCuts(botBudget.rows, gap);
   }else if(type==='cap'){
     var cap = num($('bot-goal-amt').value);
     if(!(cap>0)){ toast('Enter your target monthly spending.', true); return; }
     var over = total - cap;
     if(over<=0){
-      host.appendChild(el('p',{style:'margin:0'},'This draft already spends '+money(Math.round(total))+'/mo — under your '+money(cap)+' target.'));
+      host.appendChild(el('p',{style:'margin:0'},'This budget already spends '+money(Math.round(total))+'/mo — under your '+money(cap)+' target.'));
       return;
     }
-    res = botAllocateCuts(botProposal.rows, over);
+    res = botAllocateCuts(botBudget.rows, over);
   }else{
     var cat = $('bot-goal-cat').value, pct = num($('bot-goal-pct').value);
     if(!(pct>0 && pct<100)){ toast('Enter a percent between 1 and 99.', true); return; }
-    var r = botProposal.rows.filter(function(x){ return x.category===cat; })[0];
+    var r = botBudget.rows.filter(function(x){ return x.category===cat; })[0];
     if(!r) return;
     if(r.locked){ toast(cat+' is locked — unlock it first.', true); return; }
     var to = Math.max(0, Math.round(r.amount*(1-pct/100)));
@@ -8181,187 +8179,90 @@ function botSuggest(){
 /* Save: checked rows write their amounts; unchecked rows save as $0.
    Categories removed from the planner (or otherwise no longer listed)
    revert to $0 so stale saved budgets can't linger. */
-async function botSave(){
-  var ym = $('bud-month').value || monthLocal();
-  var btn = $('bot-save'); btn.disabled = true;
-  await withSaveLock(async function(){
-  try{
-    var inRows = {}, n = 0;
-    for(var i=0;i<botProposal.rows.length;i++){
-      var r = botProposal.rows[i];
-      inRows[r.category] = true;
-      var amt = r.locked ? Math.round(num(r.amount)*100)/100 : 0;
-      await getStore().setBudget(r.category, ym, amt);
-      if(r.locked && amt>0) n++;
-    }
-    var had = {};
-    state.budgets.forEach(function(b){
-      if(String(b.month)!==ym) return;
-      var k = String(b.category||'');
-      if(k.indexOf(INC_BUDGET_PREFIX)!==0 && num(b.amount)!==0) had[k] = true;
-    });
-    var stale = Object.keys(had).filter(function(k){ return !inRows[k]; });
-    for(var j=0;j<stale.length;j++) await getStore().setBudget(stale[j], ym, 0);
-    await loadAll(); renderBudgets();
-    toast('Budget saved for '+fmtMonthPretty(ym)+': '+n+' categor'+(n===1?'y':'ies')+'.');
-  }catch(err){ toast('Save failed: '+err.message, true); }
-  });
-  btn.disabled = false;
-}
+
 function botReset(){
-  botProposal = null;
+  botBudget = null;
   $('bot-table').innerHTML = '';
   $('bot-bulk-row').style.display = 'none';
   $('bot-suggestions').innerHTML = '';
-  $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
-  $('bot-save-row').hidden = true;
   updateFloatTotals();
 }
 
 /* ================= income planner =================
-   Mirrors the Budget planner for income: drafts monthly income targets from
-   year-to-date income, with editable amounts, locks, per-row delete, draft
-   persistence per budget month, and save into namespaced income budgets. */
-var incBotProposal = null; // {v, month, rows:[{category, ytd, lastMo, amount, locked, touched}], months, mSums}
+   Mirrors the Budget planner for income: the planner IS the income-target
+   budget — every edit writes straight through to namespaced income budgets.
+   No draft, no Save button. */
+var incBotBudget = null; // {month, rows:[{category, ytd, lastMo, amount, locked}], months, mSums}
 var ibotBarRefs = []; // [{r, fill}] received-vs-target bars in the income planner
-var INC_BOT_DRAFT_LS = 'expTrackerBotIncomeDraft:';
-function incBotCompute(ym){
-  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01', mStart = ym+'-01';
-  var prevStart = monthAdd(ym,-1)+'-01';
-  var months = parseInt(ym.slice(5,7),10)||1;
-  var sums = {}, lasts = {}, mSums = {};
-  state.transactions.forEach(function(t){
-    if(t.txn_type!=='income') return;
-    if(!t.date || t.date<y0 || t.date>=yEnd) return;
-    var c = t.category || 'Uncategorized';
-    sums[c] = (sums[c]||0) + num(t.amount);
-    if(t.date>=prevStart && t.date<mStart) lasts[c] = (lasts[c]||0) + num(t.amount);
-    if(t.date>=mStart) mSums[c] = (mSums[c]||0) + num(t.amount);
-  });
-  var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
-    var avg = sums[c]/months;
-    return {category:c, ytd:sums[c], lastMo:lasts[c]||0, amount:botNiceRound(avg), locked:false, touched:false};
-  }).sort(function(a,b){ return b.amount-a.amount; });
-  return {rows:rows, months:months, mSums:mSums};
-}
-function incBotPersist(){
-  try{
-    if(incBotProposal) localStorage.setItem(INC_BOT_DRAFT_LS+incBotProposal.month, JSON.stringify(incBotProposal));
-  }catch(e){}
-}
-function incBotRestore(ym){
-  if(incBotProposal) return;
-  try{
-    var raw = localStorage.getItem(INC_BOT_DRAFT_LS+ym);
-    if(!raw) return;
-    var d = JSON.parse(raw);
-    if(!d || d.month!==ym || d.v!==2 || !Array.isArray(d.rows) || !d.rows.length) return;
-    d.rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, d.rows);
-    incBotProposal = d;
-    incBotRenderTable();
-    $('ibot-save-row').hidden = false;
-    $('ibot-save-month').textContent = fmtMonthPretty(ym);
-    return true;
-  }catch(e){}
-  return false;
-}
+
 /* Refresh a proposal's calculated values from current transactions, keeping the
    user's edits and locks: rows they typed keep their amounts; untouched rows
    follow the fresh YTD average. New categories appear; user-added rows with no
    YTD income are kept as-is. */
-function incBotRecalc(){
-  if(!incBotProposal) return;
-  var ym = $('bud-month').value || monthLocal();
-  if(incBotProposal.month!==ym) return;
-  var fresh = incBotCompute(ym);
-  var freshRows = botFilterRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, fresh.rows);
-  var oldByCat = {};
-  incBotProposal.rows.forEach(function(r){ oldByCat[r.category] = r; });
-  var freshCats = {};
-  var merged = freshRows.map(function(fr){
-    freshCats[fr.category] = true;
-    var old = oldByCat[fr.category];
-    if(old){
-      return {category:fr.category, ytd:fr.ytd, lastMo:fr.lastMo,
-        amount: old.touched ? old.amount : fr.amount,
-        locked: !!old.locked, touched: !!old.touched};
-    }
-    return fr;
-  });
-  incBotProposal.rows.forEach(function(r){
-    if(!freshCats[r.category]) merged.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked, touched:!!r.touched});
-  });
-  incBotProposal.rows = merged;
-  incBotProposal.months = fresh.months;
-  incBotProposal.mSums = fresh.mSums;
-  incBotRenderTable();
-}
-function incBotPropose(){
-  var ym = $('bud-month').value || monthLocal();
+/* Load the live income targets for a month: saved targets overlaid on fresh
+   year-to-date income. Saved rows come back checked with their saved amounts;
+   everything else is an unchecked YTD suggestion. Removed categories stay out. */
+function ibotLoadBudget(ym){
   var c = incBotCompute(ym);
   var saved = savedBudgetsFor(ym, true);
-  var prevLocked = {};
-  if(incBotProposal && incBotProposal.month===ym){
-    incBotProposal.rows.forEach(function(r){ prevLocked[r.category] = !!r.locked; });
-  }
-  var byCat = {};
-  c.rows.forEach(function(r){ byCat[r.category] = true; });
-  var rows = c.rows.map(function(r){
-    return {category:r.category, ytd:r.ytd, lastMo:r.lastMo, amount:r.amount,
-      locked:!!prevLocked[r.category], touched:true};
-  });
-  Object.keys(saved).forEach(function(cat){
-    if(!byCat[cat]) rows.push({category:cat, ytd:0, lastMo:0, amount:saved[cat],
-      locked:!!prevLocked[cat], touched:true});
-  });
-  rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, rows);
-  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
-  incBotProposal = {v:2, month:ym, rows:rows, months:c.months, mSums:c.mSums};
-  incBotRenderTable();
-  $('ibot-save-row').hidden = false;
-  $('ibot-save-month').textContent = fmtMonthPretty(ym);
-  toast('Income targets recalculated from year-to-date income.');
-}
-function incBotEnsureProposal(ym){
-  if(incBotProposal && incBotProposal.month===ym){ incBotRecalc(); return; }
-  incBotProposal = null;
-  if(incBotRestore(ym)){ incBotRecalc(); return; }
-  if(incBotPrefillFromSaved(ym)){ incBotRecalc(); return; }
-  incBotPropose();
-}
-function incBotPrefillFromSaved(ym){
-  var saved = savedBudgetsFor(ym, true);
-  var cats = Object.keys(saved);
-  if(!cats.length) return false;
-  var c = incBotCompute(ym);
   var removed = botRemovedGet(INC_BOT_REMOVED_LS, ym);
   var byCat = {};
   c.rows.forEach(function(r){ byCat[r.category] = r; });
-  var rows = cats.filter(function(cat){ return removed.indexOf(cat)<0; }).map(function(cat){
-    var fr = byCat[cat];
-    return {category:cat, ytd:fr?fr.ytd:0, lastMo:fr?fr.lastMo:0, amount:saved[cat],
-      locked:true, touched:true};
+  var rows = c.rows.map(function(r){
+    var s = saved[r.category];
+    return {category:r.category, ytd:r.ytd, lastMo:r.lastMo,
+      amount:(s!=null ? s : r.amount), locked:(s!=null ? s>0 : false)};
   });
-  if(!rows.length) return false;
+  Object.keys(saved).forEach(function(cat){
+    if(!byCat[cat]) rows.push({category:cat, ytd:0, lastMo:0, amount:saved[cat], locked:saved[cat]>0});
+  });
+  rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
-  incBotProposal = {v:2, month:ym, rows:rows, months:c.months, mSums:c.mSums};
+  incBotBudget = {month:ym, rows:rows, months:c.months, mSums:c.mSums};
   incBotRenderTable();
-  $('ibot-save-row').hidden = false;
-  $('ibot-save-month').textContent = fmtMonthPretty(ym);
-  return true;
 }
+/* Recalculate: fresh year-to-date amounts for every row, checks preserved,
+   removed categories stay out. Writes straight through. */
+function ibotRecalculate(){
+  if(!incBotBudget) return;
+  var ym = incBotBudget.month;
+  var c = incBotCompute(ym);
+  var saved = savedBudgetsFor(ym, true);
+  var oldByCat = {};
+  incBotBudget.rows.forEach(function(r){ oldByCat[r.category] = r; });
+  var freshCats = {};
+  var rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, c.rows).map(function(fr){
+    freshCats[fr.category] = true;
+    var old = oldByCat[fr.category];
+    return {category:fr.category, ytd:fr.ytd, lastMo:fr.lastMo, amount:fr.amount,
+      locked:old ? !!old.locked : false};
+  });
+  incBotBudget.rows.forEach(function(r){
+    if(!freshCats[r.category]) rows.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked});
+  });
+  rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  incBotBudget.rows = rows;
+  incBotBudget.months = c.months; incBotBudget.mSums = c.mSums;
+  rows.forEach(function(r){
+    if(r.locked) botWriteNow(ym, INC_BUDGET_PREFIX+r.category, r.amount);
+    else if((saved[r.category]||0) > 0) botWriteNow(ym, INC_BUDGET_PREFIX+r.category, 0);
+  });
+  incBotRenderTable();
+  toast('Income targets recalculated from year-to-date income.');
+}
+
 function incBotTotal(){
-  if(!incBotProposal) return 0;
-  return incBotProposal.rows.reduce(function(s,r){ return s+(r.locked?num(r.amount):0); }, 0);
+  if(!incBotBudget) return 0;
+  return incBotBudget.rows.reduce(function(s,r){ return s+(r.locked?num(r.amount):0); }, 0);
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
   ibotBarRefs = [];
-  if(!incBotProposal){ $('ibot-bulk-row').style.display = 'none'; return; }
-  var rows = incBotProposal.rows;
+  if(!incBotBudget){ $('ibot-bulk-row').style.display = 'none'; return; }
+  var rows = incBotBudget.rows, ym = incBotBudget.month;
   $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  var months = incBotProposal.months||1;
+  var months = incBotBudget.months||1;
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
     head.appendChild(el('span'));
@@ -8376,7 +8277,11 @@ function incBotRenderTable(){
   rows.forEach(function(r){
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
-    check.addEventListener('click', function(){ r.locked = !r.locked; incBotRenderTable(); incBotPersist(); });
+    check.addEventListener('click', function(){
+      r.locked = !r.locked;
+      botWriteNow(ym, INC_BUDGET_PREFIX+r.category, r.locked ? r.amount : 0);
+      incBotRenderTable();
+    });
     line.appendChild(check);
     var nm = el('div');
     var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
@@ -8387,13 +8292,19 @@ function incBotRenderTable(){
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
-    inp.addEventListener('change', function(){ r.amount = Math.max(0, num(inp.value)); r.touched = true; inp.value = r.amount; incBotRenderTotal(); incBotPersist(); });
+    inp.addEventListener('change', function(){
+      r.amount = Math.max(0, num(inp.value));
+      inp.value = r.amount;
+      botWriteSoon(ym, INC_BUDGET_PREFIX+r.category, r.locked ? r.amount : 0);
+      incBotRenderTotal();
+    });
     line.appendChild(inp);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
-      botRememberRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, r.category);
-      incBotProposal.rows = incBotProposal.rows.filter(function(x){ return x!==r; });
-      incBotRenderTable(); incBotPersist();
+      botRememberRemoved(INC_BOT_REMOVED_LS, ym, r.category);
+      botWriteNow(ym, INC_BUDGET_PREFIX+r.category, 0);
+      incBotBudget.rows = incBotBudget.rows.filter(function(x){ return x!==r; });
+      incBotRenderTable();
     });
     line.appendChild(del);
     /* Slim received-vs-target bar for the selected month. */
@@ -8413,10 +8324,10 @@ function incBotRenderTable(){
     var addRow = el('div',{style:'display:flex;gap:8px;margin-top:10px'});
     var addBtn = el('button',{class:'btn small',type:'button'},'Add category');
     addBtn.addEventListener('click', function(){
-      botForgetRemoved(INC_BOT_REMOVED_LS, incBotProposal.month, sel.value);
-      incBotProposal.rows.push({category:sel.value, ytd:0, lastMo:0, amount:0, locked:false, touched:false});
-      incBotProposal.rows.sort(function(a,b){ return b.amount-a.amount; });
-      incBotRenderTable(); incBotPersist();
+      botForgetRemoved(INC_BOT_REMOVED_LS, ym, sel.value);
+      incBotBudget.rows.push({category:sel.value, ytd:0, lastMo:0, amount:0, locked:false});
+      incBotBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
+      incBotRenderTable();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
     host.appendChild(addRow);
@@ -8428,17 +8339,17 @@ function incBotRenderTable(){
     host.appendChild(tot);
     host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},'Total of checked rows only.'));
   }
-  var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, incBotProposal.month).length;
+  var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, ym).length;
   if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
   ibotPaintBars();
-  incBotPersist();
   updateFloatTotals();
 }
+
 /* Received-vs-target bars for the selected month: filled width =
    received/target, red when received exceeds the target. */
 function ibotPaintBars(){
-  var sums = (incBotProposal && incBotProposal.mSums) || {};
+  var sums = (incBotBudget && incBotBudget.mSums) || {};
   (ibotBarRefs||[]).forEach(function(o){
     var actual = sums[o.r.category]||0, amt = num(o.r.amount);
     var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
@@ -8453,55 +8364,29 @@ function incBotRenderTotal(){
   ibotPaintBars();
   updateFloatTotals();
 }
-async function incBotSave(){
-  var ym = $('bud-month').value || monthLocal();
-  var btn = $('ibot-save'); btn.disabled = true;
-  await withSaveLock(async function(){
-  try{
-    var inRows = {}, n = 0;
-    for(var i=0;i<incBotProposal.rows.length;i++){
-      var r = incBotProposal.rows[i];
-      inRows[r.category] = true;
-      var amt = r.locked ? Math.round(num(r.amount)*100)/100 : 0;
-      await getStore().setBudget(INC_BUDGET_PREFIX+r.category, ym, amt);
-      if(r.locked && amt>0) n++;
-    }
-    var had = {};
-    state.budgets.forEach(function(b){
-      if(String(b.month)!==ym) return;
-      var k = String(b.category||'');
-      if(k.indexOf(INC_BUDGET_PREFIX)===0 && num(b.amount)!==0) had[k] = true;
-    });
-    var stale = Object.keys(had).filter(function(k){ return !inRows[k.slice(INC_BUDGET_PREFIX.length)]; });
-    for(var j=0;j<stale.length;j++) await getStore().setBudget(stale[j], ym, 0);
-    await loadAll(); renderBudgets();
-    toast('Income targets saved for '+fmtMonthPretty(ym)+': '+n+' categor'+(n===1?'y':'ies')+'.');
-  }catch(err){ toast('Save failed: '+err.message, true); }
-  });
-  btn.disabled = false;
-}
+
 function incBotReset(){
-  incBotProposal = null;
+  incBotBudget = null;
   $('ibot-table').innerHTML = '';
   $('ibot-bulk-row').style.display = 'none';
-  $('ibot-save-row').hidden = true;
   updateFloatTotals();
 }
-/* Floating total pills pinned above the tab bar while a bot proposal is
-   active on the Budget tab. pointer-events:none so they never block taps. */
+
+/* Floating total pills pinned above the tab bar while a budget is open
+   on the Budget tab. pointer-events:none so they never block taps. */
 function updateFloatTotals(){
   var wrap = $('float-totals');
   if(!wrap) return;
   var onBudget = state.screen==='budgets';
-  var expRows = (botProposal && botProposal.rows) || [];
-  var incRows = (incBotProposal && incBotProposal.rows) || [];
+  var expRows = (botBudget && botBudget.rows) || [];
+  var incRows = (incBotBudget && incBotBudget.rows) || [];
   var expOn = onBudget && expRows.length>0, incOn = onBudget && incRows.length>0;
   var one = $('float-totals-one');
   one.innerHTML = '';
   if(expOn){
     var d1 = el('div');
     d1.appendChild(document.createTextNode('Planned total '));
-    var b = el('b'); b.textContent = money(botProposalTotal()); d1.appendChild(b);
+    var b = el('b'); b.textContent = money(botBudgetTotal()); d1.appendChild(b);
     var pct = botPctText();
     if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; d1.appendChild(s); }
     one.appendChild(d1);
