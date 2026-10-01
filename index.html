@@ -2387,7 +2387,10 @@ var scrollPosByScreen = {}; // tab name -> remembered window.scrollY
    switch, throttled while scrolling, and on pagehide (refresh/close). */
 var SCROLL_POS_KEY = 'expenseTracker.scrollPos';
 function saveScrollPos(){
-  try{ localStorage.setItem(SCROLL_POS_KEY, JSON.stringify(scrollPosByScreen)); }catch(e){}
+  try{
+    localStorage.setItem(SCROLL_POS_KEY, JSON.stringify(scrollPosByScreen));
+    localStorage.setItem(SCROLL_SEL_SIG_KEY, JSON.stringify(scrollSelSigByScreen));
+  }catch(e){}
 }
 function loadScrollPos(){
   try{
@@ -2397,12 +2400,42 @@ function loadScrollPos(){
         if(SCREENS.indexOf(k)>=0 && typeof p[k]==='number' && isFinite(p[k]) && p[k]>=0) scrollPosByScreen[k] = Math.round(p[k]);
       });
     }
+    var g = JSON.parse(localStorage.getItem(SCROLL_SEL_SIG_KEY)||'null');
+    if(g && typeof g==='object'){
+      Object.keys(g).forEach(function(k){
+        if(SCREENS.indexOf(k)>=0 && typeof g[k]==='string') scrollSelSigByScreen[k] = g[k];
+      });
+    }
   }catch(e){}
+}
+/* The Transactions selection signature: native filters + search + drill pill.
+   A remembered scroll position only applies while the selection is unchanged;
+   navigating to Transactions with a new selection starts at the first row. */
+var SCROLL_SEL_SIG_KEY = 'expenseTracker.scrollSelSig';
+var scrollSelSigByScreen = {}; // tab name -> selection signature at save time
+function txnSelectionSig(){
+  function v(id){ var n = $(id); return n ? n.value : ''; }
+  var parts = [v('f-preset'), v('f-from'), v('f-to'), v('f-cat'), v('f-type'),
+               v('f-bank'), v('f-bp'), v('f-tax'), (v('f-q')||'').trim().toLowerCase()];
+  try{ parts.push(txnDrill ? JSON.stringify(txnDrill) : ''); }catch(e){ parts.push(''); }
+  return parts.join('|');
+}
+function txnScrollY(){
+  if(scrollSelSigByScreen.transactions !== txnSelectionSig()) return 0;
+  return scrollPosByScreen.transactions || 0;
+}
+/* Remember the current tab's scroll (and the Transactions selection it goes
+   with), then persist. */
+function rememberScroll(){
+  if(!state.screen) return;
+  scrollPosByScreen[state.screen] = window.scrollY;
+  if(state.screen==='transactions') scrollSelSigByScreen.transactions = txnSelectionSig();
+  saveScrollPos();
 }
 function showScreen(name){
   var same = (state.screen === name);
   // remember each tab's vertical scroll; restore it when coming back
-  if(state.screen && !same){ scrollPosByScreen[state.screen] = window.scrollY; saveScrollPos(); }
+  if(state.screen && !same){ rememberScroll(); }
   state.screen = name;
   if(screenPersistOk && SCREENS.indexOf(name)>=0){ try{ localStorage.setItem('expTrackerScreen', name); }catch(e){} }
   SCREENS.forEach(function(s){
@@ -2419,7 +2452,7 @@ function showScreen(name){
     else if(name==='reports') renderReports();
     else if(name==='settings') syncStoreSettings();
   }
-  if(!same) window.scrollTo(0, scrollPosByScreen[name] || 0);
+  if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
 }
 function updateUserChip(){
   $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
@@ -2439,12 +2472,9 @@ document.addEventListener('DOMContentLoaded', function(){
     if(!state.screen) return;
     scrollPosByScreen[state.screen] = window.scrollY;
     if(scrollSaveT) return;
-    scrollSaveT = setTimeout(function(){ scrollSaveT = null; saveScrollPos(); }, 800);
+    scrollSaveT = setTimeout(function(){ scrollSaveT = null; rememberScroll(); }, 800);
   }, {passive:true});
-  window.addEventListener('pagehide', function(){
-    if(state.screen) scrollPosByScreen[state.screen] = window.scrollY;
-    saveScrollPos();
-  });
+  window.addEventListener('pagehide', function(){ rememberScroll(); });
   boot();
 });
 /* Keyboard shortcuts: number keys 1-8 jump straight to tabs (browsers reserve
@@ -2598,13 +2628,13 @@ async function enterApp(){
     await loadAll();
     showScreen(targetScreen);
     // same-tab re-show skips the scroll restore above; content is final now
-    window.scrollTo(0, scrollPosByScreen[targetScreen] || 0);
+    window.scrollTo(0, targetScreen==='transactions' ? txnScrollY() : (scrollPosByScreen[targetScreen] || 0));
     maybeResumeBulkJob();
   }catch(err){
     if(instant){
       toast('Could not refresh data — showing your last saved view.', true);
       showScreen(targetScreen);
-      window.scrollTo(0, scrollPosByScreen[targetScreen] || 0);
+      window.scrollTo(0, targetScreen==='transactions' ? txnScrollY() : (scrollPosByScreen[targetScreen] || 0));
     }else{
       toast('Could not load data: '+err.message, true);
       showScreen('settings');
@@ -4495,6 +4525,7 @@ function drillToTransactions(o){
   // the native dropdown alone shows exactly the drilled selection.
   if(drillCat && !drillHasDims(txnDrill)) txnDrill = null;
   showScreen('transactions');
+  window.scrollTo(0, 0); // a drill is always a new selection: start at the first row
 }
 /* show/hide the × clear buttons in the two search boxes */
 function syncSearchClear(){
