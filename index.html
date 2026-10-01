@@ -158,9 +158,10 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-cal .day{position:relative; min-height:44px; border:1px solid var(--border); border-radius:10px; padding:4px 2px; font-size:12px; text-align:center; cursor:pointer; background:var(--card);}
 .bill-cal .day.other{opacity:0.35;}
 .bill-cal .day.today > div:first-child{display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700;}
+.bill-cal .day.has-bills{background:var(--accent-soft);}
 .bill-cal .day.sel{background:var(--accent-faint); border-color:var(--accent);}
-.bill-cal .day .dots{display:flex; gap:3px; justify-content:center; margin-top:4px; flex-wrap:wrap; min-height:7px;}
-.bill-cal .day .dot{width:7px; height:7px; border-radius:99px; background:var(--accent);}
+.bill-cal .day .dots{display:flex; gap:4px; justify-content:center; margin-top:4px; flex-wrap:wrap; min-height:9px;}
+.bill-cal .day .dot{width:9px; height:9px; border-radius:99px; background:var(--accent);}
 .bill-cal .day .dot.over{background:var(--danger);}
 .bill-cal .day .n{font-size:10px; color:var(--muted); line-height:1.3;}
 /* bills list */
@@ -9261,7 +9262,8 @@ function renderBillCalendar(){
   }
   while(cells.length%7) cells.push({d:'', other:true, ymd:null});
   cells.forEach(function(c){
-    var cls = 'day'+(c.other?' other':'')+(c.ymd===today?' today':'')+(c.ymd&&c.ymd===billSelDay?' sel':'');
+    var hasBills = !!(c.ymd && counts[c.ymd]);
+    var cls = 'day'+(c.other?' other':'')+(c.ymd===today?' today':'')+(c.ymd&&c.ymd===billSelDay?' sel':'')+(hasBills?' has-bills':'');
     var cell = el('div',{class:cls});
     cell.appendChild(el('div',null,String(c.d)));
     if(c.ymd && counts[c.ymd]){
