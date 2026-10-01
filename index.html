@@ -436,7 +436,7 @@ textarea{resize:vertical; min-height:64px;}
 #bud-month:hover{border-color:var(--border);}
 /* Live budget-vs-income totals pill: second row of the sticky bar, always a
    single line (truncates instead of wrapping over the buttons below). */
-.bud-totals{margin:0; text-align:right; font-size:14px; color:var(--muted);
+.bud-totals{margin:0; text-align:center; font-size:14px; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .bud-totals b{color:var(--text); font-variant-numeric:tabular-nums; font-size:16px;}
 .bud-totals b.neg{color:var(--danger);}
@@ -456,6 +456,14 @@ textarea{resize:vertical; min-height:64px;}
 .bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2;}
 .bot-row > :nth-child(4), .bot-head > :nth-child(4){grid-column:3; grid-row:2;}
 .bot-row > :nth-child(5), .bot-head > :nth-child(5){grid-column:4; grid-row:2;}
+/* Drag-reorder grip handle on each planner row (touch-action:none so a touch
+   drag doesn't scroll the page) and the row's appearance while dragging. */
+.bot-grip{flex:none; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
+  color:var(--muted); opacity:.55; font-size:13px; letter-spacing:2px; line-height:1;
+  padding:12px 5px; margin-left:-5px;}
+.bot-grip:active{cursor:grabbing;}
+.bot-row.bot-dragging{position:relative; z-index:30; box-shadow:0 12px 28px rgba(0,0,0,.35); opacity:.96;}
+.bot-row.bot-dragging .bot-grip{cursor:grabbing; opacity:1;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -7767,6 +7775,103 @@ function botFixedSet(prefix, ym, cat, fixed){
   if(fixed) m[cat] = 1; else delete m[cat];
   try{ localStorage.setItem(prefix+ym, JSON.stringify(m)); }catch(e){}
 }
+/* Per-month manual row order for the planners, set by dragging a row's grip
+   handle. Stored as an array of category names; when present it overrides the
+   default amount-descending sort. */
+var BOT_ORDER_LS = 'expTrackerBotOrder:';
+var INC_BOT_ORDER_LS = 'expTrackerIncBotOrder:';
+function botOrderGet(prefix, ym){
+  try{
+    var a = JSON.parse(localStorage.getItem(prefix+ym)||'null');
+    return Array.isArray(a) ? a : null;
+  }catch(e){ return null; }
+}
+function botOrderSet(prefix, ym, cats){
+  try{ localStorage.setItem(prefix+ym, JSON.stringify(cats)); }catch(e){}
+}
+/* Reorder rows to a stored manual order; rows missing from it keep their
+   current relative order at the end. */
+function botApplyStoredOrder(rows, prefix, ym){
+  var order = botOrderGet(prefix, ym);
+  if(!order || !order.length) return rows;
+  var pos = {};
+  order.forEach(function(c,i){ if(pos[c]==null) pos[c]=i; });
+  var inOrder = [], rest = [];
+  rows.forEach(function(r){ (pos[r.category]!=null ? inOrder : rest).push(r); });
+  inOrder.sort(function(a,b){ return pos[a.category]-pos[b.category]; });
+  return inOrder.concat(rest);
+}
+/* Pointer-based drag reorder for planner rows. The grip handle (.bot-grip)
+   starts the drag; rows live-reorder in the DOM as the pointer moves; on
+   release the new order is saved for the month. Works with mouse and touch
+   (the grip's touch-action:none keeps touch drags from scrolling the page).
+   opts: {host, rowsFn (live rows array), ymFn, prefix}. Bound once per host. */
+function botMakeRowsDraggable(opts){
+  var host = opts.host;
+  if(!host || host._botDragBound) return;
+  host._botDragBound = true;
+  var drag = null;
+  host.addEventListener('pointerdown', function(e){
+    var grip = e.target && e.target.closest ? e.target.closest('.bot-grip') : null;
+    if(!grip || !host.contains(grip)) return;
+    var row = grip.closest('.bot-row');
+    if(!row) return;
+    e.preventDefault();
+    drag = {row:row, grip:grip, pointerId:e.pointerId, startY:e.clientY,
+      dy:0, active:false};
+    try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  host.addEventListener('pointermove', function(e){
+    if(!drag || e.pointerId!==drag.pointerId) return;
+    var dy = e.clientY - drag.startY;
+    if(!drag.active){
+      if(Math.abs(dy) < 8) return;
+      drag.active = true;
+      drag.row.classList.add('bot-dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+    }
+    drag.dy = dy;
+    drag.row.style.transform = 'translateY('+dy+'px)';
+    if(e.clientY < 72) window.scrollBy(0, -14);
+    else if(e.clientY > window.innerHeight - 72) window.scrollBy(0, 14);
+    /* Live reorder: first sibling whose midpoint sits below the dragged
+       row's untransformed center takes the dragged row before it. */
+    var rect = drag.row.getBoundingClientRect();
+    var centerY = rect.top - dy + rect.height/2;
+    var sibs = Array.prototype.filter.call(host.children, function(ch){
+      return ch!==drag.row && ch.classList && ch.classList.contains('bot-row');
+    });
+    if(sibs.length){
+      var placed = false;
+      for(var i=0;i<sibs.length;i++){
+        var r = sibs[i].getBoundingClientRect();
+        if(centerY < r.top + r.height/2){ host.insertBefore(drag.row, sibs[i]); placed = true; break; }
+      }
+      if(!placed) host.insertBefore(drag.row, sibs[sibs.length-1].nextSibling);
+    }
+  });
+  function endDrag(e){
+    if(!drag || (e && e.pointerId!=null && e.pointerId!==drag.pointerId)) return;
+    var wasActive = drag.active, row = drag.row;
+    row.classList.remove('bot-dragging');
+    row.style.transform = '';
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
+    if(wasActive){
+      var cats = Array.prototype.map.call(host.querySelectorAll('.bot-row'), function(r){
+        return r.getAttribute('data-cat');
+      });
+      var arr = opts.rowsFn(), pos = {};
+      cats.forEach(function(c,i){ if(pos[c]==null) pos[c]=i; });
+      arr.sort(function(a,b){ return pos[a.category]-pos[b.category]; });
+      botOrderSet(opts.prefix, opts.ymFn(), cats);
+    }
+    drag = null;
+  }
+  host.addEventListener('pointerup', endDrag);
+  host.addEventListener('pointercancel', endDrag);
+}
 /* Paint a planner row's enabled/disabled state: enabled rows get a full
    accent fill; disabled (suggestion) rows stay dimmed. */
 /* Labeled mini-stat for planner rows (YTD avg / Actual grouped together). */
@@ -7939,6 +8044,7 @@ function botLoadBudget(ym){
   });
   rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  rows = botApplyStoredOrder(rows, BOT_ORDER_LS, ym);
   botBudget = {month:ym, rows:rows, avgIncome:c.avgIncome, ytdSums:c.ytdSums,
     ytdIncSums:c.ytdIncSums, ytdMonths:c.ytdMonths, monthSums:c.monthSums,
     billFloors:c.billFloors};
@@ -7970,6 +8076,7 @@ function botRecalculate(){
     if(!freshCats[r.category]) rows.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked, fixed:!!r.fixed});
   });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  rows = botApplyStoredOrder(rows, BOT_ORDER_LS, ym);
   botBudget.rows = rows;
   botBudget.avgIncome = c.avgIncome; botBudget.ytdSums = c.ytdSums;
   botBudget.ytdIncSums = c.ytdIncSums; botBudget.ytdMonths = c.ytdMonths;
@@ -8041,6 +8148,7 @@ function botRenderTable(){
   rows.forEach(function(r){
     var isInc = ((botBudget.ytdIncSums||{})[r.category]||0) > ((botBudget.ytdSums||{})[r.category]||0);
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    line.setAttribute('data-cat', r.category);
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -8057,6 +8165,7 @@ function botRenderTable(){
     var actual = (botBudget.monthSums||{})[r.category]||0;
     var over = num(r.amount)>0 && actual>num(r.amount);
     nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(over?';color:var(--danger);font-weight:700':'')},'This month '+money(Math.round(actual))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
+    nm.appendChild(el('span',{class:'bot-grip',title:'Drag to reorder'},'⋮⋮'));
     nm.appendChild(nmText);
     var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
       title:r.fixed?'Unlock — allow editing this amount':'Lock — fix this amount',
@@ -8128,7 +8237,9 @@ function botRenderTable(){
     addBtn.addEventListener('click', function(){
       botForgetRemoved(BOT_REMOVED_LS, ym, sel.value);
       botBudget.rows.push({category:sel.value, avg:0, last:0, amount:0, locked:false});
-      botBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
+      var addOrder = botOrderGet(BOT_ORDER_LS, ym);
+      if(addOrder){ addOrder.push(sel.value); botOrderSet(BOT_ORDER_LS, ym, addOrder); }
+      else botBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
       botRenderTable(); botRenderGoalInputs();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
@@ -8151,6 +8262,11 @@ function botRenderTable(){
   var nRemoved = botRemovedGet(BOT_REMOVED_LS, ym).length;
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this budget — re-add above to bring one back.'));
+  /* Drag-to-reorder rows via the ⋮⋮ grip (bound once; reads live state). */
+  botMakeRowsDraggable({host:host,
+    rowsFn:function(){ return botBudget.rows; },
+    ymFn:function(){ return botBudget.month; },
+    prefix:BOT_ORDER_LS});
 }
 
 function botPctText(){
@@ -8339,6 +8455,7 @@ function ibotLoadBudget(ym){
   });
   rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  rows = botApplyStoredOrder(rows, INC_BOT_ORDER_LS, ym);
   incBotBudget = {month:ym, rows:rows, months:c.months, mSums:c.mSums};
   incBotRenderTable();
 }
@@ -8364,6 +8481,7 @@ function ibotRecalculate(){
     if(!freshCats[r.category]) rows.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked, fixed:!!r.fixed});
   });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
+  rows = botApplyStoredOrder(rows, INC_BOT_ORDER_LS, ym);
   incBotBudget.rows = rows;
   incBotBudget.months = c.months; incBotBudget.mSums = c.mSums;
   rows.forEach(function(r){
@@ -8398,6 +8516,7 @@ function incBotRenderTable(){
   }
   rows.forEach(function(r){
     var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    line.setAttribute('data-cat', r.category);
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -8414,6 +8533,7 @@ function incBotRenderTable(){
     var iactual = (incBotBudget.mSums||{})[r.category]||0;
     var imet = num(r.amount)>0 && iactual>=num(r.amount);
     nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'+(imet?';color:var(--accent);font-weight:700':'')},'This month '+money(Math.round(iactual))));
+    nm.appendChild(el('span',{class:'bot-grip',title:'Drag to reorder'},'⋮⋮'));
     nm.appendChild(nmText);
     var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
       title:r.fixed?'Unlock — allow editing this target':'Lock — fix this target',
@@ -8466,7 +8586,9 @@ function incBotRenderTable(){
     addBtn.addEventListener('click', function(){
       botForgetRemoved(INC_BOT_REMOVED_LS, ym, sel.value);
       incBotBudget.rows.push({category:sel.value, ytd:0, lastMo:0, amount:0, locked:false});
-      incBotBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
+      var iaddOrder = botOrderGet(INC_BOT_ORDER_LS, ym);
+      if(iaddOrder){ iaddOrder.push(sel.value); botOrderSet(INC_BOT_ORDER_LS, ym, iaddOrder); }
+      else incBotBudget.rows.sort(function(a,b){ return b.amount-a.amount; });
       incBotRenderTable();
     });
     addRow.appendChild(sel); addRow.appendChild(addBtn);
@@ -8482,6 +8604,11 @@ function incBotRenderTable(){
   var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, ym).length;
   if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
+  /* Drag-to-reorder rows via the ⋮⋮ grip (bound once; reads live state). */
+  botMakeRowsDraggable({host:host,
+    rowsFn:function(){ return incBotBudget.rows; },
+    ymFn:function(){ return incBotBudget.month; },
+    prefix:INC_BOT_ORDER_LS});
 }
 
 function incBotRenderTotal(){
