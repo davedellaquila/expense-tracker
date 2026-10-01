@@ -8213,7 +8213,7 @@ function botRenderTable(){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',null,'YTD avg · Last month'));
+    head.appendChild(el('span',null,'YTD avg · Prev month'));
     head.appendChild(el('span',null,'Budget'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -8257,7 +8257,7 @@ function botRenderTable(){
     /* YTD average + last-month actual, grouped with labels for planning. */
     var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
     stats.appendChild(botStat('YTD avg', money(Math.round(ytd)), ''));
-    stats.appendChild(botStat('Last month', money(Math.round(r.last)), ''));
+    stats.appendChild(botStat('Prev month', money(Math.round(r.last)), ''));
     line.appendChild(stats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
@@ -8601,7 +8601,7 @@ function incBotRenderTable(){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
-    head.appendChild(el('span',null,'YTD avg · Last month'));
+    head.appendChild(el('span',null,'YTD avg · Prev month'));
     head.appendChild(el('span',null,'Target'));
     head.appendChild(el('span'));
     host.appendChild(head);
@@ -8643,7 +8643,7 @@ function incBotRenderTable(){
     /* YTD average + last-month actual, grouped with labels for planning. */
     var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
     istats.appendChild(botStat('YTD avg', money(Math.round((r.ytd||0)/months))+'/mo', ''));
-    istats.appendChild(botStat('Last month', money(Math.round(r.lastMo||0)), ''));
+    istats.appendChild(botStat('Prev month', money(Math.round(r.lastMo||0)), ''));
     line.appendChild(istats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});

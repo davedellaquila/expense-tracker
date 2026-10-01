@@ -5,6 +5,10 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget tiles: "Last month" → "Prev month"
+- The reference stat on budget/income planner rows (and its column header)
+  now reads "Prev month".
+
 ### Renamed merchants keep their original name for import dedup
 - Editing a transaction's merchant name now stashes the statement's
   original name in a new `merchant_orig` field (first rename wins; later
