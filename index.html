@@ -726,6 +726,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 .scanattach{display:flex; align-items:center; gap:10px; margin:2px 0 8px;}
 .scanattach img{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex:none;}
 .scanbadge{font-size:13px; flex:none;}
+.billbadge{font-size:13px; flex:none;}
 .splitbadge{font-size:10.5px; font-weight:700; color:var(--blue); background:var(--blue-soft);
   border-radius:8px; padding:2px 7px; flex:none; letter-spacing:.02em;}
 /* Split-parts breakdown shown on a split transaction's detail sheet. */
@@ -4470,6 +4471,10 @@ function syncSearchClear(){
 }
 function renderTransactions(){
   syncSearchClear();
+  /* Transactions that have a bill reminder set (bill.sourceTxnId points at
+     them) get a 🔔 badge. Rebuilt per render so deleting the bill clears it. */
+  var billTxnIds = {};
+  state.bills.forEach(function(bd){ if(bd.sourceTxnId) billTxnIds[bd.sourceTxnId] = true; });
   var fcat = $('f-cat');
   var keep = fcat.value;
   fcat.innerHTML='';
@@ -4540,6 +4545,8 @@ function renderTransactions(){
     b.appendChild(amt);
     if(t.scanPath || t.scanDataUrl)
       b.appendChild(el('span',{class:'scanbadge', title:'Receipt scan attached'},'\uD83D\uDCF7'));
+    if(billTxnIds[t.id])
+      b.appendChild(el('span',{class:'billbadge', title:'Bill reminder set'},'\uD83D\uDD14'));
     if(t.split_group)
       b.appendChild(el('span',{class:'splitbadge', title:'Split transaction'},'split'));
     if(txnSelectMode){
@@ -9519,7 +9526,8 @@ function openScanPhoto(rec){
   }
 }
 /* Build a new-bill prefill from a transaction: name/amount/date/category/
-   account come from the transaction; frequency is left for the user to pick. */
+   account come from the transaction; frequency is left for the user to pick.
+   sourceTxnId links the bill back so the transaction can show a 🔔 badge. */
 function billPrefillFromTxn(t){
   return {
     name: t.merchant || t.description || '',
@@ -9527,7 +9535,8 @@ function billPrefillFromTxn(t){
     dueDate: parseDateFlex(t.date) || todayLocal(),
     category: t.category || '',
     account: t.business_personal || 'Personal',
-    notes: ''
+    notes: '',
+    sourceTxnId: (t && t.id) || null
   };
 }
 
@@ -9679,11 +9688,17 @@ function openBillForm(b, opts){
       try{
         if(isEdit){
           row.id = b.id;
+          /* Keep the transaction link across edits on stores that replace
+             the whole row. */
+          if(b.sourceTxnId) row.sourceTxnId = b.sourceTxnId;
           var cur = state.bills.find(function(x){ return x.id===b.id; });
           if(cur) for(var k in row) cur[k]=row[k];
           await getStore().update('Bills', b.id, row);
           toast('Bill updated.');
         }else{
+          /* Bill created from a transaction ("Add bill reminder"): remember
+             the source so the transaction shows a 🔔 badge. */
+          if(opts && opts.prefill && opts.prefill.sourceTxnId) row.sourceTxnId = opts.prefill.sourceTxnId;
           var tmpId = 'tmp-'+Date.now();
           state.bills.push(Object.assign({id:tmpId}, row));
           var newId = await getStore().append('Bills', row);

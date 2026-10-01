@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- Transactions with a bill reminder set now show a 🔔 badge in the list (bills created via "Add bill reminder" link back to their source transaction; deleting the bill clears the badge).
+- Transactions page now remembers all filter criteria across reload: the Account (Personal/Business) and Tax category filters are persisted alongside category/type/bank and the period. Search text and the drill pill stay transient by design.
 - Transaction detail (edit mode) now has an Add bill reminder button next to Split: it opens the bill form pre-filled from the transaction (name, amount, date as due date, category, Personal/Business), stacked above so unsaved edits are kept; frequency is left for the user to pick before saving.
 - Bill scanner: new Upload PDF option — the first page is rendered on-device with PDF.js and read by the same OCR pipeline; the original PDF is retained in bill-scans/ (or the rendered page locally). Also available in the receipt scanner via the shared sheet.
 - Tapping a statement on the Import page now opens an in-app preview of the stored file (PDF renders inline, CSV shows text), with an Open full button for the new-tab view; View opens the same preview. Rows without a stored file are unchanged.
