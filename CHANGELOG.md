@@ -1,4 +1,7 @@
 # Changelog
+## 2026-10-01
+- Home page Budget vs Actual card now renders the same paired-bar chart as Reports (Budget teal / Actual green-red with variance labels), replacing the old progress bars; tap a bar to drill into the category. Sorted by budget, largest first.
+
 
 Running record of what ships in the expense tracker, kept for future
 documentation. Newest first.
