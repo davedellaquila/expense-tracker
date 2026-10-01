@@ -1083,6 +1083,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <select id="bot-goal-type" style="flex:1;min-width:190px">
               <option value="save">Save $___ more per month</option>
+              <option value="savepct">Save ___% of income per month</option>
               <option value="cap">Keep total spending under $___/mo</option>
               <option value="cut">Cut a category by ___%</option>
             </select>
@@ -8677,6 +8678,8 @@ function botRenderGoalInputs(){
     botBudget.rows.forEach(function(r){ sel.appendChild(el('option',{value:r.category},r.category)); });
     host.appendChild(sel);
     host.appendChild(el('input',{type:'number',min:'1',max:'99',step:'1',placeholder:'%',inputmode:'decimal',id:'bot-goal-pct',style:'width:76px'}));
+  }else if(type==='savepct'){
+    host.appendChild(el('input',{type:'number',min:'1',max:'99',step:'1',placeholder:'%',inputmode:'decimal',id:'bot-goal-savepct',style:'width:76px'}));
   }else{
     host.appendChild(el('input',{type:'number',min:'1',step:'1',placeholder:'$ amount',inputmode:'decimal',id:'bot-goal-amt',style:'width:120px'}));
   }
@@ -8693,7 +8696,20 @@ function botSuggest(){
   var type = $('bot-goal-type').value;
   var total = botBudgetTotal();
   var res = null, note = '';
-  if(type==='save'){
+  if(type==='savepct'){
+    var pct = num($('bot-goal-savepct').value);
+    if(!(pct>0 && pct<100)){ toast('Enter a savings percent between 1 and 99.', true); return; }
+    if(!(botBudget.avgIncome>0)){ toast('Add income targets first so I know your monthly income.', true); return; }
+    var wantPct = botBudget.avgIncome*pct/100;
+    var projectedPct = botBudget.avgIncome - total;
+    var gapPct = wantPct - Math.max(0, projectedPct);
+    note = 'Your paycheck averages ~'+money(Math.round(botBudget.avgIncome))+'/mo; saving '+pct+'% means keeping '+money(Math.round(wantPct))+'/mo unspent. This budget spends '+money(Math.round(total))+'/mo.';
+    if(gapPct<=0){
+      host.appendChild(el('p',{style:'margin:0'},'Good news — this budget already leaves about '+money(Math.round(projectedPct))+'/mo unspent, which covers your '+pct+'% savings goal ('+money(Math.round(wantPct))+'/mo).'));
+      return;
+    }
+    res = botAllocateCuts(botBudget.rows, gapPct);
+  }else if(type==='save'){
     var want = num($('bot-goal-amt').value);
     if(!(want>0)){ toast('Enter how much you want to save per month.', true); return; }
     var projected = botBudget.avgIncome - total;
