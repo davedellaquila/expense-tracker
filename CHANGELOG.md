@@ -5,6 +5,13 @@ documentation. Newest first.
 
 ## 2026-09-30
 
+### Bot cards: Propose buttons moved up, row fill removed
+- "Propose my budget" / "Propose my income" now sit in the card header
+  next to the title instead of below the description.
+- Removed the green fill from checked bot proposal rows (both bots) —
+  checked state still shows via the green checkmark; unchecked rows
+  stay dimmed.
+
 ### Enable/disable all in both bots
 - The Budget Bot and Income Bot proposals each gained "Enable all" /
   "Disable all" buttons above the proposal table (shown only when a
