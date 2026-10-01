@@ -9255,9 +9255,14 @@ function renderBillCalendar(){
       if(billStatus(b)==='overdue') counts[k].over = true;
     }
   });
-  // Heaviest bill day in the month: background intensity scales relative to it.
-  var maxDay = 0;
-  Object.keys(counts).forEach(function(k){ if(counts[k].total > maxDay) maxDay = counts[k].total; });
+/* Green-wash intensity for a bill day, in fixed bands so a day reads the same
+   in every month: <$100 a whisper, $100+ light, $500+ medium, $2000+ full. */
+function billDayShade(total){
+  if(total >= 2000) return 30;
+  if(total >= 500) return 22;
+  if(total >= 100) return 15;
+  return 8;
+}
   var cells = [];
   for(var i=first-1;i>=0;i--) cells.push({d:prevDays-i, other:true, ymd:null});
   for(var d=1;d<=daysIn;d++){
@@ -9269,11 +9274,10 @@ function renderBillCalendar(){
     var hasBills = !!(c.ymd && counts[c.ymd]);
     var cls = 'day'+(c.other?' other':'')+(c.ymd===today?' today':'')+(c.ymd&&c.ymd===billSelDay?' sel':'')+(hasBills?' has-bills':'');
     var cell = el('div',{class:cls});
-    // Amount-relative green wash: the heaviest bill day gets the deepest tint
-    // (30%), the lightest a whisper (8%). Skipped on the selected day so the
-    // selection style stays unmistakable.
-    if(hasBills && maxDay > 0 && c.ymd !== billSelDay){
-      var pct = Math.round(8 + 22 * (counts[c.ymd].total / maxDay));
+    // Amount-relative green wash (fixed bands — see billDayShade). Skipped on
+    // the selected day so the selection style stays unmistakable.
+    if(hasBills && c.ymd !== billSelDay){
+      var pct = billDayShade(counts[c.ymd].total);
       cell.style.background = 'color-mix(in srgb, var(--accent) ' + pct + '%, var(--card))';
     }
     cell.appendChild(el('div',null,String(c.d)));
