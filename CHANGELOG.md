@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Sheets no longer dismiss when a text-selection drag slides off the dialog edge — only a tap that starts outside the dialog closes it, so edits are never lost this way.
 - Bills: new "Every 6 months" option in the Repeats menu.
 - Transactions: switching to the tab now puts the cursor in the search box (the floating clone if the filter card is scrolled off).
 - Bills calendar: day background green deepens with the day's bill total — under $100 a whisper, $100+ light, $500+ medium, $2,000+ full.
