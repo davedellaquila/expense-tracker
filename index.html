@@ -7974,10 +7974,12 @@ function botMakeRowsDraggable(opts){
 /* Paint a planner row's enabled/disabled state: enabled rows get a full
    accent fill; disabled (suggestion) rows stay dimmed. */
 /* Labeled mini-stat for planner rows (YTD avg / Actual grouped together). */
-function botStat(label, value, extra){
+function botStat(label, value, extra, onTap){
   var w = el('div',{style:'min-width:0'});
   w.appendChild(el('div',{class:'muted',style:'font-size:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap'},label));
-  w.appendChild(el('div',{style:'font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(extra?';'+extra:'')},value));
+  var v = el('div',{style:'font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(extra?';'+extra:'')},value);
+  if(onTap){ v.style.cursor = 'pointer'; v.title = 'Tap to use this amount'; v.addEventListener('click', onTap); }
+  w.appendChild(v);
   return w;
 }
 function botPaintRowState(r, line, check, fill){
@@ -8199,11 +8201,24 @@ function botSliderCeil(v){
 }
 /* Mark a proposal row enabled (locked) in place, without a full re-render,
    so a slider drag isn't interrupted. */
-function botEnableRow(r, line, check){
+function botEnableRow(r, line, check, fill){
   if(r.locked) return;
   r.locked = true;
   check.title = 'Uncheck — bot may suggest trims';
-  botPaintRowState(r, line, check, 'var(--danger-soft)');
+  botPaintRowState(r, line, check, fill || 'var(--danger-soft)');
+}
+/* Tapping a reference stat (YTD avg / Prev month) copies that value into the
+   row's amount field, enables the row like the slider does, and saves through
+   the normal debounced path. Fixed (padlocked) rows ignore taps. */
+function botTapStat(r, inp, sld, line, check, ym, v, isInc){
+  if(!r || r.fixed || !inp) return;
+  botEnableRow(r, line, check, isInc ? 'var(--accent-soft)' : 'var(--danger-soft)');
+  var amt = Math.max(0, Math.round(num(v)));
+  r.amount = amt;
+  inp.value = amt;
+  if(sld) sld.value = Math.min(amt, num(sld.max));
+  botWriteSoon(ym, (isInc ? INC_BUDGET_PREFIX : '')+r.category, amt);
+  if(isInc) incBotRenderTotal(); else botRenderTotal();
 }
 function botRenderTable(){
   var host = $('bot-rows'); host.innerHTML = '';
@@ -8256,8 +8271,9 @@ function botRenderTable(){
     var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
     /* YTD average + last-month actual, grouped with labels for planning. */
     var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    stats.appendChild(botStat('YTD avg', money(Math.round(ytd)), ''));
-    stats.appendChild(botStat('Prev month', money(Math.round(r.last)), ''));
+    var ytdV = Math.round(ytd), lastV = Math.round(r.last);
+    stats.appendChild(botStat('YTD avg', money(ytdV), '', function(){ botTapStat(r, inp, sld, line, check, ym, ytdV, false); }));
+    stats.appendChild(botStat('Prev month', money(lastV), '', function(){ botTapStat(r, inp, sld, line, check, ym, lastV, false); }));
     line.appendChild(stats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
@@ -8642,8 +8658,9 @@ function incBotRenderTable(){
     line.appendChild(nm);
     /* YTD average + last-month actual, grouped with labels for planning. */
     var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    istats.appendChild(botStat('YTD avg', money(Math.round((r.ytd||0)/months))+'/mo', ''));
-    istats.appendChild(botStat('Prev month', money(Math.round(r.lastMo||0)), ''));
+    var iytdV = Math.round((r.ytd||0)/months), ilastV = Math.round(r.lastMo||0);
+    istats.appendChild(botStat('YTD avg', money(iytdV)+'/mo', '', function(){ botTapStat(r, inp, null, line, check, ym, iytdV, true); }));
+    istats.appendChild(botStat('Prev month', money(ilastV), '', function(){ botTapStat(r, inp, null, line, check, ym, ilastV, true); }));
     line.appendChild(istats);
     var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});

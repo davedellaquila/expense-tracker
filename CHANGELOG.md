@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Tap a reference stat to fill the budget amount
+- Tapping the YTD avg or Prev month value on a budget/income planner row
+  copies it into that category's amount field, enables the row (like the
+  slider does), and saves. Padlocked rows ignore taps.
+
 ### Budget tiles: "Last month" → "Prev month"
 - The reference stat on budget/income planner rows (and its column header)
   now reads "Prev month".
