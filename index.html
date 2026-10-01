@@ -9946,7 +9946,13 @@ function openBillForm(b, opts){
     });
     sh.appendChild(el('label',{class:'f'},'Repeats')); sh.appendChild(inRec);
     var inCat = el('select',{style:'width:100%'});
+    // New bills default to Uncategorized (stored blank, displayed as
+    // "Uncategorized" like everywhere else).
+    var unc = el('option',{value:''},'Uncategorized');
+    if(!src.category) unc.selected = true;
+    inCat.appendChild(unc);
     allCategories().forEach(function(c){
+      if(c==='Uncategorized') return; // already covered by the blank option above
       var op = el('option',{value:c},c);
       if(src.category===c) op.selected = true;
       inCat.appendChild(op);
