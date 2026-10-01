@@ -257,6 +257,21 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   border-radius:0 0 var(--radius) var(--radius);
   box-shadow:none;
 }
+/* docked: while the floating sticky filter card is visible and a drill
+   context is active, the temporary drill pill parks itself as an attached
+   section at the bottom of the sticky card (same treatment as .selbar.stuck) */
+.drillchip.docked{
+  margin:10px -14px -10px;
+  padding:9px 14px;
+  border:none;
+  border-top:1px solid var(--border);
+  border-radius:0;
+  box-shadow:none;
+}
+/* rounded bottom corners only when the pill is the last section in the
+   sticky card — the bulk-update bar docks below it when select mode is on */
+#searchstick > #txn-drill:last-child .drillchip.docked{border-radius:0 0 var(--radius) var(--radius);}
+.drillchip.soft-in{animation:selbar-soft-in .22s ease;}
 /* in-flight bulk jobs: one slim progress bar each, stacked above the selection bar */
 #jobbars{display:flex; flex-direction:column; gap:8px; margin:0 0 12px;}
 #jobbars:empty{display:none;}
@@ -465,6 +480,7 @@ textarea{resize:vertical; min-height:64px;}
 @media (prefers-reduced-motion: reduce){
   #searchstick{transition:none;}
   .selbar.soft-in{animation:none;}
+  .drillchip.soft-in{animation:none;}
   #tabtip{transition:none;}
 }
 /* Reports sticky filter summary: same floating placement as the Transactions
@@ -3802,6 +3818,7 @@ function wireTransactions(){
       var offTop = !entries[0].isIntersecting && r.top < 0 && state.screen==='transactions';
       stick.classList.toggle('gone', !offTop);
       syncSelbarDock();
+      syncDrillDock();
       if(offTop){
         if(document.activeElement!==stickInput && stickInput.value!==origInput.value){
           stickInput.value = origInput.value;
@@ -3914,6 +3931,29 @@ function syncSelbarDock(){
     bar.classList.remove('stuck');
   }
   if(moved) softInBar();
+}
+/* Drill-pill docking: while the floating sticky filter card is visible and a
+   drill context is active, the temporary drill pill parks itself as an
+   attached section at the bottom of the sticky card; otherwise it sits in the
+   page flow below the filter card. Same node-moving pattern as the
+   bulk-update bar, so listeners and state move with the node. */
+function syncDrillDock(){
+  var td = $('txn-drill'), stick = $('searchstick');
+  if(!td || !stick) return;
+  var chip = td.firstChild;
+  if(chip && !stick.classList.contains('gone')){
+    if(td.parentNode!==stick){
+      var bar = $('selbar');
+      if(bar && bar.parentNode===stick) stick.insertBefore(td, bar);
+      else stick.appendChild(td);
+      chip.classList.add('docked');
+      chip.classList.remove('soft-in'); void chip.offsetWidth; chip.classList.add('soft-in');
+    }
+  }else{
+    var home = $('jobbars');
+    if(home && (td.parentNode!==home.parentNode || td.nextSibling!==home)) home.parentNode.insertBefore(td, home);
+    if(chip) chip.classList.remove('docked');
+  }
 }
 function updateSelbar(){
   var btn = $('selbar-update');
@@ -4144,7 +4184,7 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
 function renderDrillChip(){
   var td = $('txn-drill');
   td.innerHTML = '';
-  if(!txnDrill) return;
+  if(!txnDrill){ syncDrillDock(); return; }
   // Temporary, dismissible drill pill. The \u00D7 clears ONLY the drill context;
   // the native filters are independent and keep their values.
   var chip = el('div',{class:'drillchip'});
@@ -4153,6 +4193,7 @@ function renderDrillChip(){
   x.addEventListener('click', function(){ txnDrill = null; disarmSelbarUndo(); renderTransactions(); });
   chip.appendChild(x);
   td.appendChild(chip);
+  syncDrillDock();
 }
 /* Normalized "who entered it" value, matching the Owner Split chart. */
 function txnOwner(t){ return String(t.entered_by||'').trim() || 'Unknown'; }
