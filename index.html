@@ -4654,6 +4654,21 @@ function defaultTaxFor(categoryName){
 }
 
 /* bulk recategorize: review similar transactions before applying */
+/* Merchant renames keep the first (statement) merchant name in
+   merchant_orig so import dedup can still match the row against the
+   statement's original text. First write wins; later renames don't
+   overwrite it. */
+function stashMerchantOrig(x, row){
+  var oldM = String((x&&x.merchant)||'').trim();
+  var newM = String((row&&row.merchant)||'').trim();
+  if(newM!==oldM){
+    if(x&&x.merchant_orig) row.merchant_orig = x.merchant_orig;
+    else if(oldM) row.merchant_orig = oldM;
+  }else if(x&&x.merchant_orig){
+    row.merchant_orig = x.merchant_orig;
+  }
+  return row;
+}
 function txnRowForUpdate(x, newCategory, overrides){
   var r = {
     id: x.id,
@@ -4671,7 +4686,7 @@ function txnRowForUpdate(x, newCategory, overrides){
     created_at: x.created_at||''
   };
   if(overrides) for(var k in overrides) r[k] = overrides[k];
-  return r;
+  return stashMerchantOrig(x, r);
 }
 /* Write several transaction updates in one server round trip when the store
    supports batching; otherwise fall back to one update per row (older server
@@ -6049,6 +6064,9 @@ function openTxnForm(t){
         notes: inNotes.value.trim(),
         entered_by: state.userName||''
       };
+      /* Renaming the merchant keeps the statement's original name for
+         import dedup (first rename wins). */
+      if(isEdit) stashMerchantOrig(t, rowData);
       /* Receipt scan photo: Firebase -> Storage (path on the row); local ->
          data URL on the row; Sheets backend -> skipped. Edit without a new
          scan keeps the existing photo (updates replace the whole row). */
@@ -6247,6 +6265,8 @@ function markDuplicates(rows){
   var seen = {};
   state.transactions.forEach(function(t){
     seen[dupKey(t.date, t.txn_type, t.amount, t.merchant||t.description)] = true;
+    // a renamed merchant still matches the statement's original name
+    if(t.merchant_orig) seen[dupKey(t.date, t.txn_type, t.amount, t.merchant_orig)] = true;
   });
   rows.forEach(function(r){
     var k = dupKey(r.date, r.txn_type, r.amount, r.description);
@@ -6829,7 +6849,7 @@ function downloadCsv(filename, headers, rows){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 800);
 }
-var TXN_HEADERS = ['id','date','merchant','description','amount','txn_type','category','tax_category','business_personal','payment_method','notes','entered_by','created_at'];
+var TXN_HEADERS = ['id','date','merchant','merchant_orig','description','amount','txn_type','category','tax_category','business_personal','payment_method','notes','entered_by','created_at'];
 
 /* ================= import: CSV ================= */
 var csvData = []; // parsed rows (arrays)

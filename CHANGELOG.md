@@ -5,6 +5,16 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Renamed merchants keep their original name for import dedup
+- Editing a transaction's merchant name now stashes the statement's
+  original name in a new `merchant_orig` field (first rename wins; later
+  renames don't overwrite it). Import duplicate detection matches against
+  both the current and original names, so a cleaned-up merchant no longer
+  causes the same statement row to import twice. The scrubber and bulk
+  "update similar" writes preserve it too. `merchant_orig` is included in
+  CSV exports and the Apps Script column list (takes effect on the next
+  Code.gs redeploy).
+
 ### Sticky header shows remaining budget
 - The totals pill under the month picker now ends with the unbudgeted
   remainder (income minus proposed budget), e.g. "$4,500 remaining" in

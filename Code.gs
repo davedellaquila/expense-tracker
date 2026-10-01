@@ -17,7 +17,7 @@
  */
 
 var TABS = {
-  Transactions: ['id', 'date', 'merchant', 'description', 'amount', 'txn_type',
+  Transactions: ['id', 'date', 'merchant', 'merchant_orig', 'description', 'amount', 'txn_type',
                  'category', 'tax_category', 'business_personal',
                  'payment_method', 'notes', 'entered_by', 'created_at'],
   Budgets:      ['category', 'month', 'amount', 'updated_at'],
