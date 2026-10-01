@@ -1019,7 +1019,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
         </div>
-        <div id="bot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your budget.</div>
+        <div id="bot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your budget. Tap the padlock to fix a category's amount.</div>
         <div id="bot-table" style="margin-top:12px"></div>
         <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
@@ -1049,7 +1049,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
         </div>
-        <div id="ibot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your income target.</div>
+        <div id="ibot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your income target. Tap the padlock to fix a category's amount.</div>
         <div id="ibot-table" style="margin-top:12px"></div>
       </div>
       </div>
@@ -7640,6 +7640,12 @@ function openBudgetCopySheet(mode){
         }
         toast((isInc?'Income targets':'Budget')+' copied from '+fmtMonthPretty(src)+'.');
       }catch(e){ toast('Copy failed.', true); go.disabled = false; refreshInfo(); return; }
+      /* Locks follow the copied budget: the target month's fixed map is
+         replaced with the source month's, matching the amount replacement. */
+      try{
+        var fixKey = isInc ? INC_BOT_FIXED_LS : BOT_FIXED_LS;
+        localStorage.setItem(fixKey+targetYm, JSON.stringify(botFixedGet(fixKey, src)));
+      }catch(e){}
       close(); renderBudgets();
     });
     bar.appendChild(go);
@@ -7693,6 +7699,46 @@ function botFilterRemoved(prefix, ym, rows){
   var list = botRemovedGet(prefix, ym);
   if(!list.length) return rows;
   return rows.filter(function(r){ return list.indexOf(r.category)<0; });
+}
+
+/* Per-month "fixed amount" locks: a locked category's amount can't be edited
+   (amount input disabled, slider hidden) until it's unlocked again. Stored
+   per budget month, like removed-category memory. */
+var BOT_FIXED_LS = 'expTrackerBotFixed:';
+var INC_BOT_FIXED_LS = 'expTrackerIncBotFixed:';
+function botFixedGet(prefix, ym){
+  try{
+    var d = JSON.parse(localStorage.getItem(prefix+ym)||'{}');
+    return (d && typeof d==='object') ? d : {};
+  }catch(e){ return {}; }
+}
+function botFixedSet(prefix, ym, cat, fixed){
+  var m = botFixedGet(prefix, ym);
+  if(fixed) m[cat] = 1; else delete m[cat];
+  try{ localStorage.setItem(prefix+ym, JSON.stringify(m)); }catch(e){}
+}
+/* Paint a planner row's enabled/disabled state: enabled rows get a full
+   accent fill; disabled (suggestion) rows stay dimmed. */
+function botPaintRowState(r, line, check){
+  if(r.locked){
+    line.style.background = 'var(--accent-soft)';
+    line.style.opacity = '';
+    check.style.color = 'var(--accent)';
+    check.style.opacity = '1';
+  }else{
+    line.style.background = '';
+    line.style.opacity = '0.6';
+    check.style.color = 'var(--muted)';
+    check.style.opacity = '0.35';
+  }
+}
+function botUpdateHint(){
+  if(!botBudget || !botBudget.rows.length){ $('bot-hint').style.display = 'none'; return; }
+  $('bot-hint').style.display = botBudget.rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
+}
+function ibotUpdateHint(){
+  if(!incBotBudget || !incBotBudget.rows.length){ $('ibot-hint').style.display = 'none'; return; }
+  $('ibot-hint').style.display = incBotBudget.rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
 }
 
 function botNiceRound(avg){
@@ -7820,6 +7866,7 @@ function botLoadBudget(ym){
   var c = botCompute(ym);
   var saved = savedBudgetsFor(ym, false);
   var removed = botRemovedGet(BOT_REMOVED_LS, ym);
+  var fixedMap = botFixedGet(BOT_FIXED_LS, ym);
   var byCat = {};
   c.rows.forEach(function(r){ byCat[r.category] = r; });
   var rows = c.rows.map(function(r){
@@ -7827,10 +7874,11 @@ function botLoadBudget(ym){
     return {category:r.category, avg:r.avg, last:r.last,
       amount:(s!=null ? s : r.amount),
       locked:(s!=null ? s>0 : false),
+      fixed:!!fixedMap[r.category],
       billFloored:!!r.billFloored};
   });
   Object.keys(saved).forEach(function(cat){
-    if(!byCat[cat]) rows.push({category:cat, avg:0, last:0, amount:saved[cat], locked:saved[cat]>0});
+    if(!byCat[cat]) rows.push({category:cat, avg:0, last:0, amount:saved[cat], locked:saved[cat]>0, fixed:!!fixedMap[cat]});
   });
   rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
@@ -7843,7 +7891,8 @@ function botLoadBudget(ym){
   $('bot-goal').hidden = false;
 }
 /* Recalculate: fresh year-to-date amounts for every row, checks preserved,
-   removed categories stay out. Writes straight through — this is the budget. */
+   fixed amounts untouched, removed categories stay out. Writes straight
+   through — this is the budget. */
 function botRecalculate(){
   if(!botBudget) return;
   var ym = botBudget.month;
@@ -7855,11 +7904,13 @@ function botRecalculate(){
   var rows = botFilterRemoved(BOT_REMOVED_LS, ym, c.rows).map(function(fr){
     freshCats[fr.category] = true;
     var old = oldByCat[fr.category];
-    return {category:fr.category, avg:fr.avg, last:fr.last, amount:fr.amount,
-      locked:old ? !!old.locked : false, billFloored:!!fr.billFloored};
+    var wasFixed = old ? !!old.fixed : false;
+    return {category:fr.category, avg:fr.avg, last:fr.last,
+      amount:wasFixed ? old.amount : fr.amount,
+      locked:old ? !!old.locked : false, fixed:wasFixed, billFloored:!!fr.billFloored};
   });
   botBudget.rows.forEach(function(r){
-    if(!freshCats[r.category]) rows.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked});
+    if(!freshCats[r.category]) rows.push({category:r.category, avg:0, last:0, amount:r.amount, locked:!!r.locked, fixed:!!r.fixed});
   });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
   botBudget.rows = rows;
@@ -7892,14 +7943,13 @@ function botSliderCeil(v){
   return step*mag;
 }
 /* Mark a proposal row enabled (locked) in place, without a full re-render,
-   so a slider drag isn't interrupted. Mirrors botRenderTable's locked styling. */
+   so a slider drag isn't interrupted. */
 function botEnableRow(r, line, check){
   if(r.locked) return;
   r.locked = true;
-  check.style.color = 'var(--accent)';
-  check.style.opacity = '1';
   check.title = 'Uncheck — bot may suggest trims';
-  line.style.opacity = '';
+  botPaintRowState(r, line, check);
+  botUpdateHint();
 }
 /* Bulk enable/disable for bot proposal rows (expense and income). */
 function botSetAllLocked(locked){
@@ -7919,9 +7969,9 @@ function botRenderTable(){
   if(!botBudget){ $('bot-bulk-row').style.display = 'none'; $('bot-hint').style.display = 'none'; return; }
   var rows = botBudget.rows, ym = botBudget.month;
   $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  $('bot-hint').style.display = rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
+  botUpdateHint();
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
     head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -7933,46 +7983,70 @@ function botRenderTable(){
   }
   rows.forEach(function(r){
     var isInc = ((botBudget.ytdIncSums||{})[r.category]||0) > ((botBudget.ytdSums||{})[r.category]||0);
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
       botWriteNow(ym, r.category, r.locked ? r.amount : 0);
       botRenderTable();
     });
     line.appendChild(check);
-    var nm = el('div');
-    var bName = el('b',{class:'rep-click',style:'color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
+    botPaintRowState(r, line, check);
+    var nm = el('div',{style:'display:flex;align-items:center;gap:6px;min-width:0'});
+    var nmText = el('div',{style:'flex:1;min-width:0'});
+    var bName = el('b',{class:'rep-click',style:'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
     bName.addEventListener('click', function(){ botDrillCategory(r.category, isInc?'income':'expense'); });
-    nm.appendChild(bName);
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'Last month '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
+    nmText.appendChild(bName);
+    nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},'Last month '+money(Math.round(r.last))+(r.billFloored?' · ⚡ bills floor '+money(r.amount):'')));
+    nm.appendChild(nmText);
+    var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
+      title:r.fixed?'Unlock — allow editing this amount':'Lock — fix this amount',
+      style:'padding:4px 6px;flex:none;color:'+(r.fixed?'var(--accent)':'var(--muted)')+';opacity:'+(r.fixed?'1':'0.45')},
+      r.fixed?'🔒':'🔓');
+    lockBtn.addEventListener('click', function(){
+      r.fixed = !r.fixed;
+      botFixedSet(BOT_FIXED_LS, ym, r.category, r.fixed);
+      botRenderTable();
+    });
+    nm.appendChild(lockBtn);
     line.appendChild(nm);
     var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round(ytd))));
+    var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
+    inp.disabled = !!r.fixed;
+    if(r.fixed) inp.style.opacity = '0.55';
     inp.addEventListener('change', function(){
       r.amount = Math.max(0, num(inp.value));
       inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max));
       botWriteSoon(ym, r.category, r.locked ? r.amount : 0);
       botRenderTotal();
     });
-    line.appendChild(inp);
+    amtCell.appendChild(inp);
+    /* Selected-month actual, next to the editable amount, for planning. */
+    var actual = (botBudget.monthSums||{})[r.category]||0;
+    var over = num(r.amount)>0 && actual>num(r.amount);
+    amtCell.appendChild(el('div',{class:'muted',style:'font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(over?';color:var(--danger);font-weight:700':'')},
+      'actual '+money(Math.round(actual))));
+    line.appendChild(amtCell);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, ym, r.category);
+      botFixedSet(BOT_FIXED_LS, ym, r.category, false);
       botWriteNow(ym, r.category, 0);
       botBudget.rows = botBudget.rows.filter(function(x){ return x!==r; });
       botRenderTable(); botRenderGoalInputs();
     });
     line.appendChild(del);
     /* Per-row adjust slider: moving it enables the row (as if the ✓ was
-       clicked) and updates the row's amount field live. Every change saves. */
+       clicked) and updates the row's amount field live. Every change saves.
+       Hidden while the row's amount is locked. */
     var sMax = botSliderCeil(Math.max(2*Math.max(0, num(r.amount)), num(r.amount)*1.2));
     var sld = el('input',{type:'range',min:'0',max:String(sMax),
       step:String(Math.max(1, Math.round(sMax/200))),
       value:String(Math.min(Math.max(0, num(r.amount)), sMax)),
-      style:'grid-column:1/-1;width:100%;margin:0;padding:0',
+      style:'grid-column:1/-1;width:100%;margin:0;padding:0'+(r.fixed?';display:none':''),
       'aria-label':'Adjust budget for '+r.category});
     sld.addEventListener('input', function(){
       var v = num(sld.value);
@@ -8193,15 +8267,17 @@ function ibotLoadBudget(ym){
   var c = incBotCompute(ym);
   var saved = savedBudgetsFor(ym, true);
   var removed = botRemovedGet(INC_BOT_REMOVED_LS, ym);
+  var fixedMap = botFixedGet(INC_BOT_FIXED_LS, ym);
   var byCat = {};
   c.rows.forEach(function(r){ byCat[r.category] = r; });
   var rows = c.rows.map(function(r){
     var s = saved[r.category];
     return {category:r.category, ytd:r.ytd, lastMo:r.lastMo,
-      amount:(s!=null ? s : r.amount), locked:(s!=null ? s>0 : false)};
+      amount:(s!=null ? s : r.amount), locked:(s!=null ? s>0 : false),
+      fixed:!!fixedMap[r.category]};
   });
   Object.keys(saved).forEach(function(cat){
-    if(!byCat[cat]) rows.push({category:cat, ytd:0, lastMo:0, amount:saved[cat], locked:saved[cat]>0});
+    if(!byCat[cat]) rows.push({category:cat, ytd:0, lastMo:0, amount:saved[cat], locked:saved[cat]>0, fixed:!!fixedMap[cat]});
   });
   rows = rows.filter(function(r){ return removed.indexOf(r.category)<0; });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
@@ -8221,11 +8297,13 @@ function ibotRecalculate(){
   var rows = botFilterRemoved(INC_BOT_REMOVED_LS, ym, c.rows).map(function(fr){
     freshCats[fr.category] = true;
     var old = oldByCat[fr.category];
-    return {category:fr.category, ytd:fr.ytd, lastMo:fr.lastMo, amount:fr.amount,
-      locked:old ? !!old.locked : false};
+    var wasFixed = old ? !!old.fixed : false;
+    return {category:fr.category, ytd:fr.ytd, lastMo:fr.lastMo,
+      amount:wasFixed ? old.amount : fr.amount,
+      locked:old ? !!old.locked : false, fixed:wasFixed};
   });
   incBotBudget.rows.forEach(function(r){
-    if(!freshCats[r.category]) rows.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked});
+    if(!freshCats[r.category]) rows.push({category:r.category, ytd:0, lastMo:0, amount:r.amount, locked:!!r.locked, fixed:!!r.fixed});
   });
   rows.sort(function(a,b){ return (b.amount-a.amount) || (a.category<b.category?-1:1); });
   incBotBudget.rows = rows;
@@ -8247,10 +8325,10 @@ function incBotRenderTable(){
   if(!incBotBudget){ $('ibot-bulk-row').style.display = 'none'; $('ibot-hint').style.display = 'none'; return; }
   var rows = incBotBudget.rows, ym = incBotBudget.month;
   $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
-  $('ibot-hint').style.display = rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
+  ibotUpdateHint();
   var months = incBotBudget.months||1;
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
     head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -8261,33 +8339,56 @@ function incBotRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No income targets yet — add categories below or tap Recalculate.'));
   }
   rows.forEach(function(r){
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
-    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:4px'});
+    var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700'}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
       botWriteNow(ym, INC_BUDGET_PREFIX+r.category, r.locked ? r.amount : 0);
       incBotRenderTable();
     });
     line.appendChild(check);
-    var nm = el('div');
-    var ibName = el('b',{class:'rep-click',style:'color:var(--accent)',title:'Show transactions'},r.category);
+    botPaintRowState(r, line, check);
+    var nm = el('div',{style:'display:flex;align-items:center;gap:6px;min-width:0'});
+    var nmText = el('div',{style:'flex:1;min-width:0'});
+    var ibName = el('b',{class:'rep-click',style:'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent)',title:'Show transactions'},r.category);
     ibName.addEventListener('click', function(){ botDrillCategory(r.category, 'income'); });
-    nm.appendChild(ibName);
-    nm.appendChild(el('div',{class:'muted',style:'font-size:12px'},'Last month '+money(Math.round(r.lastMo||0))));
+    nmText.appendChild(ibName);
+    nmText.appendChild(el('div',{class:'muted',style:'font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},'Last month '+money(Math.round(r.lastMo||0))));
+    nm.appendChild(nmText);
+    var lockBtn = el('button',{class:'btn small ghost lockbtn',type:'button',
+      title:r.fixed?'Unlock — allow editing this target':'Lock — fix this target',
+      style:'padding:4px 6px;flex:none;color:'+(r.fixed?'var(--accent)':'var(--muted)')+';opacity:'+(r.fixed?'1':'0.45')},
+      r.fixed?'🔒':'🔓');
+    lockBtn.addEventListener('click', function(){
+      r.fixed = !r.fixed;
+      botFixedSet(INC_BOT_FIXED_LS, ym, r.category, r.fixed);
+      incBotRenderTable();
+    });
+    nm.appendChild(lockBtn);
     line.appendChild(nm);
     line.appendChild(el('div',{class:'muted',style:'font-size:13px;text-align:right'},money(Math.round((r.ytd||0)/months))+'/mo'));
+    var amtCell = el('div',{style:'min-width:0'});
     var inp = el('input',{type:'number',min:'0',step:'1',inputmode:'decimal',style:'width:100%'});
     inp.value = r.amount;
+    inp.disabled = !!r.fixed;
+    if(r.fixed) inp.style.opacity = '0.55';
     inp.addEventListener('change', function(){
       r.amount = Math.max(0, num(inp.value));
       inp.value = r.amount;
       botWriteSoon(ym, INC_BUDGET_PREFIX+r.category, r.locked ? r.amount : 0);
       incBotRenderTotal();
     });
-    line.appendChild(inp);
+    amtCell.appendChild(inp);
+    /* Selected-month actual, next to the editable target, for planning. */
+    var actual = (incBotBudget.mSums||{})[r.category]||0;
+    var met = num(r.amount)>0 && actual>=num(r.amount);
+    amtCell.appendChild(el('div',{class:'muted',style:'font-size:11px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(met?';color:var(--accent);font-weight:700':'')},
+      'actual '+money(Math.round(actual))));
+    line.appendChild(amtCell);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
     del.addEventListener('click', function(){
       botRememberRemoved(INC_BOT_REMOVED_LS, ym, r.category);
+      botFixedSet(INC_BOT_FIXED_LS, ym, r.category, false);
       botWriteNow(ym, INC_BUDGET_PREFIX+r.category, 0);
       incBotBudget.rows = incBotBudget.rows.filter(function(x){ return x!==r; });
       incBotRenderTable();

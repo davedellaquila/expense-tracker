@@ -5,6 +5,19 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget page: locks, enabled fill, selected-month actuals
+- Each planner row now has a padlock button next to the category name.
+  Locking fixes the amount: the amount field can't be edited and the
+  slider is hidden until you unlock it. Locks are saved per month,
+  survive Recalculate (fixed amounts aren't recomputed), travel with
+  Copy from…, and clear when the category is removed.
+- Enabled categories now get a full accent fill across the row, so it's
+  obvious which categories are in the live budget; suggestion rows stay
+  dimmed.
+- Each row shows the selected month's actual ("actual $312") under the
+  budget amount — red when an expense is over budget, green when income
+  meets its target — for planning next month's amounts.
+
 ### Budget page: iPhone layout fixes (from screenshot review)
 - The sticky bar is now two compact rows (month stepper, then the live
   totals pill) and the pill is always a single line — shortened to
