@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Bills page: upcoming and paid tiles are now grouped by month under labeled headers with each month's total.
 - Budget page: the sticky totals pill now wraps on narrow screens instead of cutting figures off with "…".
 - Budget planner: manual row order, removed-category memory, and 🔒 padlocks now sync through Firebase — the Budget page looks the same on every machine.
 - Split transactions: in a transaction's detail sheet, the split-parts breakdown rows are now tappable — tapping a sibling part opens that part's transaction (the part you're viewing stays inert).
