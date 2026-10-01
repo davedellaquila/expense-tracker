@@ -10214,6 +10214,16 @@ function wireBills(){
     billCalYm = monthAdd(billCalYm||todayLocal().slice(0,7), 1);
     billSelDay = null; renderBills();
   });
+  // Tapping the month title jumps back to the current month.
+  var bct = $('bill-cal-title');
+  bct.style.cursor = 'pointer';
+  bct.title = 'Back to current month';
+  bct.addEventListener('click', function(){
+    var cur = todayLocal().slice(0,7);
+    if(billCalYm === cur && !billSelDay) return;
+    billCalYm = cur;
+    billSelDay = null; renderBills();
+  });
   $('bill-add').addEventListener('click', function(){ openBillForm(null); });
   $('bill-sticky-add').addEventListener('click', function(){ openBillForm(null); });
   window.addEventListener('scroll', billStickyOnScroll, {passive:true});
