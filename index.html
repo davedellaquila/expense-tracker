@@ -111,6 +111,8 @@ body{
   display:flex; align-items:center; justify-content:space-between;
 }
 .app-header h1{font-size:21px; margin:0; font-weight:700; letter-spacing:-.2px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-icon{width:30px; height:30px; border-radius:8px; display:block;}
 .user-chip{
   font-size:15px; color:var(--muted); background:var(--bg);
   border:1px solid var(--border); border-radius:999px; padding:4px 12px;
@@ -806,7 +808,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 <!-- ============ APP ============ -->
 <div id="app" hidden>
   <header class="app-header">
-    <h1>Expense Tracker</h1>
+    <div class="brand"><img class="brand-icon" src="icons/apple-touch-icon.png" alt=""><h1>Expense Tracker</h1></div>
     <span class="user-chip" id="user-chip"></span>
   </header>
   <div id="refresh-pill" aria-live="polite"><span class="spin"></span>Updating&hellip;</div>
