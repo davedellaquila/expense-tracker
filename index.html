@@ -1731,6 +1731,19 @@ function applyKbOffset(){
   window.addEventListener('orientationchange', function(){ setTimeout(applyKbOffset, 350); });
   applyKbOffset();
 })();
+/* Tap-outside dismisses a sheet — but only when the press STARTED outside it.
+   A press that began inside the sheet (e.g. a text-selection drag that slides
+   off the sheet's edge) must never dismiss it: the browser fires click on the
+   nearest common ancestor of the pointerdown/pointerup targets, so a drag-out
+   lands on the overlay and would otherwise close the sheet and lose edits. */
+function wireOverlayDismiss(ov, onDismiss, close){
+  var downOnOverlay = false;
+  ov.addEventListener('pointerdown', function(e){ downOnOverlay = (e.target===ov); });
+  ov.addEventListener('click', function(e){
+    var ok = downOnOverlay; downOnOverlay = false;
+    if(e.target===ov && ok){ if(onDismiss) onDismiss(); else close(); }
+  });
+}
 function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
@@ -1740,9 +1753,7 @@ function openSheet(build, onDismiss){
   ov.appendChild(sh);
   root.appendChild(ov);
   function close(){ root.innerHTML=''; }
-  ov.addEventListener('click', function(e){
-    if(e.target===ov){ if(onDismiss) onDismiss(); else close(); }
-  });
+  wireOverlayDismiss(ov, onDismiss, close);
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
@@ -1762,7 +1773,7 @@ function openSheetStacked(build, onDismiss){
   ov.appendChild(sh);
   root.appendChild(ov);
   function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
-  ov.addEventListener('click', function(e){ if(e.target===ov){ if(onDismiss) onDismiss(); else close(); } });
+  wireOverlayDismiss(ov, onDismiss, close);
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
