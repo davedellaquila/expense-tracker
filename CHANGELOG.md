@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Financial goal (Budget page) has a new option: "Save ___% of income per month". Enter a percent (e.g. 15) and the target is computed off average paycheck income; if the budget already leaves enough unspent it says so, otherwise the cut allocator proposes trims for the shortfall.
 - Budget planner drag-to-reorder rebuilt: the dragged row is now a fixed ghost that follows the pointer exactly (no more jumping to the top on slight drags), and a dashed placeholder marks the drop position as you drag — the same affordance chart cards already had.
 - Sheet Save/Cancel buttons now show a tooltip after hovering for one second: Save-type buttons read e.g. "Save (Shift+Return)", Cancel/Done buttons read "Cancel (Esc)". The tooltip system was generalized from the tab bar to any button (mouse/trackpad hover only).
 - Transaction filter card labels now read "Type (Income/Expense/Transfer)" and "Account (Personal/Business)" so the options are visible at a glance.
