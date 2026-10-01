@@ -443,11 +443,14 @@ textarea{resize:vertical; min-height:64px;}
 #bud-month{border:1px solid transparent; background:transparent; font-size:18px;
   font-weight:600; color:var(--text); padding:5px 4px; border-radius:8px; width:auto;}
 #bud-month:hover{border-color:var(--border);}
-/* Live budget-vs-income totals pill: second row of the sticky bar, always a
-   single line (truncates instead of wrapping over the buttons below). */
+/* Live budget-vs-income totals pill: second row of the sticky bar. Single
+   line on wide screens; wraps on narrow ones so no figure is ever cut off. */
 .bud-totals{margin:0; text-align:center; font-size:14px; color:var(--muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .bud-totals b{color:var(--text); font-variant-numeric:tabular-nums; font-size:16px;}
+@media (max-width:640px){
+  .bud-totals{white-space:normal; overflow:visible; line-height:1.5;}
+}
 .bud-totals b.neg{color:var(--danger);}
 .bud-totals b.pos{color:var(--accent);}
 /* Planner rows: let every grid child shrink (name cell, amount input, range
