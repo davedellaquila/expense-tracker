@@ -138,6 +138,14 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* Pin the Propose buttons to the bottom so both bot cards line up */
 .bot-actions{margin-top:auto; padding-top:12px;}
 @media (max-width:560px){ .duo-grid{grid-template-columns:1fr;} }
+/* Side-by-side planners scroll independently: each column's row list gets its
+   own scroll region capped below the sticky month bar and above the tab bar,
+   so a long expense list never pushes the income planner off screen. */
+@media (min-width:561px){
+  #screen-budgets .duo-grid{ align-items:start; }
+  #screen-budgets .duo-grid > .card{ max-height:calc(100vh - 250px); max-height:calc(100dvh - 250px); }
+  #bot-table, #ibot-table{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+}
 .stat{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 10px; text-align:center;}
 .stat .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
 .stat .value{font-size:21px; font-weight:800; margin:4px 0 2px; letter-spacing:-.3px;}
@@ -459,8 +467,8 @@ textarea{resize:vertical; min-height:64px;}
 /* Drag-reorder grip handle on each planner row (touch-action:none so a touch
    drag doesn't scroll the page) and the row's appearance while dragging. */
 .bot-grip{flex:none; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
-  color:var(--muted); opacity:.55; font-size:13px; letter-spacing:2px; line-height:1;
-  padding:12px 5px; margin-left:-5px;}
+  color:var(--muted); opacity:.55; font-size:14px; letter-spacing:2px; line-height:1;
+  padding:12px 9px; margin-left:-9px;}
 .bot-grip:active{cursor:grabbing;}
 .bot-row.bot-dragging{position:relative; z-index:30; box-shadow:0 12px 28px rgba(0,0,0,.35); opacity:.96;}
 .bot-row.bot-dragging .bot-grip{cursor:grabbing; opacity:1;}
@@ -1047,7 +1055,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Live budget — every change saves instantly.</p>
+        <p class="muted">Live budget — every change saves instantly. Drag ⋮⋮ to reorder.</p>
         <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
@@ -1077,7 +1085,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="ibot-propose" type="button" style="width:auto" title="Recalculate from year-to-date income">Recalculate</button>
           </div>
         </div>
-        <p class="muted">Live income targets — every change saves instantly.</p>
+        <p class="muted">Live income targets — every change saves instantly. Drag ⋮⋮ to reorder.</p>
         <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
@@ -7801,6 +7809,18 @@ function botApplyStoredOrder(rows, prefix, ym){
   inOrder.sort(function(a,b){ return pos[a.category]-pos[b.category]; });
   return inOrder.concat(rest);
 }
+/* Nearest scrollable ancestor of a planner row, for edge auto-scroll while
+   dragging when the planner columns scroll independently; null when the
+   page itself scrolls. */
+function botScrollParent(elm){
+  var p = elm ? elm.parentElement : null;
+  while(p && p!==document.body){
+    var s = window.getComputedStyle(p);
+    if((s.overflowY==='auto'||s.overflowY==='scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+    p = p.parentElement;
+  }
+  return null;
+}
 /* Pointer-based drag reorder for planner rows. The grip handle (.bot-grip)
    starts the drag; rows live-reorder in the DOM as the pointer moves; on
    release the new order is saved for the month. Works with mouse and touch
@@ -7828,17 +7848,19 @@ function botMakeRowsDraggable(opts){
       if(Math.abs(dy) < 8) return;
       drag.active = true;
       drag.row.classList.add('bot-dragging');
+      drag.scroller = botScrollParent(drag.row);
       document.body.style.userSelect = 'none';
       document.body.style.webkitUserSelect = 'none';
     }
     drag.dy = dy;
     drag.row.style.transform = 'translateY('+dy+'px)';
-    if(e.clientY < 72) window.scrollBy(0, -14);
-    else if(e.clientY > window.innerHeight - 72) window.scrollBy(0, 14);
+    var tgt = drag.scroller || window;
+    if(e.clientY < 72) tgt.scrollBy(0, -14);
+    else if(e.clientY > window.innerHeight - 72) tgt.scrollBy(0, 14);
     /* Live reorder: first sibling whose midpoint sits below the dragged
        row's untransformed center takes the dragged row before it. */
     var rect = drag.row.getBoundingClientRect();
-    var centerY = rect.top - dy + rect.height/2;
+    var centerY = rect.top + rect.height/2;
     var sibs = Array.prototype.filter.call(host.children, function(ch){
       return ch!==drag.row && ch.classList && ch.classList.contains('bot-row');
     });
@@ -8282,7 +8304,8 @@ function botRenderTotal(){
   if(p) p.textContent = botPctText();
   renderBotBillsLine();
 }
-/* Cash-flow check: bills due this month vs expected income and proposed budget. */
+/* Cash-flow check: bills due this month vs expected income and proposed budget,
+   with the itemized list of bills due in the selected month. */
 function renderBotBillsLine(){
   var host = $('bot-bills-line');
   if(!host) return;
@@ -8290,12 +8313,33 @@ function renderBotBillsLine(){
   host.hidden = false;
   host.innerHTML = '';
   var ym = botBudget.month;
-  var bills = billsDueInMonth(ym);
+  var list = billsListInMonth(ym);
+  var bills = 0;
+  list.forEach(function(b){ bills += num(b.amount); });
   var total = botBudgetTotal();
   var income = botBudget.avgIncome||0;
   var remaining = income - bills - total;
-  var l1 = el('div',{class:'muted'},'Bills due '+fmtMonthPretty(ym)+': '+money(Math.round(bills)));
+  var l1 = el('div',{class:'muted'},'Bills due '+fmtMonthPretty(ym)+': '+money(Math.round(bills))+
+    (list.length ? ' ('+list.length+' bill'+(list.length===1?'':'s')+')' : ''));
   host.appendChild(l1);
+  if(list.length){
+    var ul = el('div',{style:'margin:6px 0 2px;border-top:1px solid var(--border)'});
+    list.forEach(function(b){
+      var st = billStatus(b);
+      var row = el('div',{style:'display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)'});
+      var left = el('div',{style:'min-width:0'});
+      var nm = el('div',{style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}, b.name||'(unnamed bill)');
+      if(st==='overdue') nm.appendChild(el('span',{class:'bill-badge over',style:'margin-left:6px'},'overdue'));
+      else if(st==='due-soon') nm.appendChild(el('span',{class:'bill-badge soon',style:'margin-left:6px'},'due soon'));
+      left.appendChild(nm);
+      left.appendChild(el('div',{class:'muted',style:'font-size:11.5px'},
+        fmtBillDate(b.dueDate)+(b.category ? ' · '+b.category : '')));
+      row.appendChild(left);
+      row.appendChild(el('div',{style:'font-weight:700;white-space:nowrap'}, money(Math.round(num(b.amount)))));
+      ul.appendChild(row);
+    });
+    host.appendChild(ul);
+  }
   var l2 = el('div',{style:'margin-top:2px'});
   l2.appendChild(document.createTextNode('After bills + budget: '));
   var b = el('b',{style:'color:'+(remaining>=0?'var(--accent)':'var(--danger)')},money(Math.round(remaining))+' remaining');
@@ -8646,6 +8690,11 @@ function billsForDay(ymd){
 }
 /* Sum of active bills due in a calendar month, optionally filtered by category
    and account. Used by Budget planner flooring and the cash-flow check. */
+/* Active bills whose next due date falls in a calendar month, sorted by date. */
+function billsListInMonth(ym){
+  return billsActive().filter(function(b){ return String(b.dueDate||'').slice(0,7)===ym; })
+    .sort(function(a,b){ return String(a.dueDate||'')<String(b.dueDate||'')?-1:1; });
+}
 function billsDueInMonth(ym, category, account){
   var total = 0;
   billsActive().forEach(function(b){
