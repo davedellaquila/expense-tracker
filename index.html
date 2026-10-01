@@ -495,10 +495,11 @@ textarea{resize:vertical; min-height:64px;}
 /* soft appear for the bulk-update bar: first shown, docking, undocking */
 @keyframes selbar-soft-in{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
 .selbar.soft-in{animation:selbar-soft-in .22s ease;}
-/* Custom tab-bar tooltip: native `title` timing isn't controllable, so the
-   footer buttons use data-tip with a 500ms hover delay instead. */
+/* Custom tooltip pill: native `title` timing isn't controllable, so buttons use
+   data-tip (or automatic sheet-button tips) with a 1000ms hover delay instead.
+   Positioned by JS above the hovered button. */
 #tabtip{
-  position:fixed; z-index:90; bottom:calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom));
+  position:fixed; z-index:90;
   transform:translateX(-50%) translateY(4px);
   background:#20262d; color:#fff; padding:7px 12px; border-radius:9px; font-size:13.5px;
   max-width:92vw; text-align:center; opacity:0; pointer-events:none;
@@ -871,12 +872,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
               <option value="all">All time</option>
               <option value="custom">Custom…</option>
             </select></div>
-          <div><label class="f" style="margin-top:0" for="f-type">Type</label>
+          <div><label class="f" style="margin-top:0" for="f-type">Type <span style="font-weight:400">(Income/Expense/Transfer)</span></label>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="allchip on" id="allchip-f-type" data-for="f-type" type="button">All</button>
               <select id="f-type" style="flex:1;min-width:0"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option><option value="transfer">Transfer</option></select>
             </div></div>
-          <div><label class="f" style="margin-top:0" for="f-bp">Account</label>
+          <div><label class="f" style="margin-top:0" for="f-bp">Account <span style="font-weight:400">(Personal/Business)</span></label>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="allchip on" id="allchip-f-bp" data-for="f-bp" type="button">All</button>
               <select id="f-bp" style="flex:1;min-width:0"><option value="">All</option><option>Business</option><option>Personal</option></select>
@@ -2545,33 +2546,58 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   });
 })();
-/* Footer tooltip with a 1000ms hover delay (mouse only — touch taps navigate
-   immediately). Native `title` timing can't be controlled, so the tab bar
-   buttons carry data-tip instead. */
+/* Delayed tooltips (1000ms hover, mouse/trackpad only — touch taps act
+   immediately). Tab-bar buttons carry data-tip; sheet Save/Cancel buttons get
+   automatic tips naming the Shift+Return / Esc shortcuts. Native `title`
+   timing can't be controlled, so this custom pill is used instead. */
 (function(){
   var tip = document.getElementById('tabtip');
   if(!tip) return;
-  var timer = null;
-  function hide(){ if(timer){ clearTimeout(timer); timer = null; } tip.classList.remove('show'); }
-  Array.prototype.forEach.call(document.querySelectorAll('#tabbar button[data-tip]'), function(b){
-    b.addEventListener('pointerenter', function(e){
-      if(e.pointerType && e.pointerType!=='mouse') return;
-      hide();
-      timer = setTimeout(function(){
-        timer = null;
-        tip.textContent = b.getAttribute('data-tip');
-        var r = b.getBoundingClientRect();
-        /* clamp the centered pill by its real rendered width, not a guess */
-        var half = tip.offsetWidth/2 + 8;
-        var x = Math.min(Math.max(r.left + r.width/2, half), window.innerWidth - half);
-        tip.style.left = x + 'px';
-        tip.classList.add('show');
-      }, 1000);
-    });
-    b.addEventListener('pointerleave', hide);
-    b.addEventListener('pointerdown', hide);
-    b.addEventListener('blur', hide);
+  var timer = null, cur = null;
+  function hide(){
+    if(timer){ clearTimeout(timer); timer = null; }
+    cur = null;
+    tip.classList.remove('show');
+  }
+  function tipText(b){
+    var t = b.getAttribute('data-tip');
+    if(t) return t;
+    if(!b.closest('#modal-root .overlay')) return null;
+    var label = (b.textContent || '').trim();
+    if(/^(cancel|done)$/i.test(label)) return label + ' (Esc)';
+    if(b.classList.contains('btn') && !b.classList.contains('ghost')) return label + ' (Shift+Return)';
+    return null;
+  }
+  document.addEventListener('pointerover', function(e){
+    if(e.pointerType && e.pointerType !== 'mouse') return;
+    var b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if(b === cur) return; // moving within the same button: keep the timer
+    hide();
+    if(!b) return;
+    var txt = tipText(b);
+    if(!txt) return;
+    cur = b;
+    timer = setTimeout(function(){
+      timer = null;
+      if(cur !== b || !document.body.contains(b) || b.disabled) return;
+      tip.textContent = txt;
+      var r = b.getBoundingClientRect();
+      /* clamp the centered pill by its real rendered width, not a guess */
+      var half = tip.offsetWidth / 2 + 8;
+      var x = Math.min(Math.max(r.left + r.width / 2, half), window.innerWidth - half);
+      tip.style.left = x + 'px';
+      tip.style.top = Math.max(8, r.top - tip.offsetHeight - 10) + 'px';
+      tip.classList.add('show');
+    }, 1000);
   });
+  document.addEventListener('pointerout', function(e){
+    if(e.pointerType && e.pointerType !== 'mouse') return;
+    var b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if(b && b === cur && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('button') === b)) hide();
+  });
+  document.addEventListener('pointerdown', hide);
+  document.addEventListener('blur', hide);
+  document.addEventListener('scroll', hide, true);
 })();
 async function boot(){
   updateUserChip();

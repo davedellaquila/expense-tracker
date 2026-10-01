@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- Sheet Save/Cancel buttons now show a tooltip after hovering for one second: Save-type buttons read e.g. "Save (Shift+Return)", Cancel/Done buttons read "Cancel (Esc)". The tooltip system was generalized from the tab bar to any button (mouse/trackpad hover only).
+- Transaction filter card labels now read "Type (Income/Expense/Transfer)" and "Account (Personal/Business)" so the options are visible at a glance.
 - Bills page visual polish: the calendar now marks today with a filled accent circle, the selected day gets an accent border, bill dots are slightly larger with consistent spacing, tiles use the app's standard card radius with a softer urgency fill, amounts and due dates use tabular numerals, the days-left text is now a status pill (red overdue / amber due-soon, matching the Budget page badges), and the Paid/Edit/✕ buttons are a touch more compact. No behavior or layout changes — same controls in the same places.
 - Navigating to the Transactions page with a new filter selection (including chart drill-throughs) now starts the list at the first row instead of restoring the previous scroll position; returning with the selection unchanged still restores where you were.
 - The 🔔 bill-reminder badge now sits right before the amount in the transaction list, and tapping it opens the linked bill reminder.
