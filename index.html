@@ -3756,7 +3756,7 @@ function wireTransactions(){
         if(f.value && t.value && t.value < f.value) t.value = f.value;
       }
       if(id==='f-preset'||id==='f-from'||id==='f-to') saveTxnPeriod();
-      if(id==='f-cat'||id==='f-type'||id==='f-bank') saveTxnFilters();
+      if(id==='f-cat'||id==='f-type'||id==='f-bank'||id==='f-bp'||id==='f-tax') saveTxnFilters();
       disarmSelbarUndo(); // a filter change retires the Update-as-Undo button
       renderTransactions();
     });
@@ -3872,7 +3872,7 @@ function wireTransactions(){
       .then(function(ok){ if(ok) runBulkDelete(ids); });
   });
   restoreTxnPeriod(); // reopen on the period the user was last viewing
-  restoreTxnFilters(); // reopen on the saved category/type/bank filters
+  restoreTxnFilters(); // reopen on the saved category/type/bank/scope/tax filters
   refreshUndoButtons(); // arm the Update-as-Undo button when a completed bulk update exists
 }
 /* bulk selection + bulk update on the Transactions screen */
@@ -4276,11 +4276,13 @@ function ensureSelOption(id, val){
   if(!has) s.appendChild(el('option',{value:val},val));
   s.value = val;
 }
-/* Transactions: category / type / bank. The period already persists via TXN_PERIOD_KEY. */
+/* Transactions: category / type / bank / account scope / tax category.
+   The period already persists via TXN_PERIOD_KEY. */
 function saveTxnFilters(){
   try{
     localStorage.setItem(TXN_FILTERS_KEY, JSON.stringify({
-      cat: $('f-cat').value, type: $('f-type').value, bank: $('f-bank').value
+      cat: $('f-cat').value, type: $('f-type').value, bank: $('f-bank').value,
+      bp: $('f-bp').value, tax: $('f-tax').value
     }));
   }catch(e){}
 }
@@ -4291,6 +4293,8 @@ function restoreTxnFilters(){
     if(typeof f.cat==='string') ensureSelOption('f-cat', f.cat);
     restoreSel('f-type', f.type, ['', 'income', 'expense', 'transfer']);
     if(typeof f.bank==='string') ensureSelOption('f-bank', f.bank);
+    restoreSel('f-bp', f.bp, ['', 'Business', 'Personal']);
+    if(typeof f.tax==='string') ensureSelOption('f-tax', f.tax);
   }catch(e){}
 }
 /* Reports: period, business/personal scope, category chips. */
