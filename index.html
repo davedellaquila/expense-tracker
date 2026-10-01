@@ -8195,6 +8195,25 @@ function botReset(){
    No draft, no Save button. */
 var incBotBudget = null; // {month, rows:[{category, ytd, lastMo, amount, locked}], months, mSums}
 var ibotBarRefs = []; // [{r, fill}] received-vs-target bars in the income planner
+function incBotCompute(ym){
+  var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01', mStart = ym+'-01';
+  var prevStart = monthAdd(ym,-1)+'-01';
+  var months = parseInt(ym.slice(5,7),10)||1;
+  var sums = {}, lasts = {}, mSums = {};
+  state.transactions.forEach(function(t){
+    if(t.txn_type!=='income') return;
+    if(!t.date || t.date<y0 || t.date>=yEnd) return;
+    var c = t.category || 'Uncategorized';
+    sums[c] = (sums[c]||0) + num(t.amount);
+    if(t.date>=prevStart && t.date<mStart) lasts[c] = (lasts[c]||0) + num(t.amount);
+    if(t.date>=mStart) mSums[c] = (mSums[c]||0) + num(t.amount);
+  });
+  var rows = Object.keys(sums).filter(function(c){ return sums[c]>0; }).map(function(c){
+    var avg = sums[c]/months;
+    return {category:c, ytd:sums[c], lastMo:lasts[c]||0, amount:botNiceRound(avg), locked:false};
+  }).sort(function(a,b){ return b.amount-a.amount; });
+  return {rows:rows, months:months, mSums:mSums};
+}
 
 /* Refresh a proposal's calculated values from current transactions, keeping the
    user's edits and locks: rows they typed keep their amounts; untouched rows

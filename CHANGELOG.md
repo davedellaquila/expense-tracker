@@ -3,7 +3,7 @@
 Running record of what ships in the expense tracker, kept for future
 documentation. Newest first.
 
-## 2026-09-30
+## 2026-10-01
 
 ### Budget page: planners are now the live budget (no more drafts)
 - The draft/Save model is gone. The **Budget planner** and **Income
@@ -20,6 +20,9 @@ documentation. Newest first.
   suggestion. Removed categories stay hidden for the month.
 - One-time cleanup: old per-month draft keys are swept from localStorage
   on load; removed-category memory is kept.
+- **Fix:** restored `incBotCompute`, which a span edit had accidentally
+  deleted along with the old draft/save code — the Income planner card
+  rendered empty because its loader threw before painting any rows.
 
 ## 2026-09-30
 
