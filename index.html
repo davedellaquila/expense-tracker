@@ -7726,9 +7726,9 @@ function botFixedSet(prefix, ym, cat, fixed){
 }
 /* Paint a planner row's enabled/disabled state: enabled rows get a full
    accent fill; disabled (suggestion) rows stay dimmed. */
-function botPaintRowState(r, line, check){
+function botPaintRowState(r, line, check, fill){
   if(r.locked){
-    line.style.background = 'var(--accent-soft)';
+    line.style.background = fill || 'var(--accent-soft)';
     line.style.opacity = '';
     check.style.color = 'var(--accent)';
     check.style.opacity = '1';
@@ -7955,7 +7955,7 @@ function botEnableRow(r, line, check){
   if(r.locked) return;
   r.locked = true;
   check.title = 'Uncheck — bot may suggest trims';
-  botPaintRowState(r, line, check);
+  botPaintRowState(r, line, check, 'var(--danger-soft)');
   botUpdateHint();
 }
 /* Bulk enable/disable for bot proposal rows (expense and income). */
@@ -7998,7 +7998,7 @@ function botRenderTable(){
       botRenderTable();
     });
     line.appendChild(check);
-    botPaintRowState(r, line, check);
+    botPaintRowState(r, line, check, 'var(--danger-soft)');
     var nm = el('div',{style:'display:flex;align-items:center;gap:6px;min-width:0'});
     var nmText = el('div',{style:'flex:1;min-width:0'});
     var bName = el('b',{class:'rep-click',style:'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isInc?'var(--accent)':'var(--danger)'),title:'Show transactions'},r.category);
@@ -8354,7 +8354,7 @@ function incBotRenderTable(){
       incBotRenderTable();
     });
     line.appendChild(check);
-    botPaintRowState(r, line, check);
+    botPaintRowState(r, line, check, 'var(--accent-soft)');
     var nm = el('div',{style:'display:flex;align-items:center;gap:6px;min-width:0'});
     var nmText = el('div',{style:'flex:1;min-width:0'});
     var ibName = el('b',{class:'rep-click',style:'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent)',title:'Show transactions'},r.category);
