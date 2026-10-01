@@ -9,6 +9,8 @@ documentation. Newest first.
 - The floating totals pill near the footer is gone (markup, styles, and
   update logic removed). The per-planner header cards still show planned
   total, % of income, and expected income.
+- The values in the sticky totals pill next to the month picker are now
+  larger (16px bold values, 14px labels, up from 12.5px).
 
 ### Budget page: planners are now the live budget (no more drafts)
 - The draft/Save model is gone. The **Budget planner** and **Income
