@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Transaction detail (edit mode) now has an Add bill reminder button next to Split: it opens the bill form pre-filled from the transaction (name, amount, date as due date, category, Personal/Business), stacked above so unsaved edits are kept; frequency is left for the user to pick before saving.
 - Bill scanner: new Upload PDF option — the first page is rendered on-device with PDF.js and read by the same OCR pipeline; the original PDF is retained in bill-scans/ (or the rendered page locally). Also available in the receipt scanner via the shared sheet.
 - Tapping a statement on the Import page now opens an in-app preview of the stored file (PDF renders inline, CSV shows text), with an Open full button for the new-tab view; View opens the same preview. Rows without a stored file are unchanged.
 - Home page Budget vs Actual card now renders the same paired-bar chart as Reports (Budget teal / Actual green-red with variance labels), replacing the old progress bars; tap a bar to drill into the category. Sorted by budget, largest first.
