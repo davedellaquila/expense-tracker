@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Budget planner drag-to-reorder rebuilt: the dragged row is now a fixed ghost that follows the pointer exactly (no more jumping to the top on slight drags), and a dashed placeholder marks the drop position as you drag — the same affordance chart cards already had.
 - Sheet Save/Cancel buttons now show a tooltip after hovering for one second: Save-type buttons read e.g. "Save (Shift+Return)", Cancel/Done buttons read "Cancel (Esc)". The tooltip system was generalized from the tab bar to any button (mouse/trackpad hover only).
 - Transaction filter card labels now read "Type (Income/Expense/Transfer)" and "Account (Personal/Business)" so the options are visible at a glance.
 - Bills page visual polish: the calendar now marks today with a filled accent circle, the selected day gets an accent border, bill dots are slightly larger with consistent spacing, tiles use the app's standard card radius with a softer urgency fill, amounts and due dates use tabular numerals, the days-left text is now a status pill (red overdue / amber due-soon, matching the Budget page badges), and the Paid/Edit/✕ buttons are a touch more compact. No behavior or layout changes — same controls in the same places.
