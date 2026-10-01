@@ -9173,7 +9173,7 @@ function incBotReset(){
 
 /* ================= bills =================
    Bill: {id, name, amount, dueDate:'YYYY-MM-DD', recurrence:'once'|'monthly'|
-          'quarterly'|'yearly', category, account:'Personal'|'Business',
+          'quarterly'|'semiannual'|'yearly', category, account:'Personal'|'Business',
           notes, createdAt, lastPaid:'YYYY-MM-DD'|null}
    Status is computed from dueDate. Recurring bills advance their dueDate when
    paid (same doc); one-time bills move to the Paid section via lastPaid. */
@@ -9213,7 +9213,7 @@ function advanceDueDate(dateStr, recurrence){
   var parts = String(dateStr||'').split('-');
   if(parts.length<3) return null;
   var y = parseInt(parts[0],10), m = parseInt(parts[1],10), d = parseInt(parts[2],10);
-  var add = recurrence==='monthly' ? 1 : recurrence==='quarterly' ? 3 : recurrence==='yearly' ? 12 : 0;
+  var add = recurrence==='monthly' ? 1 : recurrence==='quarterly' ? 3 : recurrence==='semiannual' ? 6 : recurrence==='yearly' ? 12 : 0;
   if(!add) return null;
   m += add;
   while(m>12){ m-=12; y++; }
@@ -10024,7 +10024,7 @@ function openBillForm(b, opts){
     var inDate = el('input',{type:'date',value:src.dueDate||todayLocal(),style:'width:100%'});
     sh.appendChild(el('label',{class:'f'},'Due date')); sh.appendChild(inDate);
     var inRec = el('select',{style:'width:100%'});
-    [['once','One-time'],['monthly','Monthly'],['quarterly','Quarterly'],['yearly','Yearly']].forEach(function(o){
+    [['once','One-time'],['monthly','Monthly'],['quarterly','Quarterly'],['semiannual','Every 6 months'],['yearly','Yearly']].forEach(function(o){
       var op = el('option',{value:o[0]},o[1]);
       if(src.recurrence===o[0]) op.selected = true;
       inRec.appendChild(op);
