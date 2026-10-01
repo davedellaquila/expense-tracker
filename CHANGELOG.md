@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Bills calendar: days with bills get a light-green background; dots are bigger (multiple dots per day were already shown).
 - Bills page: scrolling the upcoming list now pins a sticky header under the app header showing the current month, its total, and an Add bill button.
 - Bill form: new bills default to Uncategorized instead of the first category in the list.
 - App header: the gradient app icon now sits left of the "Expense Tracker" name.
