@@ -6337,6 +6337,55 @@ function openStatementFile(path){
     .then(function(url){ window.open(url, '_blank'); })
     .catch(function(){ toast('Could not open the statement file.', true); });
 }
+/* In-app statement preview: taps on an import-log statement row open this
+   sheet when the file was stored (f.filePath). PDFs render in an iframe;
+   CSVs show their text. An "Open full" button keeps the old new-tab view. */
+function openStatementPreview(f){
+  if(!f || !f.filePath) return;
+  var isPdf = /\.pdf$/i.test(String(f.name||''));
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,'Statement'));
+    sh.appendChild(el('p',{class:'muted',style:'margin-top:-8px;font-size:13px'}, String(f.name||'')));
+    var body = el('div',{style:'min-height:160px;display:flex;align-items:center;justify-content:center'});
+    body.appendChild(el('p',{class:'muted'},'Loading…'));
+    sh.appendChild(body);
+    var row = el('div',{class:'btnrow'});
+    var done = el('button',{class:'btn ghost'},'Close');
+    done.addEventListener('click', close);
+    row.appendChild(done);
+    var full = el('button',{class:'btn'},'Open full');
+    full.style.display = 'none';
+    row.appendChild(full);
+    sh.appendChild(row);
+    firebaseStorage()
+      .then(function(storage){ return storage.ref(f.filePath).getDownloadURL(); })
+      .then(function(url){
+        full.style.display = '';
+        full.addEventListener('click', function(){ window.open(url, '_blank'); });
+        body.innerHTML = '';
+        body.style.display = 'block';
+        if(isPdf){
+          var fr = document.createElement('iframe');
+          fr.src = url;
+          fr.title = String(f.name||'Statement');
+          fr.style.cssText = 'width:100%;height:62vh;border:0;border-radius:8px;background:#fff';
+          body.appendChild(fr);
+        }else{
+          return fetch(url).then(function(resp){
+            if(!resp.ok) throw new Error('fetch failed');
+            return resp.text();
+          }).then(function(txt){
+            body.appendChild(el('pre',{style:'max-height:62vh;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;background:var(--rowbg,#f4f4f4);padding:10px;border-radius:8px;margin:0'},
+              String(txt).slice(0, 20000)));
+          });
+        }
+      })
+      .catch(function(){
+        body.innerHTML = '';
+        body.appendChild(el('p',{class:'muted'},'Could not load the statement file.'));
+      });
+  });
+}
 function getImportedFiles(){
   try{ return JSON.parse(localStorage.getItem('et_imported_files')||'[]'); }catch(e){ return []; }
 }
@@ -6468,6 +6517,7 @@ function bankSelectFor(w){
   sel.value = guessBankFromName(w.f.name) || 'Other';
   sel.style.fontSize = '13px';
   sel.style.maxWidth = '170px';
+  sel.addEventListener('click', function(ev){ ev.stopPropagation(); });
   sel.addEventListener('change', function(){ setImportBank(w.i, sel.value); });
   return sel;
 }
@@ -6510,7 +6560,8 @@ function importLogRow(w){
   if(!pl){
     // Imports logged before the month was recorded: one-tap to fill it in.
     var add = el('button',{class:'linkbtn',type:'button',style:'font-size:12px;padding:2px 0'},'+ add month');
-    add.addEventListener('click', function(){
+    add.addEventListener('click', function(ev){
+      ev.stopPropagation();
       var wrap = el('span');
       var inp = document.createElement('input');
       inp.type = 'month';
@@ -6520,6 +6571,7 @@ function importLogRow(w){
       var okb = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
       okb.addEventListener('click', function(){ if(inp.value) setImportPeriod(w.i, inp.value); });
       wrap.appendChild(inp); wrap.appendChild(okb);
+      wrap.addEventListener('click', function(ev){ ev.stopPropagation(); });
       add.replaceWith(wrap);
     });
     left.appendChild(add);
@@ -6529,11 +6581,20 @@ function importLogRow(w){
   right.appendChild(el('div',{class:'muted',style:'font-size:12px'},String(f.at||'').slice(0,10)));
   if(f.filePath){
     var vw = el('button',{class:'linkbtn',type:'button',style:'font-size:12px; padding:0; margin-top:2px'},'View');
-    vw.addEventListener('click', function(){ openStatementFile(f.filePath); });
+    vw.addEventListener('click', function(ev){ ev.stopPropagation(); openStatementPreview(f); });
     right.appendChild(vw);
+    // Tapping the statement row itself opens the preview when the file is stored.
+    r.style.cursor = 'pointer';
+    r.setAttribute('role','button');
+    r.setAttribute('tabindex','0');
+    r.setAttribute('aria-label','Preview statement '+String(f.name||''));
+    r.addEventListener('click', function(){ openStatementPreview(f); });
+    r.addEventListener('keydown', function(e){
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openStatementPreview(f); }
+    });
   }
   var del = el('button',{class:'linkbtn',type:'button',style:'font-size:12px; padding:0; margin-top:2px; margin-left:8px; color:var(--danger)'},'Delete');
-  del.addEventListener('click', function(){ deleteImportEntry(f); });
+  del.addEventListener('click', function(ev){ ev.stopPropagation(); deleteImportEntry(f); });
   right.appendChild(del);
   r.appendChild(left); r.appendChild(right);
   return r;
