@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Bills page visual polish: the calendar now marks today with a filled accent circle, the selected day gets an accent border, bill dots are slightly larger with consistent spacing, tiles use the app's standard card radius with a softer urgency fill, amounts and due dates use tabular numerals, the days-left text is now a status pill (red overdue / amber due-soon, matching the Budget page badges), and the Paid/Edit/✕ buttons are a touch more compact. No behavior or layout changes — same controls in the same places.
 - Navigating to the Transactions page with a new filter selection (including chart drill-throughs) now starts the list at the first row instead of restoring the previous scroll position; returning with the selection unchanged still restores where you were.
 - The 🔔 bill-reminder badge now sits right before the amount in the transaction list, and tapping it opens the linked bill reminder.
 - Each tab now reopens at its previous scroll position after a page refresh (positions are saved per tab, throttled while scrolling, on tab switch, and on refresh/close).
