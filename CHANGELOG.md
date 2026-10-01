@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Cancel is always on the left
+- Every sheet with a Cancel + action button pair now puts Cancel first:
+  copy-budget, bill form, delete-bill confirm, and the import-log account
+  rename. Sheets that already had it (bulk edit, scrubber, split, txn form,
+  confirms) are unchanged.
+
 ### Bill notes field auto-resizes
 - The Notes field on the add/edit bill form now grows and shrinks to fit
   its contents (also refits when a scan pre-fills or clears payment info).

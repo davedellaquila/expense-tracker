@@ -6446,8 +6446,8 @@ function startRenameAccount(ahl, bankKey, acctKey){
   inp.value = acctKey;
   inp.setAttribute('aria-label', 'Account name');
   inp.style.cssText = 'font-size:14px;max-width:170px';
-  var saveB = el('button',{class:'btn small',type:'button',style:'margin-left:6px'},'Save');
-  var cancelB = el('button',{class:'btn small ghost',type:'button',style:'margin-left:4px'},'Cancel');
+  var saveB = el('button',{class:'btn small',type:'button',style:'margin-left:4px'},'Save');
+  var cancelB = el('button',{class:'btn small ghost',type:'button',style:'margin-left:6px'},'Cancel');
   function close(){ renderImportLog(bankKey, acctKey); }
   saveB.addEventListener('click', function(ev){ ev.stopPropagation(); renameImportAccount(bankKey, acctKey, inp.value); });
   cancelB.addEventListener('click', function(ev){ ev.stopPropagation(); close(); });
@@ -6458,7 +6458,7 @@ function startRenameAccount(ahl, bankKey, acctKey){
     else if(ev.key === 'Escape'){ ev.preventDefault(); close(); }
   });
   if(labelEl) labelEl.replaceWith(inp); else ahl.insertBefore(inp, ahl.firstChild);
-  inp.after(saveB); saveB.after(cancelB);
+  inp.after(cancelB); cancelB.after(saveB);
   inp.focus(); inp.select();
 }
 /* Delete one import-log entry: removes it from the history on this device
@@ -7791,10 +7791,10 @@ function openBudgetCopySheet(mode){
       }catch(e){}
       close(); renderBudgets();
     });
-    bar.appendChild(go);
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.addEventListener('click', close);
     bar.appendChild(cancel);
+    bar.appendChild(go);
     sh.appendChild(bar);
     inSrc.addEventListener('input', refreshInfo);
     inSrc.addEventListener('change', refreshInfo);
@@ -9481,15 +9481,15 @@ function openBillForm(b){
       }catch(e){ toast('Could not save the bill.', true); return; }
       close(); renderBills();
     });
+    var cancelBtn = el('button',{class:'btn ghost',type:'button'},'Cancel');
+    cancelBtn.addEventListener('click', close);
+    bar.appendChild(cancelBtn);
     bar.appendChild(saveBtn);
     if(isEdit){
       var delBtn = el('button',{class:'btn ghost',type:'button',style:'color:var(--danger)'},'Delete');
       delBtn.addEventListener('click', function(){ deleteBill(b, close); });
       bar.appendChild(delBtn);
     }
-    var cancelBtn = el('button',{class:'btn ghost',type:'button'},'Cancel');
-    cancelBtn.addEventListener('click', close);
-    bar.appendChild(cancelBtn);
     sh.appendChild(bar);
     setTimeout(function(){ inName.focus(); }, 60);
   });
@@ -9589,10 +9589,10 @@ function deleteBill(b, closeParent){
       toast('Bill deleted.');
       renderBills();
     });
-    bar.appendChild(del);
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.addEventListener('click', close);
     bar.appendChild(cancel);
+    bar.appendChild(del);
     sh.appendChild(bar);
   });
 }
