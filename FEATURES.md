@@ -19,6 +19,9 @@ it's where ideas wait until Dave says "build it."
   than "Expense Tracker".
 - **Track merchant details** (2026-09-29, Dave): a dedicated place to keep notes
   and details for each merchant.
+- **Test CSV import** (2026-10-01, Dave): try out the CSV importer — e.g. a
+  built-in sample CSV or a dry-run mode that previews the import without saving
+  anything.
 
 ## Completed features
 
