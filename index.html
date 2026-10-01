@@ -2494,6 +2494,7 @@ function rememberScroll(){
 }
 function showScreen(name){
   var same = (state.screen === name);
+  var prevScreen = state.screen;
   // remember each tab's vertical scroll; restore it when coming back
   if(state.screen && !same){ rememberScroll(); }
   state.screen = name;
@@ -2513,6 +2514,14 @@ function showScreen(name){
     else if(name==='settings') syncStoreSettings();
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
+  // Switching to Transactions puts the cursor in the search box. Focus the
+  // floating clone when the in-card box has scrolled off above; not on boot.
+  if(!same && prevScreen && name==='transactions'){
+    var fq = $('f-q');
+    var fr = fq.getBoundingClientRect();
+    var target = (fr.bottom <= 0) ? $('f-q-stick') : fq;
+    if(target && document.activeElement !== target) target.focus({preventScroll:true});
+  }
 }
 function updateUserChip(){
   $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
