@@ -726,6 +726,15 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
 .scanattach{display:flex; align-items:center; gap:10px; margin:2px 0 8px;}
 .scanattach img{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer; flex:none;}
 .scanbadge{font-size:13px; flex:none;}
+.splitbadge{font-size:10.5px; font-weight:700; color:var(--blue); background:var(--blue-soft);
+  border-radius:8px; padding:2px 7px; flex:none; letter-spacing:.02em;}
+/* Split-parts breakdown shown on a split transaction's detail sheet. */
+.splitparts{margin:2px 0 12px; padding:10px 12px; background:var(--blue-soft);
+  border:1px solid var(--border); border-radius:10px; font-size:13.5px;}
+.splitparts-h{font-weight:700; margin-bottom:6px;}
+.splitparts-r{display:flex; justify-content:space-between; gap:8px; padding:2px 0;}
+.splitparts-a{font-variant-numeric:tabular-nums; font-weight:600; flex:none;}
+.splitparts-r.thisone .splitparts-a{color:var(--blue);}
 </style>
 </head>
 <body>
@@ -1057,7 +1066,9 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
           </div>
         </div>
-        <div id="bot-table" style="margin-top:12px"><div id="bot-rows"></div>
+        <div id="bot-table" style="margin-top:12px">
+        <div id="bot-bills-line" style="margin-bottom:10px;font-size:13px" hidden></div>
+        <div id="bot-rows"></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
           <label class="f" for="bot-goal-type" style="margin-top:0">Financial goal</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -1072,7 +1083,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
           <div id="bot-suggestions" style="margin-top:10px"></div>
         </div>
         </div>
-        <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
       </div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -4561,6 +4571,8 @@ function renderTransactions(){
     b.appendChild(amt);
     if(t.scanPath || t.scanDataUrl)
       b.appendChild(el('span',{class:'scanbadge', title:'Receipt scan attached'},'\uD83D\uDCF7'));
+    if(t.split_group)
+      b.appendChild(el('span',{class:'splitbadge', title:'Split transaction'},'split'));
     if(txnSelectMode){
       b.addEventListener('click', function(){
         if(txnSelected[t.id]) delete txnSelected[t.id]; else txnSelected[t.id]=true;
@@ -5636,16 +5648,15 @@ function openSplitSheet(t, baseRow, closeEditForm){
     var cancelBtn = el('button', {class:'btn ghost', type:'button'}, 'Cancel');
     var saveBtn = el('button', {class:'btn go', type:'button'}, 'Save split');
     function refresh(){
-      var sum = 0, allOk = true;
-      rows.forEach(function(r){
-        var c = cents(r.amt.value);
-        sum += c;
-        if(!(c>0)) allOk = false;
-      });
+      var sum = 0;
+      rows.forEach(function(r){ sum += cents(r.amt.value); });
       var rem = totalCents - sum;
       remEl.textContent = 'Remaining: $'+(rem/100).toFixed(2);
       remEl.style.color = (rem===0) ? 'var(--green)' : (rem<0 ? 'var(--red)' : '');
-      saveBtn.disabled = !(rem===0 && allOk && rows.length>=2);
+      /* Save stays tappable: the save handler explains any problem with a
+         toast (<2 parts, a part at $0, or a leftover remainder) instead of
+         the button silently doing nothing. */
+      saveBtn.disabled = rows.length<2;
     }
     function addRow(amount, cat){
       var rowEl = el('div', {style:'display:flex;gap:8px;margin-bottom:8px;align-items:center'});
@@ -5685,7 +5696,10 @@ function openSplitSheet(t, baseRow, closeEditForm){
       }
       var sum = parts.reduce(function(a,p){ return a+p.cents; }, 0);
       if(sum!==totalCents){
-        toast('Parts add up to $'+(sum/100).toFixed(2)+' — they must total $'+(totalCents/100).toFixed(2)+'.', true);
+        var diff = totalCents - sum;
+        toast('Parts total $'+(sum/100).toFixed(2)+' — '+
+          (diff>0 ? '$'+(diff/100).toFixed(2)+' short of ' : '$'+((-diff)/100).toFixed(2)+' over ')+
+          '$'+(totalCents/100).toFixed(2)+'.', true);
         return;
       }
       var groupId = 'sg'+Date.now().toString(36);
@@ -5800,6 +5814,26 @@ function openTxnForm(t){
     sh.appendChild(scanRow);
     sh.appendChild(scanBox);
     renderScanBox();
+
+    /* Split parts: if this transaction came from a split, show every part so
+       the other amounts are visible right here. */
+    if(isEdit && t.split_group){
+      var sibs = state.transactions.filter(function(x){ return x.split_group===t.split_group; });
+      if(sibs.length>1){
+        var spBox = el('div',{class:'splitparts'});
+        var spTotal = sibs.reduce(function(a,x){ return a+num(x.amount); }, 0);
+        spBox.appendChild(el('div',{class:'splitparts-h'},
+          'Split into '+sibs.length+' parts · '+money(spTotal)+' total'));
+        sibs.forEach(function(x){
+          var line = el('div',{class:'splitparts-r'+(x.id===t.id?' thisone':'')});
+          line.appendChild(el('span',null,(x.category||'Uncategorized')));
+          line.appendChild(el('span',{class:'splitparts-a'},
+            money(num(x.amount)) + (x.id===t.id ? ' · this one' : '')));
+          spBox.appendChild(line);
+        });
+        sh.appendChild(spBox);
+      }
+    }
 
     /* Split across categories (edit mode only): divide this transaction's
        amount into parts, each with its own category. Base values come from

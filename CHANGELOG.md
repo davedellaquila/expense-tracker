@@ -5,6 +5,22 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Bills-due line moves to the top of the Budget planner
+- The "Bills due" cash-flow line now sits at the top of the Budget planner's
+  scrolling list instead of pinned at the card bottom — it scrolls away with
+  the categories instead of staying stuck.
+
+### Split transactions: visible badge + parts on the detail sheet
+- Split transactions now show a small "split" badge in the Transactions list.
+- Opening a split part shows every part of the split (category + amount,
+  with the current one marked) and the parts total, so the other amounts
+  are visible right on the detail page.
+
+### Split save: toast explains a leftover remainder
+- The Save split button no longer silently stays disabled when the parts
+  don't add up — tapping it now says exactly what's off, e.g. "Parts total
+  $90.00 — $10.00 short of $100.00."
+
 ### Budget planner: declutter + Financial goal scrolls with the list
 - Removed the "Live income targets…" / "Live budget…" intro paragraphs, the
   Enable all / Disable all buttons, and the "Dimmed rows are suggestions…"
