@@ -5,6 +5,11 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget page: removed the sticky floating totals card
+- The floating totals pill near the footer is gone (markup, styles, and
+  update logic removed). The per-planner header cards still show planned
+  total, % of income, and expected income.
+
 ### Budget page: planners are now the live budget (no more drafts)
 - The draft/Save model is gone. The **Budget planner** and **Income
   planner** are the live budget — every check, amount edit, add, and

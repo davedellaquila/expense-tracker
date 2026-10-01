@@ -496,21 +496,6 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 }
 .fab:active{transform:scale(.94);}
 
-/* ---------- floating bot totals (Budget tab) ---------- */
-#float-totals{
-  position:fixed; left:14px; right:14px; z-index:30;
-  bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px);
-  display:flex; flex-direction:column; gap:6px; align-items:center;
-  pointer-events:none;
-}
-#float-totals[hidden]{display:none;}
-#float-totals > div{
-  background:var(--card); border:1px solid var(--border); border-radius:16px;
-  padding:8px 16px; font-size:13.5px; box-shadow:0 4px 16px rgba(0,0,0,.22);
-  max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  display:flex; flex-direction:column; gap:2px; align-items:center;
-}
-#screen-budgets.has-floattotals{padding-bottom:76px;}
 /* ---------- tab bar ---------- */
 .tabbar{
   position:fixed; left:0; right:0; bottom:0; z-index:40;
@@ -1275,9 +1260,6 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
     </section>
   </main>
 
-  <div id="float-totals" hidden>
-    <div id="float-totals-one"></div>
-  </div>
   <nav class="tabbar" id="tabbar">
     <button data-screen="dashboard" class="on" data-tip="Home — balances, budgets and bills at a glance (shortcut: 1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Home</button>
     <button data-screen="transactions" data-tip="Transactions — search, filter and edit transactions (shortcut: 2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="tab-full">Transactions</span><span class="tab-short">Txns</span></button>
@@ -2340,7 +2322,6 @@ function showScreen(name){
     else if(name==='reports') renderReports();
     else if(name==='settings') syncStoreSettings();
   }
-  updateFloatTotals();
   if(!same) window.scrollTo(0, scrollPosByScreen[name] || 0);
 }
 function updateUserChip(){
@@ -8035,7 +8016,6 @@ function botRenderTable(){
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this budget — re-add above to bring one back.'));
   botPaintBars();
-  updateFloatTotals();
 }
 
 /* Actual-vs-budget bars for the selected month: filled width = spent/budget,
@@ -8063,7 +8043,6 @@ function botRenderTotal(){
   if(p) p.textContent = botPctText();
   botPaintBars();
   renderBotBillsLine();
-  updateFloatTotals();
 }
 /* Cash-flow check: bills due this month vs expected income and proposed budget. */
 function renderBotBillsLine(){
@@ -8186,7 +8165,6 @@ function botReset(){
   $('bot-bulk-row').style.display = 'none';
   $('bot-suggestions').innerHTML = '';
   $('bot-goal').hidden = true;
-  updateFloatTotals();
 }
 
 /* ================= income planner =================
@@ -8362,7 +8340,6 @@ function incBotRenderTable(){
   if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
   ibotPaintBars();
-  updateFloatTotals();
 }
 
 /* Received-vs-target bars for the selected month: filled width =
@@ -8381,46 +8358,16 @@ function incBotRenderTotal(){
   var t = $('ibot-total');
   if(t) t.textContent = money(incBotTotal());
   ibotPaintBars();
-  updateFloatTotals();
 }
 
 function incBotReset(){
   incBotBudget = null;
   $('ibot-table').innerHTML = '';
   $('ibot-bulk-row').style.display = 'none';
-  updateFloatTotals();
 }
 
 /* Floating total pills pinned above the tab bar while a budget is open
    on the Budget tab. pointer-events:none so they never block taps. */
-function updateFloatTotals(){
-  var wrap = $('float-totals');
-  if(!wrap) return;
-  var onBudget = state.screen==='budgets';
-  var expRows = (botBudget && botBudget.rows) || [];
-  var incRows = (incBotBudget && incBotBudget.rows) || [];
-  var expOn = onBudget && expRows.length>0, incOn = onBudget && incRows.length>0;
-  var one = $('float-totals-one');
-  one.innerHTML = '';
-  if(expOn){
-    var d1 = el('div');
-    d1.appendChild(document.createTextNode('Planned total '));
-    var b = el('b'); b.textContent = money(botBudgetTotal()); d1.appendChild(b);
-    var pct = botPctText();
-    if(pct){ var s = el('span',{class:'muted'}); s.textContent = ' · '+pct; d1.appendChild(s); }
-    one.appendChild(d1);
-  }
-  if(incOn){
-    var d2 = el('div');
-    d2.appendChild(document.createTextNode('Expected income '));
-    var b2 = el('b'); b2.textContent = money(incBotTotal())+'/mo'; d2.appendChild(b2);
-    one.appendChild(d2);
-  }
-  wrap.hidden = !(expOn||incOn);
-  var scr = $('screen-budgets');
-  if(scr) scr.classList.toggle('has-floattotals', !!(expOn||incOn));
-}
-
 /* ================= bills =================
    Bill: {id, name, amount, dueDate:'YYYY-MM-DD', recurrence:'once'|'monthly'|
           'quarterly'|'yearly', category, account:'Personal'|'Business',
