@@ -5,6 +5,17 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Planner rows: drag to reorder
+- Each Budget and Income planner row now has a ⋮⋮ grip handle beside the
+  category name. Drag it (mouse or touch) to move the row; the list
+  reorders live as you drag. The order is saved per month, survives
+  Recalculate, and newly added categories go to the end once you've set a
+  manual order.
+
+### Sticky header: totals centered under the month
+- The budget/income and percent values in the sticky header are now
+  centered under the month, instead of right-aligned.
+
 ### Planner rows: "This month" and "Last month" swapped
 - "This month" now sits under the category name (keeping its red/green
   over-budget/target-met coloring); "Last month" moved into the grouped
