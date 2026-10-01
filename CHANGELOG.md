@@ -5,6 +5,25 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Budget page: iPhone layout fixes (from screenshot review)
+- The sticky bar is now two compact rows (month stepper, then the live
+  totals pill) and the pill is always a single line — shortened to
+  "$11,915 budget · $11,590 income · 103%" with ellipsis instead of
+  wrapping mid-phrase over the Copy from…/Recalculate buttons.
+- Planner rows can no longer push past the card's right edge on a 390px
+  phone: the name column is `minmax(0,1fr)` and every grid child
+  (name, amount input, slider) may shrink to zero, so the amount input
+  and × button stay on screen and the header labels align with their
+  columns.
+- Removed the slim actual-vs-budget / received-vs-target bars under each
+  row — they read as a double slider track. The slider, YTD avg, and
+  "Last month" figures remain.
+- Planner intros shortened to one line ("Live budget — every change
+  saves instantly.").
+- Unchecked (suggestion) rows now get an explanatory hint: "Dimmed rows
+  are suggestions — tap ✓ to include one in your budget." The faded
+  checkmark means the row isn't part of the live budget yet.
+
 ### Budget page: removed the sticky floating totals card
 - The floating totals pill near the footer is gone (markup, styles, and
   update logic removed). The per-planner header cards still show planned

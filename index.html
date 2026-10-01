@@ -401,13 +401,15 @@ textarea{resize:vertical; min-height:64px;}
 .linkbtn.on{background:var(--blue-soft); border-radius:999px; padding:8px 14px;}
 /* transactions filter card sits tight above the bulk-update toolbar */
 #txn-filtercard{margin-bottom:6px; padding-bottom:8px;}
-/* Budget sticky month bar: stays pinned under the app header while the page scrolls */
+/* Budget sticky month bar: stays pinned under the app header while the page scrolls.
+   Two compact rows (month stepper, then the live totals pill) so the pill
+   never wraps mid-phrase over the card buttons below. */
 #bud-stickybar{
   position:sticky; top:calc(var(--headH, 64px) + 6px); z-index:15;
   background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
   box-shadow:0 10px 24px rgba(10,20,15,.14);
   padding:10px 14px; margin-bottom:12px;
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  display:flex; flex-direction:column; align-items:stretch; gap:4px;
 }
 #bud-stickybar input{margin:0;}
 /* Month stepper: prev/next chevrons around the native month picker */
@@ -416,12 +418,17 @@ textarea{resize:vertical; min-height:64px;}
 #bud-month{border:1px solid transparent; background:transparent; font-size:15px;
   font-weight:600; color:var(--text); padding:5px 4px; border-radius:8px; width:auto;}
 #bud-month:hover{border-color:var(--border);}
-/* Live budget-vs-income totals pill: shares the sticky bar with the month
-   picker and updates on every slider tick. */
-.bud-totals{flex:1; min-width:150px; margin:0; text-align:right; font-size:14px; color:var(--muted);}
+/* Live budget-vs-income totals pill: second row of the sticky bar, always a
+   single line (truncates instead of wrapping over the buttons below). */
+.bud-totals{margin:0; text-align:left; font-size:14px; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .bud-totals b{color:var(--text); font-variant-numeric:tabular-nums; font-size:16px;}
 .bud-totals b.neg{color:var(--danger);}
 .bud-totals b.pos{color:var(--accent);}
+/* Planner rows: let every grid child shrink (name cell, amount input, range
+   slider) so nothing can push the row past the card's right edge. */
+.bot-row>*{min-width:0;}
+.bot-row input[type=range]{max-width:100%;}
 /* floating search clone: appears fixed below the app header only after the
    in-card search box scrolls off the top of the page */
 #searchstick label.f{display:none;}
@@ -555,8 +562,10 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
   /* budget proposal rows: roomier grid, 44px lock/delete tap targets
-     (grid is inline in JS, so !important overrides it here) */
-  .bot-row, .bot-head{grid-template-columns:44px 1fr 62px 80px 40px !important; gap:6px !important;}
+     (grid is inline in JS, so !important overrides it here).
+     minmax(0,1fr) + min-width:0 below keeps long category names from
+     blowing the row wider than a 390px viewport. */
+  .bot-row, .bot-head{grid-template-columns:44px minmax(0,1fr) 62px 80px 40px !important; gap:6px !important;}
   .bot-row .lockbtn{min-height:44px; min-width:40px;}
   /* bills calendar: taller day cells so dots don't crowd the date */
   .bill-cal .day{min-height:52px;}
@@ -1005,11 +1014,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="bot-propose" type="button" style="width:auto" title="Recalculate from year-to-date spending">Recalculate</button>
           </div>
         </div>
-        <p class="muted">This is your live budget — every change saves instantly. Edit any amount, check the categories to keep, set a savings goal for trim suggestions, or tap Recalculate to rebuild from year-to-date spending.</p>
+        <p class="muted">Live budget — every change saves instantly.</p>
         <div id="bot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="bot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="bot-disable-all" type="button">Disable all</button>
         </div>
+        <div id="bot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your budget.</div>
         <div id="bot-table" style="margin-top:12px"></div>
         <div id="bot-bills-line" style="margin-top:10px;font-size:13px" hidden></div>
         <div id="bot-goal" hidden style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
@@ -1034,11 +1044,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
             <button class="btn small" id="ibot-propose" type="button" style="width:auto" title="Recalculate from year-to-date income">Recalculate</button>
           </div>
         </div>
-        <p class="muted">These are your live income targets — every change saves instantly. Edit any amount, check the categories to keep, or tap Recalculate to rebuild from year-to-date income.</p>
+        <p class="muted">Live income targets — every change saves instantly.</p>
         <div id="ibot-bulk-row" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap">
           <button class="btn small ghost" id="ibot-enable-all" type="button">Enable all</button>
           <button class="btn small ghost" id="ibot-disable-all" type="button">Disable all</button>
         </div>
+        <div id="ibot-hint" class="muted" style="display:none;font-size:12.5px;margin-top:8px">Dimmed rows are suggestions — tap ✓ to include one in your income target.</div>
         <div id="ibot-table" style="margin-top:12px"></div>
       </div>
       </div>
@@ -7570,11 +7581,11 @@ function paintBudgetTotals(){
   box.appendChild(el('b',null,money0(bT)));
   box.appendChild(document.createTextNode(' budget · '));
   box.appendChild(el('b',null,money0(iT)));
-  box.appendChild(document.createTextNode(' income target'));
+  box.appendChild(document.createTextNode(' income'));
   if(iT>0){
     var pct = bT/iT*100;
     box.appendChild(document.createTextNode(' · '));
-    box.appendChild(el('b',{class: pct>100?'neg':'pos'}, Math.round(pct)+'% of income'));
+    box.appendChild(el('b',{class: pct>100?'neg':'pos'}, Math.round(pct)+'%'));
   }
 }
 /* Copy a month's budget (category budgets + income targets) into the month
@@ -7655,7 +7666,6 @@ function renderBudgets(){
    The planner IS the budget: every edit writes straight through to the
    store — no draft, no Save button. botBudget.rows is the live budget. */
 var botBudget = null; // {month, rows:[{category, avg, last, amount, locked, billFloored}], ...refs}
-var botBarRefs = []; // [{r, fill}] actual-vs-budget bars in the expense planner
 
 /* Removed-category memory: categories deleted from a planner stay deleted
    for that budget month — loading and Recalculate both filter them out.
@@ -7906,12 +7916,12 @@ function incBotSetAllLocked(locked){
 }
 function botRenderTable(){
   var host = $('bot-table'); host.innerHTML = '';
-  botBarRefs = [];
-  if(!botBudget){ $('bot-bulk-row').style.display = 'none'; return; }
+  if(!botBudget){ $('bot-bulk-row').style.display = 'none'; $('bot-hint').style.display = 'none'; return; }
   var rows = botBudget.rows, ym = botBudget.month;
   $('bot-bulk-row').style.display = rows.length ? 'flex' : 'none';
+  $('bot-hint').style.display = rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
     head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -7923,7 +7933,7 @@ function botRenderTable(){
   }
   rows.forEach(function(r){
     var isInc = ((botBudget.ytdIncSums||{})[r.category]||0) > ((botBudget.ytdSums||{})[r.category]||0);
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include in this budget',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -7945,7 +7955,7 @@ function botRenderTable(){
       r.amount = Math.max(0, num(inp.value));
       inp.value = r.amount; sld.value = Math.min(r.amount, num(sld.max));
       botWriteSoon(ym, r.category, r.locked ? r.amount : 0);
-      botRenderTotal(); botPaintBars();
+      botRenderTotal();
     });
     line.appendChild(inp);
     var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
@@ -7970,15 +7980,9 @@ function botRenderTable(){
       inp.value = v;
       botEnableRow(r, line, check);
       botWriteSoon(ym, r.category, v);
-      botRenderTotal(); botPaintBars();
+      botRenderTotal();
     });
     line.appendChild(sld);
-    /* Slim actual-vs-budget bar for the selected month. */
-    var bfill = el('div',{style:'height:100%;border-radius:99px;background:var(--accent);width:0%'});
-    var btrack = el('div',{style:'grid-column:1/-1;height:6px;border-radius:99px;background:var(--track);overflow:hidden;margin:0 0 8px'});
-    btrack.appendChild(bfill);
-    line.appendChild(btrack);
-    botBarRefs.push({r:r, fill:bfill});
     host.appendChild(line);
   });
   var have = {};
@@ -8015,21 +8019,8 @@ function botRenderTable(){
   var nRemoved = botRemovedGet(BOT_REMOVED_LS, ym).length;
   if(nRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nRemoved+' categor'+(nRemoved===1?'y':'ies')+' removed from this budget — re-add above to bring one back.'));
-  botPaintBars();
 }
 
-/* Actual-vs-budget bars for the selected month: filled width = spent/budget,
-   red when spent exceeds the budget amount. */
-function botPaintBars(){
-  var sums = (botBudget && botBudget.monthSums) || {};
-  (botBarRefs||[]).forEach(function(o){
-    var actual = sums[o.r.category]||0, amt = num(o.r.amount);
-    var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
-    o.fill.style.width = pct+'%';
-    o.fill.style.background = (amt>0 && actual>amt) ? 'var(--danger)' : 'var(--accent)';
-    o.fill.title = money(Math.round(actual))+' spent of '+money(Math.round(amt))+' planned';
-  });
-}
 function botPctText(){
   if(!botBudget) return '';
   var inc = num(botBudget.avgIncome), t = botBudgetTotal();
@@ -8041,7 +8032,6 @@ function botRenderTotal(){
   if(t) t.textContent = money(botBudgetTotal());
   var p = $('bot-pct');
   if(p) p.textContent = botPctText();
-  botPaintBars();
   renderBotBillsLine();
 }
 /* Cash-flow check: bills due this month vs expected income and proposed budget. */
@@ -8172,7 +8162,6 @@ function botReset(){
    budget — every edit writes straight through to namespaced income budgets.
    No draft, no Save button. */
 var incBotBudget = null; // {month, rows:[{category, ytd, lastMo, amount, locked}], months, mSums}
-var ibotBarRefs = []; // [{r, fill}] received-vs-target bars in the income planner
 function incBotCompute(ym){
   var y0 = ym.slice(0,4)+'-01-01', yEnd = monthAdd(ym,1)+'-01', mStart = ym+'-01';
   var prevStart = monthAdd(ym,-1)+'-01';
@@ -8255,13 +8244,13 @@ function incBotTotal(){
 }
 function incBotRenderTable(){
   var host = $('ibot-table'); host.innerHTML = '';
-  ibotBarRefs = [];
-  if(!incBotBudget){ $('ibot-bulk-row').style.display = 'none'; return; }
+  if(!incBotBudget){ $('ibot-bulk-row').style.display = 'none'; $('ibot-hint').style.display = 'none'; return; }
   var rows = incBotBudget.rows, ym = incBotBudget.month;
   $('ibot-bulk-row').style.display = rows.length ? 'flex' : 'none';
+  $('ibot-hint').style.display = rows.some(function(r){ return !r.locked; }) ? 'block' : 'none';
   var months = incBotBudget.months||1;
   if(rows.length){
-    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
+    var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:4px 0;font-size:12px'});
     head.appendChild(el('span'));
     head.appendChild(el('span',null,'Category'));
     head.appendChild(el('span',{style:'text-align:right'},'YTD avg'));
@@ -8272,7 +8261,7 @@ function incBotRenderTable(){
     host.appendChild(el('p',{class:'muted'},'No income targets yet — add categories below or tap Recalculate.'));
   }
   rows.forEach(function(r){
-    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px 1fr 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
+    var line = el('div',{class:'bot-row',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 78px 96px 32px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)'+(r.locked?'':';opacity:0.6')});
     var check = el('button',{class:'btn small ghost lockbtn',type:'button',title:r.locked?'Uncheck — saves as $0':'Check — include this target',style:'padding:4px 0;font-weight:700;color:'+(r.locked?'var(--accent)':'var(--muted)')+';opacity:'+(r.locked?'1':'0.35')}, '✓');
     check.addEventListener('click', function(){
       r.locked = !r.locked;
@@ -8304,12 +8293,6 @@ function incBotRenderTable(){
       incBotRenderTable();
     });
     line.appendChild(del);
-    /* Slim received-vs-target bar for the selected month. */
-    var bfill = el('div',{style:'height:100%;border-radius:99px;background:var(--accent);width:0%'});
-    var btrack = el('div',{style:'grid-column:1/-1;height:6px;border-radius:99px;background:var(--track);overflow:hidden;margin:0 0 8px'});
-    btrack.appendChild(bfill);
-    line.appendChild(btrack);
-    ibotBarRefs.push({r:r, fill:bfill});
     host.appendChild(line);
   });
   var have = {};
@@ -8339,35 +8322,20 @@ function incBotRenderTable(){
   var nIncRemoved = botRemovedGet(INC_BOT_REMOVED_LS, ym).length;
   if(nIncRemoved) host.appendChild(el('div',{class:'muted',style:'font-size:12px;margin-top:6px'},
     nIncRemoved+' categor'+(nIncRemoved===1?'y':'ies')+' removed from these targets — re-add above to bring one back.'));
-  ibotPaintBars();
 }
 
-/* Received-vs-target bars for the selected month: filled width =
-   received/target, red when received exceeds the target. */
-function ibotPaintBars(){
-  var sums = (incBotBudget && incBotBudget.mSums) || {};
-  (ibotBarRefs||[]).forEach(function(o){
-    var actual = sums[o.r.category]||0, amt = num(o.r.amount);
-    var pct = amt>0 ? Math.min(100, actual/amt*100) : (actual>0?100:0);
-    o.fill.style.width = pct+'%';
-    o.fill.style.background = (amt>0 && actual>amt) ? 'var(--danger)' : 'var(--accent)';
-    o.fill.title = money(Math.round(actual))+' received of '+money(Math.round(amt))+' targeted';
-  });
-}
 function incBotRenderTotal(){
   var t = $('ibot-total');
   if(t) t.textContent = money(incBotTotal());
-  ibotPaintBars();
 }
 
 function incBotReset(){
   incBotBudget = null;
   $('ibot-table').innerHTML = '';
   $('ibot-bulk-row').style.display = 'none';
+  $('ibot-hint').style.display = 'none';
 }
 
-/* Floating total pills pinned above the tab bar while a budget is open
-   on the Budget tab. pointer-events:none so they never block taps. */
 /* ================= bills =================
    Bill: {id, name, amount, dueDate:'YYYY-MM-DD', recurrence:'once'|'monthly'|
           'quarterly'|'yearly', category, account:'Personal'|'Business',
