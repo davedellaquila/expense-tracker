@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- App header: the gradient app icon now sits left of the "Expense Tracker" name.
 - Bills page: tapping a bill tile opens the edit form, so the per-tile Edit button is gone (Paid and ✕ still work without triggering edit).
 - Bills page: upcoming and paid tiles are now grouped by month under labeled headers with each month's total.
 - Budget page: the sticky totals pill now wraps on narrow screens instead of cutting figures off with "…".
