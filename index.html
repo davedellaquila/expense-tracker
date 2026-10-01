@@ -507,6 +507,7 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 /* ---------- tab bar ---------- */
 .tabbar{
   position:fixed; left:0; right:0; bottom:0; z-index:40;
+  transform:translateZ(0); /* own compositing layer: stays glued to the viewport on iOS */
   height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom:env(safe-area-inset-bottom);
   background:var(--tabbar-bg); backdrop-filter:blur(8px);
@@ -562,11 +563,16 @@ table.ptable.top-table th:nth-child(4){width:22%;}
   .filters .allchip{display:none;}
   /* transaction cards: slightly tighter */
   .txn{padding:8px 10px; gap:8px;}
-  /* budget proposal rows: roomier grid, 44px lock/delete tap targets
-     (grid is inline in JS, so !important overrides it here).
-     minmax(0,1fr) + min-width:0 below keeps long category names from
-     blowing the row wider than a 390px viewport. */
-  .bot-row, .bot-head{grid-template-columns:44px minmax(0,1fr) 62px 80px 40px !important; gap:6px !important;}
+  /* budget planner rows: two-line layout on phones so category names are
+     fully readable — line 1: ✓ + name + padlock; line 2: YTD avg + amount
+     + remove; line 3: the adjust slider (already full-width).
+     (grid is inline in JS, so !important overrides it here.) */
+  .bot-row, .bot-head{grid-template-columns:40px minmax(0,1fr) 84px 40px !important; gap:8px 6px !important;}
+  .bot-row > :nth-child(1), .bot-head > :nth-child(1){grid-column:1; grid-row:1;}
+  .bot-row > :nth-child(2), .bot-head > :nth-child(2){grid-column:2/-1; grid-row:1;}
+  .bot-row > :nth-child(3), .bot-head > :nth-child(3){grid-column:1/3; grid-row:2; text-align:left !important;}
+  .bot-row > :nth-child(4), .bot-head > :nth-child(4){grid-column:3; grid-row:2;}
+  .bot-row > :nth-child(5), .bot-head > :nth-child(5){grid-column:4; grid-row:2;}
   .bot-row .lockbtn{min-height:44px; min-width:40px;}
   /* bills calendar: taller day cells so dots don't crowd the date */
   .bill-cal .day{min-height:52px;}
