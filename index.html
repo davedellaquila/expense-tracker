@@ -5856,6 +5856,14 @@ function openTxnForm(t){
         openSplitSheet(t, base, close);
       });
       scanRow.appendChild(splitBtn);
+      /* Bill reminder from this transaction: name/amount/date/category/
+         account pre-fill; the bill sheet stacks above so unsaved edits here
+         are kept. Frequency is picked in the bill form. */
+      var billBtn = el('button',{class:'btn ghost', type:'button'},'🔔 Add bill reminder');
+      billBtn.addEventListener('click', function(){
+        openBillForm(null, {prefill: billPrefillFromTxn(t), stacked:true});
+      });
+      scanRow.appendChild(billBtn);
     }
 
     var typeSeg = el('div',{class:'seg'}), bExp=el('button',{type:'button'},'Expense'), bInc=el('button',{type:'button'},'Income'), bTrf=el('button',{type:'button'},'Transfer');
@@ -9506,9 +9514,27 @@ function openScanPhoto(rec){
       .catch(function(){ toast('Could not open the scanned photo.', true); });
   }
 }
-function openBillForm(b){
+/* Build a new-bill prefill from a transaction: name/amount/date/category/
+   account come from the transaction; frequency is left for the user to pick. */
+function billPrefillFromTxn(t){
+  return {
+    name: t.merchant || t.description || '',
+    amount: Math.abs(num(t.amount)),
+    dueDate: parseDateFlex(t.date) || todayLocal(),
+    category: t.category || '',
+    account: t.business_personal || 'Personal',
+    notes: ''
+  };
+}
+
+/* b = existing bill to edit (null for a new bill). opts.prefill = bill-shaped
+   object used to pre-fill a NEW bill (e.g. from a transaction); opts.stacked
+   lays the sheet above the current one instead of replacing it. */
+function openBillForm(b, opts){
   var isEdit = !!b;
-  openSheet(function(sh, close){
+  var src = b || (opts && opts.prefill) || {};
+  var openIt = (opts && opts.stacked) ? openSheetStacked : openSheet;
+  openIt(function(sh, close){
     sh.appendChild(el('h2',null,isEdit?'Edit bill':'Add bill'));
     /* Bill scanner: photo/PDF -> on-device OCR -> pre-fill name/amount/due date. */
     var scanPhoto = null; // {blob, dataUrl, pdfBlob} from the most recent scan
@@ -9579,24 +9605,24 @@ function openBillForm(b){
     sh.appendChild(scanBox);
     renderScanBox();
     var inName = el('input',{type:'text',placeholder:'e.g. PG&E',autocomplete:'off',style:'width:100%'});
-    if(b&&b.name) inName.value = b.name;
+    if(src.name) inName.value = src.name;
     sh.appendChild(el('label',{class:'f'},'Name')); sh.appendChild(inName);
     var inAmt = el('input',{type:'number',min:'0.01',step:'0.01',placeholder:'0.00',inputmode:'decimal',style:'width:100%'});
-    if(b&&b.amount) inAmt.value = num(b.amount);
+    if(src.amount) inAmt.value = num(src.amount);
     sh.appendChild(el('label',{class:'f'},'Amount')); sh.appendChild(inAmt);
-    var inDate = el('input',{type:'date',value:(b&&b.dueDate)||todayLocal(),style:'width:100%'});
+    var inDate = el('input',{type:'date',value:src.dueDate||todayLocal(),style:'width:100%'});
     sh.appendChild(el('label',{class:'f'},'Due date')); sh.appendChild(inDate);
     var inRec = el('select',{style:'width:100%'});
     [['once','One-time'],['monthly','Monthly'],['quarterly','Quarterly'],['yearly','Yearly']].forEach(function(o){
       var op = el('option',{value:o[0]},o[1]);
-      if(b&&b.recurrence===o[0]) op.selected = true;
+      if(src.recurrence===o[0]) op.selected = true;
       inRec.appendChild(op);
     });
     sh.appendChild(el('label',{class:'f'},'Repeats')); sh.appendChild(inRec);
     var inCat = el('select',{style:'width:100%'});
     allCategories().forEach(function(c){
       var op = el('option',{value:c},c);
-      if(b&&b.category===c) op.selected = true;
+      if(src.category===c) op.selected = true;
       inCat.appendChild(op);
     });
     sh.appendChild(el('label',{class:'f'},'Category')); sh.appendChild(inCat);
@@ -9604,15 +9630,14 @@ function openBillForm(b){
     var bpSeg = el('div',{class:'seg'});
     var bPer = el('button',{type:'button'},'Personal'), bBiz = el('button',{type:'button'},'Business');
     bpSeg.appendChild(bPer); bpSeg.appendChild(bBiz);
-    var curBp = (b&&b.account)||'Personal';
+    var curBp = src.account||'Personal';
     function paintBp(){ bPer.classList.toggle('on',curBp==='Personal'); bBiz.classList.toggle('on',curBp==='Business'); }
     bPer.onclick = function(){ curBp='Personal'; paintBp(); };
     bBiz.onclick = function(){ curBp='Business'; paintBp(); };
     paintBp();
     sh.appendChild(bpSeg);
     var inNotes = autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',style:'width:100%'}));
-    if(b&&b.notes) inNotes.value = b.notes;
-    if(b&&b.notes) inNotes.value = b.notes;
+    if(src.notes) inNotes.value = src.notes;
     sh.appendChild(el('label',{class:'f'},'Notes')); sh.appendChild(inNotes);
     var bar = el('div',{class:'btnrow stickybar-page'});
     var saveBtn = el('button',{class:'btn',type:'button'},isEdit?'Save':'Add bill');
