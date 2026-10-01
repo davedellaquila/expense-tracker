@@ -5,6 +5,19 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Wells Fargo combined statements import per account
+- A Wells Fargo "Combined Statement of Accounts" (checking + savings in one
+  file) now stamps each transaction with its own account — e.g. "Wells Fargo
+  Crown Banking xxxx7356", "Wells Fargo Way2Save Savings xxxx4175", and
+  separate labels for each Platinum Savings account — instead of labeling
+  every row with the first account name found in the file. The import log
+  groups these files as "Wells Fargo (N accounts)". Single-account statements
+  behave exactly as before.
+- Fixed alongside: split two-column headers in savings sections ("…
+  Additions … ctions … balance") flipped the parser into the income section,
+  typing savings withdrawals (e.g. mortgage payments) as income. Table
+  column-header lines no longer flip the income/expense section.
+
 ### Tap "This month" to fill the budget amount
 - Tapping the "This month $X" line on a budget/income planner row copies
   that actual into the category's amount field (same behavior as the

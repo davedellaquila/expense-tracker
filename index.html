@@ -7345,6 +7345,43 @@ function paymentMethodFromAccount(text, hint){
   if(last4) return (masked||'xxxx')+last4; // unknown bank: the number is the label
   return null;
 }
+/* Per-account label for one section of a Wells Fargo combined statement.
+   The account number is always included: two sections can share a product
+   name (e.g. two "Platinum Savings" accounts). */
+function wfSectionLabel(name, number){
+  var n = String(name||'').replace(/[®™]/g,'').replace(/^wells\s+fargo\s+/i,'').trim();
+  var last4 = String(number||'').replace(/\D/g,'').slice(-4) || 'xxxx';
+  return 'Wells Fargo '+(n ? n+' ' : '')+'xxxx'+last4;
+}
+/* Wells Fargo "Combined Statement of Accounts": each account's section begins
+   with the account name on its own line, followed by "Statement period
+   activity summary … Account number: 1234567890". Returns the sections in
+   document order as {index, nameIndex, number, name, label}. */
+function wfAccountSections(lines){
+  var out = [];
+  for(var i=0;i<lines.length;i++){
+    var line = String(lines[i]||'');
+    if(!/statement period activity summary/i.test(line)) continue;
+    var nm = line.match(/account number:\s*(\d{4,})/i);
+    if(!nm) continue;
+    var number = nm[1], name = '', nameIndex = -1, j, pl;
+    // the name may share the header line ("Crown Banking Statement period
+    // activity summary …") or sit on the line just above it
+    var same = line.match(/^(.*?)\s*statement period activity summary/i);
+    if(same && same[1].trim()){ name = same[1].trim(); nameIndex = i; }
+    else{
+      for(j=i-1;j>=0 && j>=i-4;j--){
+        pl = String(lines[j]||'').trim();
+        if(!pl || /statement period activity summary/i.test(pl)) continue;
+        if(/page \d+ of \d+/i.test(pl)) continue;
+        if(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/.test(pl)) continue;
+        name = pl; nameIndex = j; break;
+      }
+    }
+    out.push({index:i, nameIndex:nameIndex, number:number, name:name, label:wfSectionLabel(name, number)});
+  }
+  return out;
+}
 function capOnePaymentMethod(lines){
   var joined = lines.join(' ');
   var m = joined.match(/account\s+ending\s+in\D{0,10}(\d{3,4})/i)
@@ -7384,13 +7421,28 @@ function stmtAccountLabel(bank, lines){
   if(bankName==='Apple Card') return 'Apple Card';
   return null;
 }
-function parsePdfTransactions(lines, bank, year, stmtMonth){
-  var out = [];
+/* Import-log account label: a Wells Fargo combined statement covers several
+   accounts, so the log groups it under one combined entry instead of the
+   first account's label. */
+function wfImportLogAcct(bank, lines){
+  if(bank && bank.name==='Wells Fargo'){
+    var secs = wfAccountSections(lines);
+    if(secs.length > 1) return 'Wells Fargo ('+secs.length+' accounts)';
+  }
+  return stmtAccountLabel(bank, lines);
+}
+function parsePdfTransactions(lines, bank, year, stmtMonth){  var out = [];
   var section = null; // 'income' | 'expense' | null
   var lastTxn = null;
   var done = false; // reached the fine-print disclosures: ignore everything after
   var bankName = bank && bank.name;
   var stmtPayMethod = stmtAccountLabel(bank, lines);
+  // Wells Fargo combined statements hold several accounts: detect each
+  // account's section so every transaction is stamped with its own account.
+  // Single-account statements keep the previous single-label behavior.
+  var wfSections = (bankName==='Wells Fargo') ? wfAccountSections(lines) : [];
+  var wfMulti = wfSections.length > 1;
+  var wfSecPtr = -1, curWfPayMethod = stmtPayMethod;
   // Citibank: collect cardholder names ("NAME Card ending in XXXX") so their
   // section headers can be dropped, and clean the two-column glue off lines.
   var citiNames = [];
@@ -7413,17 +7465,34 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
     var hasIn = /deposits?|additions|\bcredits?\b/i.test(line);
     var hasOut = /withdrawals?|subtractions|\bdebits?\b/i.test(line);
     if(hasIn && hasOut){ section = null; return true; }
+    // Split two-column headers name table columns, not a section: in the
+    // savings layout "Subtractions" breaks across lines ("… Additions …
+    // ctions … balance"), leaving an income keyword with no expense keyword.
+    // A line mentioning Date/Description/Balance columns never flips the
+    // section — without this, every savings transaction typed as income.
+    if(hasIn && /\b(date|description|balance)\b/i.test(line)){ section = null; return true; }
     var i;
     for(i=0;i<bank.incomeSections.length;i++) if(bank.incomeSections[i].test(line)){ section='income'; return true; }
     for(i=0;i<bank.expenseSections.length;i++) if(bank.expenseSections[i].test(line)){ section='expense'; return true; }
     return false;
   }
-  lines.forEach(function(line){
+  lines.forEach(function(line, li){
     if(done) return;
     // The fine-print disclosures ("Important Information You Should Know") end
     // the transaction section — everything after would otherwise glue onto the
     // last transaction's description (= merchant).
     if(/important information you should know/i.test(line)){ done = true; return; }
+    if(wfMulti){
+      // advance to the account section containing this line; the section's
+      // header and account-name lines are structural, never transactions
+      // (without this they'd glue onto the previous account's last merchant
+      // via the wrapped-continuation branch below)
+      while(wfSecPtr+1 < wfSections.length && wfSections[wfSecPtr+1].index <= li) wfSecPtr++;
+      if(wfSecPtr >= 0){
+        curWfPayMethod = wfSections[wfSecPtr].label;
+        if(li === wfSections[wfSecPtr].index || li === wfSections[wfSecPtr].nameIndex) return;
+      }
+    }
     // Transaction lines take priority: a description may contain words
     // like "deposit" or "check" that also appear in section headers.
     var m = TXN_RE.exec(line), mm=null, dd=null, yy=year, desc=null, amtTok=null, explicitYear=false, dailyCashAmt=null;
@@ -7461,7 +7530,7 @@ function parsePdfTransactions(lines, bank, year, stmtMonth){
         date: yy+'-'+mm+'-'+dd,
         description: desc, amount: Math.abs(Math.round(amt*100)/100),
         txn_type: type, business_personal:'Personal', category:'', include:true,
-        payment_method: (stmtPayMethod && type==='expense') ? stmtPayMethod : 'Other',
+        payment_method: (curWfPayMethod && type==='expense') ? curWfPayMethod : 'Other',
         _defYear: !explicitYear
       };
       out.push(lastTxn);
@@ -7574,7 +7643,7 @@ function finishPdfParse(pending, year, stmtMonth){
   importFileInfo = pending.fileInfo
     ? Object.assign({}, pending.fileInfo, {bank:pending.bank?pending.bank.name:null, ym:_pdfYm,
         period: _pdfYm ? null : (stmtPeriodLabel(year, stmtMonth)||null),
-        acct: stmtAccountLabel(pending.bank, pending.lines),
+        acct: wfImportLogAcct(pending.bank, pending.lines),
         file: pending.file || null})
     : null;
   markDuplicates(rows);
