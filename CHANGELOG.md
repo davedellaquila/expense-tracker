@@ -5,6 +5,16 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Planner rows: stacked layout everywhere + "This month" label
+- The two-line planner row layout (name + padlock on line 1, labeled
+  YTD avg + This month stats with amount on line 2) is now the base
+  style at every screen width, not just phones — this fixes the padlock
+  overlapping the YTD stat seen on Dave's phone, where the phone-only
+  rules weren't taking effect.
+- "Actual" renamed to "This month" on the grouped stat and the header.
+- Sticky bar: month text bumped 15px → 18px; the live totals pill is now
+  right-aligned.
+
 ### Transactions: drill pill docks to the sticky filter bar
 - When a category drill-through pill is active and the filter card has
   scrolled off, the pill now parks itself as an attached section at the
