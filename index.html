@@ -189,6 +189,12 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   .bill-line1 .bdue, .bill-line1 .bdue-sp, .bill-line2 .bdue-sp{flex-basis:78px;}
   .bill-tile{padding:11px 14px;}
 }
+/* Bills page: month group headers above the bill tiles, with the month's total. */
+.bill-month{display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  font-weight:700; font-size:13px; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--muted); margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--border);}
+#bill-list .bill-month:first-child, #bill-paid-list .bill-month:first-child{margin-top:0; padding-top:0; border-top:none;}
+.bill-month-total{font-variant-numeric:tabular-nums;}
 /* Mark-paid confirmation sheet */
 .paid-card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin:12px 0;}
 .paid-card-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -9360,6 +9366,25 @@ function renderBillDay(){
   bills.forEach(function(b){ list.appendChild(billRow(b, false, maxAmt, dueMin, dueMax)); });
 }
 
+/* Group bills (already sorted) into [{ym, bills, total}] by the YYYY-MM-DD
+   month of a date field. Bills with no date land in a '' group, first. */
+function groupBillsByMonth(bills, key){
+  var groups = [], byYm = {};
+  bills.forEach(function(b){
+    var ym = String(b[key]||'').slice(0,7);
+    var g = byYm[ym];
+    if(!g){ g = byYm[ym] = {ym:ym, bills:[], total:0}; groups.push(g); }
+    g.bills.push(b);
+    g.total += num(b.amount);
+  });
+  return groups;
+}
+function billMonthHeader(g){
+  var h = el('div',{class:'bill-month'}, g.ym ? fmtMonthPretty(g.ym) : 'No due date');
+  h.appendChild(el('span',{class:'bill-month-total'}, money(Math.round(g.total))));
+  return h;
+}
+
 function renderBillList(){
   var list = $('bill-list'); list.innerHTML = '';
   var active = billsActive().sort(function(a,b){
@@ -9368,8 +9393,11 @@ function renderBillList(){
   if(!active.length) list.appendChild(el('p',{class:'muted'},'No bills yet. Tap + Add bill to track one.'));
   var maxAmt = billMaxAmount();
   var dr = billDueRange(), dueMin = dr && dr.min, dueMax = dr && dr.max;
-  active.forEach(function(b){ list.appendChild(billRow(b, true, maxAmt, dueMin, dueMax)); });
-  // paid (one-time) in a collapsed section
+  groupBillsByMonth(active, 'dueDate').forEach(function(g){
+    list.appendChild(billMonthHeader(g));
+    g.bills.forEach(function(b){ list.appendChild(billRow(b, true, maxAmt, dueMin, dueMax)); });
+  });
+  // paid (one-time) in a collapsed section, grouped by paid month
   var paid = (state.bills||[]).filter(billIsPaid).sort(function(a,b){
     return String(b.lastPaid||'').localeCompare(String(a.lastPaid||''));
   });
@@ -9377,7 +9405,11 @@ function renderBillList(){
   if(!paid.length){ pc.hidden = true; return; }
   pc.hidden = false;
   var pl = $('bill-paid-list'); pl.innerHTML = '';
-  paid.forEach(function(b){
+  groupBillsByMonth(paid, 'lastPaid').forEach(function(g){
+    var h = el('div',{class:'bill-month'}, g.ym ? fmtMonthPretty(g.ym) : 'Unknown date');
+    h.appendChild(el('span',{class:'bill-month-total'}, money(Math.round(g.total))));
+    pl.appendChild(h);
+    g.bills.forEach(function(b){
     var row = el('div',{class:'bill-row'});
     var info = el('div',{class:'bi'});
     info.appendChild(el('div',{class:'bn'},b.name||'Unnamed bill'));
@@ -9388,6 +9420,7 @@ function renderBillList(){
     del.addEventListener('click', function(){ deleteBill(b); });
     row.appendChild(del);
     pl.appendChild(row);
+    });
   });
 }
 
