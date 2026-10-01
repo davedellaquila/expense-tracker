@@ -3684,51 +3684,16 @@ function renderDashBudgets(box, d, drill){
   box.innerHTML='';
   var from=d.from, to=d.to, rows=d.rows;
   var bMap = budgetsForRange(from, to);
-  var bCats = Object.keys(bMap).sort(function(a,b){ return a.localeCompare(b); });
+  var bCats = Object.keys(bMap).sort(function(a,b){ return bMap[b]-bMap[a]; });
   if(d.catSelBudget && d.catSelBudget.length) bCats = bCats.filter(function(c){ return d.catSelBudget.indexOf(c)>=0; });
   if(!bCats.length){ emptyInto(box,'🎯', (d.catSelBudget && d.catSelBudget.length) ? 'No budgets for the selected categories.' : (from===to ? 'No budgets set for this month. Add some under Budget.' : 'No budgets set for this period. Add some under Budget.')); return; }
-  var totB = 0, totS = 0;
-  var perCat = bCats.map(function(bc){
+  var items = bCats.map(function(bc){
     var spent = 0;
     rows.forEach(function(t){ if(t.txn_type==='expense' && t.category===bc) spent += num(t.amount); });
-    totB += bMap[bc]; totS += spent;
-    return {c:bc, amt:bMap[bc], spent:spent};
+    return {name:bc, budget:bMap[bc], actual:spent};
   });
-  var sumWrap = el('div',{class:'barrow'});
-  var sumTop = el('div',{class:'top'});
-  sumTop.appendChild(el('b',null,'Total'));
-  var sumLbl = el('span',null,money(totS)+' of '+money(totB)+' budgeted');
-  if(totS>totB) sumLbl.className='neg';
-  sumTop.appendChild(sumLbl);
-  sumWrap.appendChild(sumTop);
-  var sumBar = el('div',{class:'bar'+(totS>totB?' over':'')});
-  var sumFill = el('div');
-  sumFill.style.width = (totB>0 ? Math.min(100, totS/totB*100) : 0)+'%';
-  sumBar.appendChild(sumFill); sumWrap.appendChild(sumBar);
-  if(drill){ wireBudgetRowTap(sumWrap, function(){ drill({}); }); }
-  box.appendChild(sumWrap);
-  perCat.forEach(function(p){
-    var wrap = el('div',{class:'barrow'});
-    var top = el('div',{class:'top'});
-    top.appendChild(el('b',null,p.c));
-    var lbl = el('span',null,money(p.spent)+' of '+money(p.amt));
-    if(p.spent>p.amt) lbl.className='neg';
-    top.appendChild(lbl);
-    wrap.appendChild(top);
-    var bar = el('div',{class:'bar'+(p.spent>p.amt?' over':'')});
-    var fill = el('div'); fill.style.width = (p.amt>0?Math.min(100, p.spent/p.amt*100):0)+'%'; bar.appendChild(fill);
-    wrap.appendChild(bar);
-    if(drill){ (function(cat){ wireBudgetRowTap(wrap, function(){ drill({dispCats:[cat]}); }); })(p.c); }
-    box.appendChild(wrap);
-  });
-}
-function wireBudgetRowTap(row, go){
-  row.classList.add('rep-click');
-  row.setAttribute('role','button'); row.setAttribute('tabindex','0');
-  row.addEventListener('click', go);
-  row.addEventListener('keydown', function(e){
-    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }
-  });
+  // Same paired Budget/Actual chart as the Reports page.
+  repBudgetActual(box, items, drill ? function(it){ drill({dispCats:[it.name]}); } : null);
 }
 
 /* ---- dashboard instant cache + filter persistence ----
