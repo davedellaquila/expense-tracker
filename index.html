@@ -197,6 +197,21 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   color:var(--muted); margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--border);}
 #bill-list .bill-month:first-child, #bill-paid-list .bill-month:first-child{margin-top:0; padding-top:0; border-top:none;}
 .bill-month-total{font-variant-numeric:tabular-nums;}
+/* Bills page: sticky month header that appears over the upcoming list while
+   scrolling — current month, its total, and an Add bill button. Fixed (out of
+   flow) so showing/hiding never shifts the list; JS pins it over the card. */
+.bill-stickybar{
+  position:fixed; top:calc(var(--headH, 64px) + 6px); z-index:15;
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:0 10px 24px rgba(10,20,15,.14);
+  padding:8px 12px 8px 14px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.bill-stickybar[hidden]{display:none;}
+.bill-sticky-month{display:flex; align-items:baseline; gap:10px; min-width:0;
+  font-weight:700; font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);}
+#bill-sticky-label{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#bill-sticky-total{font-variant-numeric:tabular-nums; white-space:nowrap;}
 /* Mark-paid confirmation sheet */
 .paid-card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin:12px 0;}
 .paid-card-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -1135,7 +1150,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <h2 id="bill-day-title" style="margin-top:0">Bills due</h2>
         <div id="bill-day-list"></div>
       </div>
-      <div class="card">
+      <div id="bill-stickybar" class="bill-stickybar" hidden>
+        <div class="bill-sticky-month"><span id="bill-sticky-label"></span><span id="bill-sticky-total"></span></div>
+        <button class="btn small" id="bill-sticky-add" type="button">+ Add bill</button>
+      </div>
+      <div class="card" id="bill-upcoming-card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <h2 style="margin:0">Upcoming bills</h2>
           <button class="btn small" id="bill-add" type="button">+ Add bill</button>
@@ -9211,6 +9230,7 @@ function renderBills(){
   renderBillCalendar();
   renderBillDay();
   renderBillList();
+  billStickyTick();
 }
 
 function renderBillCalendar(){
@@ -9379,9 +9399,48 @@ function groupBillsByMonth(bills, key){
   return groups;
 }
 function billMonthHeader(g){
-  var h = el('div',{class:'bill-month'}, g.ym ? fmtMonthPretty(g.ym) : 'No due date');
+  var h = el('div',{class:'bill-month'});
+  h.setAttribute('data-ym', g.ym);
+  h.appendChild(el('span',{class:'bill-month-label'}, g.ym ? fmtMonthPretty(g.ym) : 'No due date'));
   h.appendChild(el('span',{class:'bill-month-total'}, money(Math.round(g.total))));
   return h;
+}
+/* Bills page sticky month header: while the upcoming-bills list scrolls, a
+   fixed bar under the app header shows the month group at the top, its total,
+   and an Add bill button. Appears when the first tile reaches the bar. */
+var billStickyYm = null, billStickyRaf = 0;
+function billStickyTick(){
+  var bar = $('bill-stickybar');
+  if(!bar) return;
+  var hide = function(){ bar.hidden = true; billStickyYm = null; };
+  if($('screen-bills').hidden){ hide(); return; }
+  var list = $('bill-list');
+  var top = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--headH'))||64) + 6;
+  var headers = list.querySelectorAll('.bill-month');
+  var cur = null;
+  for(var i=0;i<headers.length;i++){
+    if(headers[i].getBoundingClientRect().top <= top + 2) cur = headers[i];
+    else break;
+  }
+  var lr = list.getBoundingClientRect();
+  if(!cur || lr.top > top || lr.bottom <= top + 56){ hide(); return; }
+  bar.hidden = false;
+  var card = $('bill-upcoming-card');
+  if(card){
+    var r = card.getBoundingClientRect();
+    bar.style.left = r.left+'px';
+    bar.style.width = r.width+'px';
+  }
+  var ym = cur.getAttribute('data-ym');
+  if(ym !== billStickyYm){
+    billStickyYm = ym;
+    $('bill-sticky-label').textContent = cur.querySelector('.bill-month-label').textContent;
+    $('bill-sticky-total').textContent = cur.querySelector('.bill-month-total').textContent;
+  }
+}
+function billStickyOnScroll(){
+  if(billStickyRaf) return;
+  billStickyRaf = requestAnimationFrame(function(){ billStickyRaf = 0; billStickyTick(); });
 }
 
 function renderBillList(){
@@ -10154,6 +10213,9 @@ function wireBills(){
     billSelDay = null; renderBills();
   });
   $('bill-add').addEventListener('click', function(){ openBillForm(null); });
+  $('bill-sticky-add').addEventListener('click', function(){ openBillForm(null); });
+  window.addEventListener('scroll', billStickyOnScroll, {passive:true});
+  window.addEventListener('resize', billStickyOnScroll);
 }
 
 /* ================= tax ================= */
