@@ -2330,6 +2330,23 @@ FirebaseStore.prototype.saveImportTombstones = function(hashes){
     });
   });
 };
+/* Planner UI state (per month, both planners): manual row order,
+   removed-category memory, and padlocked (fixed) amounts. One small doc so
+   the Budget page looks identical on every machine. */
+FirebaseStore.prototype.getPlannerState = function(){
+  return this._r().then(function(r){
+    return fbCol(r, 'Meta').doc('plannerState').get().then(function(snap){
+      return snap.exists ? (snap.data()||{}) : {};
+    });
+  });
+};
+FirebaseStore.prototype.savePlannerMonth = function(ym, st){
+  return this._r().then(function(r){
+    var patch = {updated_at: new Date().toISOString()};
+    patch[ym] = st;
+    return fbCol(r, 'Meta').doc('plannerState').set(patch, {merge:true});
+  });
+};
 FirebaseStore.prototype.uid = function(){
   return this._r().then(function(r){ return r.uid; });
 };
@@ -7841,7 +7858,7 @@ function wireBudgets(){
   $('ibot-propose').addEventListener('click', ibotRecalculate);
   $('bot-copy').addEventListener('click', function(){ openBudgetCopySheet('exp'); });
   $('ibot-copy').addEventListener('click', function(){ openBudgetCopySheet('inc'); });
-  window.addEventListener('pagehide', botFlushWrites);
+  window.addEventListener('pagehide', function(){ botFlushWrites(); botPlannerCloudFlush(); });
   /* One-time sweep: drop pre-live-budget draft keys. Removed-category memory
      (expTrackerBotRemoved:/expTrackerIncBotRemoved:) stays — still in use. */
   try{
@@ -8033,10 +8050,18 @@ function openBudgetCopySheet(mode){
   });
 }
 /* Budgets screen: the planners are the live budget. Opening a month builds
-   each planner from that month's saved budgets over year-to-date figures. */
-function renderBudgets(){
+   each planner from that month's saved budgets over year-to-date figures.
+   On Firebase the cloud planner state (order/removed/padlocks) is pulled
+   down first so every machine shows the same page. */
+async function renderBudgets(){
   botFlushWrites();
+  botPlannerCloudFlush();
   var ym = $('bud-month').value || monthLocal();
+  if(storeKind()==='firebase'){
+    setRefreshing(true);
+    try{ await botPlannerCloudSyncMonth(ym); }catch(e){}
+    setRefreshing(false);
+  }
   botLoadBudget(ym);
   ibotLoadBudget(ym);
   paintBudgetTotals();
@@ -8064,10 +8089,12 @@ function botRememberRemoved(prefix, ym, cat){
   if(list.indexOf(cat)<0){
     list.push(cat);
     try{ localStorage.setItem(prefix+ym, JSON.stringify(list)); }catch(e){}
+    botPlannerCloudPush(ym);
   }
 }
 function botForgetRemoved(prefix, ym, cat){
   try{ localStorage.setItem(prefix+ym, JSON.stringify(botRemovedGet(prefix, ym).filter(function(c){ return c!==cat; }))); }catch(e){}
+  botPlannerCloudPush(ym);
 }
 function botFilterRemoved(prefix, ym, rows){
   var list = botRemovedGet(prefix, ym);
@@ -8090,6 +8117,7 @@ function botFixedSet(prefix, ym, cat, fixed){
   var m = botFixedGet(prefix, ym);
   if(fixed) m[cat] = 1; else delete m[cat];
   try{ localStorage.setItem(prefix+ym, JSON.stringify(m)); }catch(e){}
+  botPlannerCloudPush(ym);
 }
 /* Per-month manual row order for the planners, set by dragging a row's grip
    handle. Stored as an array of category names; when present it overrides the
@@ -8104,6 +8132,7 @@ function botOrderGet(prefix, ym){
 }
 function botOrderSet(prefix, ym, cats){
   try{ localStorage.setItem(prefix+ym, JSON.stringify(cats)); }catch(e){}
+  botPlannerCloudPush(ym);
 }
 /* Reorder rows to a stored manual order; rows missing from it keep their
    current relative order at the end. */
@@ -8116,6 +8145,94 @@ function botApplyStoredOrder(rows, prefix, ym){
   rows.forEach(function(r){ (pos[r.category]!=null ? inOrder : rest).push(r); });
   inOrder.sort(function(a,b){ return pos[a.category]-pos[b.category]; });
   return inOrder.concat(rest);
+}
+/* Planner UI state synced across machines (Firebase only): manual row
+   order, removed-category memory, and padlocked (fixed) amounts — per
+   month, for both planners. localStorage stays as the fast local cache and
+   remains the source of truth in local/Sheets mode; every setter above
+   writes local first, then pushes the whole month's state to the cloud
+   (debounced). Month load pulls the cloud state down first, so the Budget
+   page looks the same on every machine. Last write wins per month. */
+var _plannerPushT = {};
+function botPlannerCloudPush(ym){
+  if(storeKind()!=='firebase' || !ym) return;
+  if(_plannerPushT[ym]!=null) clearTimeout(_plannerPushT[ym]);
+  _plannerPushT[ym] = setTimeout(function(){ botPlannerCloudPushNow(ym); }, 800);
+}
+function botPlannerCloudPushNow(ym){
+  if(_plannerPushT[ym]!=null){ clearTimeout(_plannerPushT[ym]); delete _plannerPushT[ym]; }
+  if(storeKind()!=='firebase' || !ym) return;
+  try{
+    var s = getStore();
+    if(!s.savePlannerMonth) return;
+    s.savePlannerMonth(ym, botPlannerMonthState(ym)).catch(function(){
+      toast('Planner layout sync failed — this change stayed on this device.', true);
+    });
+  }catch(e){}
+}
+/* Push any pending planner-state writes immediately (month switch, page hide). */
+function botPlannerCloudFlush(){
+  Object.keys(_plannerPushT).forEach(function(ym){ botPlannerCloudPushNow(ym); });
+}
+function botPlannerMonthState(ym){
+  return {
+    order: botOrderGet(BOT_ORDER_LS, ym),
+    removed: botRemovedGet(BOT_REMOVED_LS, ym),
+    fixed: botFixedGet(BOT_FIXED_LS, ym),
+    incOrder: botOrderGet(INC_BOT_ORDER_LS, ym),
+    incRemoved: botRemovedGet(INC_BOT_REMOVED_LS, ym),
+    incFixed: botFixedGet(INC_BOT_FIXED_LS, ym)
+  };
+}
+function botPlannerLocalHas(ym){
+  var ps = [BOT_ORDER_LS, BOT_REMOVED_LS, BOT_FIXED_LS,
+            INC_BOT_ORDER_LS, INC_BOT_REMOVED_LS, INC_BOT_FIXED_LS];
+  for(var i=0;i<ps.length;i++){
+    try{ if(localStorage.getItem(ps[i]+ym)!=null) return true; }catch(e){}
+  }
+  return false;
+}
+function botPlannerApplyCloudMonth(ym, st){
+  if(!st || typeof st!=='object') return;
+  function put(prefix, val){
+    var key = prefix+ym;
+    try{
+      if(val==null) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(val));
+    }catch(e){}
+  }
+  put(BOT_ORDER_LS, st.order);
+  put(BOT_REMOVED_LS, st.removed);
+  put(BOT_FIXED_LS, st.fixed);
+  put(INC_BOT_ORDER_LS, st.incOrder);
+  put(INC_BOT_REMOVED_LS, st.incRemoved);
+  put(INC_BOT_FIXED_LS, st.incFixed);
+}
+var _plannerSyncYm = null, _plannerSyncAt = 0;
+/* Pull the cloud planner state for a month before the planners render:
+   cloud wins when it has the month; otherwise seed the cloud from this
+   device's local state (one-time migration per month). Re-syncs at most
+   every 30s per month; a slow/failed fetch never blocks rendering. */
+async function botPlannerCloudSyncMonth(ym){
+  if(storeKind()!=='firebase') return;
+  var now = Date.now();
+  if(ym===_plannerSyncYm && now-_plannerSyncAt < 30000) return;
+  var s = getStore();
+  if(!s.getPlannerState || !s.savePlannerMonth) return;
+  var doc = null;
+  try{
+    doc = await Promise.race([
+      s.getPlannerState(),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('planner sync timeout')); }, 4000); })
+    ]);
+  }catch(e){ return; } /* offline or slow: local cache stands */
+  _plannerSyncYm = ym; _plannerSyncAt = now;
+  var cm = doc ? doc[ym] : null;
+  if(cm && typeof cm==='object' && Object.keys(cm).length){
+    botPlannerApplyCloudMonth(ym, cm);
+  }else if(botPlannerLocalHas(ym)){
+    try{ await s.savePlannerMonth(ym, botPlannerMonthState(ym)); }catch(e){}
+  }
 }
 /* Nearest scrollable ancestor of a planner row, for edge auto-scroll while
    dragging when the planner columns scroll independently; null when the
