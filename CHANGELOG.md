@@ -5,6 +5,12 @@ documentation. Newest first.
 
 ## 2026-10-01
 
+### Transactions: drill pill docks to the sticky filter bar
+- When a category drill-through pill is active and the filter card has
+  scrolled off, the pill now parks itself as an attached section at the
+  bottom of the floating sticky filter bar (same docking pattern as the
+  bulk-update bar); it returns to the page flow when scrolled back up.
+
 ### Planner rows: YTD avg + Actual grouped with labels
 - Each planner row now shows YTD avg and the selected month's actual
   side by side as a labeled pair (tiny "YTD AVG" / "ACTUAL" labels),
