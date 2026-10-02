@@ -732,11 +732,11 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ✕ in a circle, top-right of every sheet: closes without scrolling to Cancel.
    Sticky (not absolute) so it stays reachable while the sheet scrolls. */
 .sheet-x{
-  position:sticky; top:10px; z-index:5;
-  margin-left:auto; margin-bottom:-30px;
-  width:30px; height:30px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  position:sticky; top:12px; z-index:5;
+  margin:-6px -6px -45px auto;
+  width:45px; height:45px; border-radius:50%; border:none; cursor:pointer; padding:0;
   background:rgba(127,127,127,.22); color:var(--text);
-  font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;
+  font-size:22px; line-height:1; display:flex; align-items:center; justify-content:center;
 }
 .sheet-x:active{transform:scale(.9);}
 .sheet h2{margin:0 0 4px; font-size:18px;}
@@ -1486,7 +1486,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020447';
+var APP_VERSION = '202610020513';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
