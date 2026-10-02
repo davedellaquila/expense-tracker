@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Tapping a transaction's 🔔 bell badge now jumps to the Bills page with the linked bill reminder scrolled into view and flashed, instead of opening the edit form (tapping the bill itself still opens the form).
 - Transactions selection bar: tidied into a single row — compact "Update 3" count label, Delete still midway between Update and ✕, and Update/Delete are visibly disabled with nothing selected instead of toasting.
 - Transactions: no longer auto-focuses the search box on iPhone (the popping keyboard covered the list); desktop and iPad keep the auto-focus.
 - Largest expenses table: category names now wrap to multiple lines instead of truncating with an ellipsis, on both Home and Reports.

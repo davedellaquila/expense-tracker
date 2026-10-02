@@ -175,6 +175,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-badge.over{background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger);}
 .bill-badge.soon{background:color-mix(in srgb, #f6c85f 20%, transparent); color:#b8860b;}
 .bill-tile{position:relative; overflow:hidden; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 16px; margin-bottom:10px; box-shadow:0 1px 2px rgba(20,30,40,.04);}
+/* Flash highlight when jumping to a bill from a transaction's bell badge. */
+@keyframes bill-flash-kf{0%,100%{box-shadow:0 0 0 0 rgba(36,86,200,0);}35%{box-shadow:0 0 0 3px rgba(36,86,200,.55);}}
+.bill-tile.bill-flash, .bill-row.bill-flash{animation:bill-flash-kf 1.1s ease 2;}
 .bill-tile:last-child{margin-bottom:2px;}
 .bill-fill{position:absolute; left:0; top:0; bottom:0; width:0; pointer-events:none;}
 .bill-tile-main{position:relative;}
@@ -1417,7 +1420,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020313';
+var APP_VERSION = '202610020317';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -5150,13 +5153,14 @@ function renderTransactions(){
     var amt = el('span',{class:'amt '+tmRow.amtCls},
       tmRow.sign + money(num(t.amount)));
     if(billTxnIds[t.id]){
-      /* Tapping the bell opens the linked bill reminder. stopPropagation keeps
-         the tap from also opening the transaction (or toggling selection). */
-      var bell = el('span',{class:'billbadge', role:'button', title:'Open bill reminder'},'\uD83D\uDD14');
+      /* Tapping the bell jumps to the linked bill reminder on the Bills page
+         (scrolled into view and flashed). stopPropagation keeps the tap from
+         also opening the transaction (or toggling selection). */
+      var bell = el('span',{class:'billbadge', role:'button', title:'Go to bill reminder'},'\uD83D\uDD14');
       bell.addEventListener('click', function(e){
         e.preventDefault(); e.stopPropagation();
         var linked = state.bills.filter(function(bd){ return bd.sourceTxnId===t.id; });
-        if(linked.length) openBillForm(linked[0]);
+        if(linked.length) goToBill(linked[0].id);
       });
       b.appendChild(bell);
     }
@@ -9701,6 +9705,17 @@ function renderBills(){
   renderBillList();
   billStickyTick();
 }
+/* Jump from a transaction's bell badge to its bill reminder: switch to the
+   Bills page, scroll the bill into view, and flash it. Tapping the bill
+   itself still opens its edit form. */
+function goToBill(billId){
+  showScreen('bills');
+  var tile = document.querySelector('[data-bill-id="'+billId+'"]');
+  if(!tile) return;
+  tile.scrollIntoView({block:'center', behavior:'smooth'});
+  tile.classList.add('bill-flash');
+  setTimeout(function(){ tile.classList.remove('bill-flash'); }, 2400);
+}
 
 function renderBillCalendar(){
   var ym = billCalYm;
@@ -9769,7 +9784,7 @@ function billDayShade(total){
 }
 
 function billRow(b, showDate, maxAmt, dueMin, dueMax){
-  var tile = el('div',{class:'bill-tile'});
+  var tile = el('div',{class:'bill-tile','data-bill-id':b.id});
   tile.style.cursor = 'pointer';
   tile.addEventListener('click', function(){ openBillForm(b); });
   var hue = billUrgencyHue(b, dueMin, dueMax); // 0=red (due soonest) … 120=green (latest)
@@ -9953,7 +9968,7 @@ function renderBillList(){
     h.appendChild(el('span',{class:'bill-month-total'}, money(Math.round(g.total))));
     pl.appendChild(h);
     g.bills.forEach(function(b){
-    var row = el('div',{class:'bill-row'});
+    var row = el('div',{class:'bill-row','data-bill-id':b.id});
     var info = el('div',{class:'bi'});
     info.appendChild(el('div',{class:'bn'},b.name||'Unnamed bill'));
     info.appendChild(el('div',{class:'bm'},(b.category||'Uncategorized')+' · paid '+fmtBillDate(b.lastPaid)));
