@@ -202,7 +202,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 #bill-list .bill-month:first-child, #bill-paid-list .bill-month:first-child{margin-top:0; padding-top:0; border-top:none;}
 .bill-month-total{font-variant-numeric:tabular-nums;}
 /* Bills calendar header: monthly total at the right, balancing the month title. */
-#bill-cal-total{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:700; font-size:20px; white-space:nowrap;}
+#bill-cal-total{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:700; font-size:17px; white-space:nowrap;}
 /* Bills page: sticky month header that appears over the upcoming list while
    scrolling — current month, its total, and an Add bill button. Fixed (out of
    flow) so showing/hiding never shifts the list; JS pins it over the card. */
@@ -1474,7 +1474,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020433';
+var APP_VERSION = '202610020439';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
