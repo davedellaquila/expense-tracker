@@ -720,7 +720,11 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   transition:bottom .22s ease-out; /* bottom sheets glide above the iOS keyboard */
 }
 .sheet{
-  background:var(--card); width:100%; max-width:760px; max-height:92dvh; overflow-y:auto;
+  background:var(--card); width:100%; max-width:760px;
+  /* The iOS keyboard doesn't shrink dvh, but the overlay is lifted by --kb-h:
+     without subtracting it, a tall sheet overflows the overlay's top and the
+     first fields (e.g. merchant name) become unreachable by scrolling. */
+  max-height:calc(92dvh - var(--kb-h, 0px)); overflow-y:auto;
   border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
 }
 .sheet h2{margin:0 0 4px; font-size:18px;}
@@ -1447,7 +1451,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020354';
+var APP_VERSION = '202610020357';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -1811,6 +1815,7 @@ function wireSheetResize(sh){
       grab.removeEventListener('pointerup', done);
       grab.removeEventListener('pointercancel', done);
       grab.classList.remove('resizing');
+      sh.style.maxHeight = ''; /* restore the CSS cap (which accounts for the keyboard) */
     }
     grab.addEventListener('pointermove', move);
     grab.addEventListener('pointerup', done);

@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- iPhone: fixed unreachable sheet fields when the keyboard is open — the sheet's max-height now subtracts the keyboard height (dvh doesn't shrink with the keyboard, but the overlay is lifted by it, so tall sheets overflowed the top and the first fields couldn't be scrolled to). Drag-resize also restores the CSS max-height cap afterwards.
 - iPhone: swipe right closes the topmost open sheet or dialog (same as tapping outside it); ignored when the gesture starts in a text field, on the grab handle, or moves mostly vertically.
 - iPhone: the tab bar no longer glides up over page content when the keyboard opens — it stays behind the keyboard, so typing in Search no longer hides the results behind it.
 - iPhone: all modal button bars are now static end-of-content rows — extended from the sheet sticky bars to the page-style bars docked in the bill form, scanner review, budget copy, and delete-bill sheets. Other platforms unchanged.
