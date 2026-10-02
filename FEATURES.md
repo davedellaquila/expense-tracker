@@ -7,6 +7,13 @@ it's where ideas wait until Dave says "build it."
 
 ## Proposed
 
+- **Info page: documentation sections** (2026-10-01, Dave): grow the Info tab
+  beyond the change log with user-guide sections — how to import statements,
+  categorize, use filters and drill-through, read the reports, manage budgets
+  and bills — so anyone (e.g. Nancy) can learn the app without a walkthrough.
+- **Info page: tabs for how-tos** (2026-10-01, Dave): tabbed navigation inside
+  the Info page so guides and how-tos each get their own space instead of one
+  long scroll.
 - **Multiple storage backends + data connectors** (2026-09-29, Dave): allow saving
   and syncing to more than one storage system at the same time (not just picking
   one of This device / Google Sheets / Firebase). Build data connectors for
