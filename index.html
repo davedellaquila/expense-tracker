@@ -651,6 +651,8 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   .tabbar .tab-short{display:inline;}
 }
 
+/* iPhone only: hide the parenthetical hints on filter labels */
+.iphone .fhint{display:none;}
 /* ---------- iPhone layout refinements (≤560px) ---------- */
 @media (max-width:560px){
   /* tab bar: 50% bigger icons/text; scroll sideways to reach every tab */
@@ -1005,12 +1007,12 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
               <option value="all">All time</option>
               <option value="custom">Custom…</option>
             </select></div>
-          <div><label class="f" style="margin-top:0" for="f-type">Type <span style="font-weight:400">(Income/Expense/Transfer)</span></label>
+          <div><label class="f" style="margin-top:0" for="f-type">Type <span class="fhint" style="font-weight:400">(Income/Expense/Transfer)</span></label>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="allchip on" id="allchip-f-type" data-for="f-type" type="button">All</button>
               <select id="f-type" style="flex:1;min-width:0"><option value="">All</option><option value="income">Income</option><option value="expense">Expense</option><option value="transfer">Transfer</option></select>
             </div></div>
-          <div><label class="f" style="margin-top:0" for="f-bp">Account <span style="font-weight:400">(Personal/Business)</span></label>
+          <div><label class="f" style="margin-top:0" for="f-bp">Account <span class="fhint" style="font-weight:400">(Personal/Business)</span></label>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="allchip on" id="allchip-f-bp" data-for="f-bp" type="button">All</button>
               <select id="f-bp" style="flex:1;min-width:0"><option value="">All</option><option>Business</option><option>Personal</option></select>
@@ -1493,7 +1495,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020816';
+var APP_VERSION = '202610020823';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
