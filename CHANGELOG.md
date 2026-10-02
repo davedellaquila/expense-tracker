@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-02
+- Reports: the Expense report stat tiles are centered (removed the stale 4-column grid override).
 - Reports: removed the Net tile from the Expense report summary cards.
 ## 2026-10-01
 - iPhone: the parenthetical hints on the Transactions filter labels (Type, Account) are hidden; desktop still shows them.
