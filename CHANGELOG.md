@@ -1,5 +1,9 @@
 # Changelog
 ## 2026-10-01
+- Delete buttons standardized on edit dialogs: the full word "Delete" everywhere except iPhone, which uses 🗑️ to save space (transaction form, bill form, delete confirmations, category delete).
+- Every sheet now has a sticky ✕ in a circle at the top-right that closes it (same as Cancel/tap-outside) — it stays visible while the sheet scrolls, so no scrolling to find Cancel.
+- Dragging the sheet's handle down far enough now dismisses the sheet (drag up still resizes).
+- The transaction form's bill button re-checks when the bill sheet closes: if the bill was deleted it now reads "🔔 Create Bill Reminder" instead of the stale "Open bill reminder".
 - iPhone: the selection bar's undo button now reads just 'Undo' (was 'Undo Bulk Update', which overlapped the neighboring buttons).
 - iPhone: fixed unreachable sheet fields when the keyboard is open — the sheet's max-height now subtracts the keyboard height (dvh doesn't shrink with the keyboard, but the overlay is lifted by it, so tall sheets overflowed the top and the first fields couldn't be scrolled to). Drag-resize also restores the CSS max-height cap afterwards.
 - iPhone: swipe right closes the topmost open sheet or dialog (same as tapping outside it); ignored when the gesture starts in a text field, on the grab handle, or moves mostly vertically.

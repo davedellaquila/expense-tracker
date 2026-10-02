@@ -720,13 +720,23 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   transition:bottom .22s ease-out; /* bottom sheets glide above the iOS keyboard */
 }
 .sheet{
-  background:var(--card); width:100%; max-width:760px;
+  background:var(--card); width:100%; max-width:760px; position:relative;
   /* The iOS keyboard doesn't shrink dvh, but the overlay is lifted by --kb-h:
      without subtracting it, a tall sheet overflows the overlay's top and the
      first fields (e.g. merchant name) become unreachable by scrolling. */
   max-height:calc(92dvh - var(--kb-h, 0px)); overflow-y:auto;
   border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
 }
+/* ✕ in a circle, top-right of every sheet: closes without scrolling to Cancel.
+   Sticky (not absolute) so it stays reachable while the sheet scrolls. */
+.sheet-x{
+  position:sticky; top:10px; z-index:5;
+  margin-left:auto; margin-bottom:-30px;
+  width:30px; height:30px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  background:rgba(127,127,127,.22); color:var(--text);
+  font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;
+}
+.sheet-x:active{transform:scale(.9);}
 .sheet h2{margin:0 0 4px; font-size:18px;}
 /* Drag handle at the top of every bottom sheet: a full-width hit area with
    the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
@@ -1451,12 +1461,15 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020412';
+var APP_VERSION = '202610020421';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
 var IS_IPHONE = /iPhone/.test(navigator.userAgent || '');
 if(IS_IPHONE && document.documentElement) document.documentElement.classList.add('iphone');
+/* Standard delete-button label: the full word everywhere except iPhone,
+   where the 🗑️ icon saves space. */
+function delLabel(){ return IS_IPHONE ? '🗑️' : 'Delete'; }
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -1805,21 +1818,43 @@ function wireSheetResize(sh){
     grab.classList.add('resizing');
     function move(ev){
       if(ev.pointerId!==pid) return;
-      var h = startH + (startY - ev.clientY); /* drag up = taller */
-      h = Math.max(minH, Math.min(maxH, h));
-      sh.style.height = h + 'px';
+      var dy = ev.clientY - startY; /* positive = dragging down */
+      if(dy <= 0){
+        sh.style.transform = '';
+        var h = Math.max(minH, Math.min(maxH, startH - dy)); /* drag up = taller */
+        sh.style.height = h + 'px';
+      }else{
+        /* drag down: shrink toward minH, then follow the finger */
+        sh.style.height = Math.max(minH, startH - dy) + 'px';
+        var over = dy - (startH - minH);
+        sh.style.transform = over > 0 ? 'translateY(' + Math.round(over) + 'px)' : '';
+      }
     }
-    function done(ev){
-      if(ev.pointerId!==pid) return;
+    function cleanup(){
       grab.removeEventListener('pointermove', move);
-      grab.removeEventListener('pointerup', done);
-      grab.removeEventListener('pointercancel', done);
+      grab.removeEventListener('pointerup', up);
+      grab.removeEventListener('pointercancel', cancelled);
       grab.classList.remove('resizing');
       sh.style.maxHeight = ''; /* restore the CSS cap (which accounts for the keyboard) */
+      sh.style.transform = '';
+    }
+    function up(ev){
+      if(ev.pointerId!==pid) return;
+      var dy = ev.clientY - startY;
+      cleanup();
+      /* dragged down far enough: dismiss, same as tapping outside */
+      if(dy > 120){
+        var ov = sh.parentNode;
+        if(ov && ov._dismiss) ov._dismiss();
+      }
+    }
+    function cancelled(ev){
+      if(ev.pointerId!==pid) return;
+      cleanup();
     }
     grab.addEventListener('pointermove', move);
-    grab.addEventListener('pointerup', done);
-    grab.addEventListener('pointercancel', done);
+    grab.addEventListener('pointerup', up);
+    grab.addEventListener('pointercancel', cancelled);
   });
 }
 /* Keep the tab bar pinned above the iOS keyboard while typing, and lift
@@ -1871,6 +1906,11 @@ function openSheet(build, onDismiss){
   function close(){ root.innerHTML=''; }
   wireOverlayDismiss(ov, onDismiss, close);
   ov._dismiss = function(){ if(onDismiss) onDismiss(); else close(); }; // swipe-right closes like tap-outside
+  /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
+     First child + sticky so it stays visible while the sheet scrolls. */
+  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
+  xBtn.addEventListener('click', function(){ ov._dismiss(); });
+  sh.insertBefore(xBtn, sh.firstChild);
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
@@ -1892,6 +1932,11 @@ function openSheetStacked(build, onDismiss){
   function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
   wireOverlayDismiss(ov, onDismiss, close);
   ov._dismiss = function(){ if(onDismiss) onDismiss(); else close(); }; // swipe-right closes like tap-outside
+  /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
+     First child + sticky so it stays visible while the sheet scrolls. */
+  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
+  xBtn.addEventListener('click', function(){ ov._dismiss(); });
+  sh.insertBefore(xBtn, sh.firstChild);
   build(sh, close);
   padStickyBars(sh);
   wireSheetResize(sh);
@@ -1933,7 +1978,8 @@ function confirmDialog(message, okLabel){
       // explicit Delete label) get the red danger button; other actions
       // ("Sign in", "Proceed", ...) keep the green go button.
       var destructive = !okLabel || /delete/i.test(okLabel);
-      var yes = el('button',{class:'btn '+(destructive?'danger':'go')}, okLabel||'Delete');
+      var yes = el('button',{class:'btn '+(destructive?'danger':'go'),'aria-label':destructive?'Delete':(okLabel||'Delete')},
+        destructive ? delLabel() : (okLabel||'Delete'));
       no.onclick = function(){ done(); resolve(false); };
       yes.onclick = function(){ done(); resolve(true); };
       row.appendChild(no); row.appendChild(yes);
@@ -3526,7 +3572,7 @@ function openCatDelete(oldName){
     if(!others.length) rUnas.checked=true;
     var row=el('div',{class:'btnrow'});
     var cancel=el('button',{class:'btn ghost'},'Cancel');
-    var del=el('button',{class:'btn danger'},'Delete');
+    var del=el('button',{class:'btn danger','aria-label':'Delete'},delLabel());
     cancel.onclick=function(){ close(); };
     del.onclick=async function(){
       var target=sel.value;
@@ -6578,15 +6624,25 @@ function openTxnForm(t){
          are kept. Frequency is picked in the bill form. If the transaction
          already has a bill reminder, the button opens that bill instead. */
       var linkedBill = null;
-      if(t && t.id){
-        var lb = state.bills.filter(function(bd){ return bd.sourceTxnId===t.id; });
-        if(lb.length) linkedBill = lb[0];
+      function findLinkedBill(){
+        linkedBill = null;
+        if(t && t.id){
+          var lb = state.bills.filter(function(bd){ return bd.sourceTxnId===t.id; });
+          if(lb.length) linkedBill = lb[0];
+        }
       }
-      var billBtn = el('button',{class:'btn ghost', type:'button'},
-        linkedBill ? '🔔 Open bill reminder' : '🔔 Add bill reminder');
+      var billBtn = el('button',{class:'btn ghost', type:'button'});
+      /* Re-checks the store every time: if the bill was deleted while its
+         form was stacked above, the button falls back to Create. */
+      function paintBillBtn(){
+        findLinkedBill();
+        billBtn.textContent = linkedBill ? '🔔 Open bill reminder' : '🔔 Create Bill Reminder';
+      }
+      paintBillBtn();
       billBtn.addEventListener('click', function(){
-        if(linkedBill) openBillForm(linkedBill, {stacked:true});
-        else openBillForm(null, {prefill: billPrefillFromTxn(t), stacked:true});
+        findLinkedBill();
+        if(linkedBill) openBillForm(linkedBill, {stacked:true, onClose:paintBillBtn});
+        else openBillForm(null, {prefill: billPrefillFromTxn(t), stacked:true, onClose:paintBillBtn});
       });
       scanRow.appendChild(billBtn);
     }
@@ -6710,9 +6766,9 @@ function openTxnForm(t){
     var save = el('button',{class:'btn',type:'button'}, isEdit?'Save':'Add');
     row.appendChild(cancel); row.appendChild(save);
     if(isEdit){
-      var del = el('button',{class:'iconbtn',type:'button',title:'Delete transaction',
-        html:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>'});
-      del.setAttribute('aria-label','Delete transaction');
+      var del = el('button',{type:'button',title:'Delete transaction','aria-label':'Delete transaction'});
+      if(IS_IPHONE){ del.className='iconbtn'; del.textContent='🗑️'; }
+      else{ del.className='btn ghost'; del.textContent='Delete'; del.style.color='var(--danger)'; }
       del.onclick = async function(){
         var ok = await confirmDialog('Delete this transaction? This cannot be undone.');
         if(!ok) return;
@@ -10496,7 +10552,14 @@ function openBillForm(b, opts){
   var isEdit = !!b;
   var src = b || (opts && opts.prefill) || {};
   var openIt = (opts && opts.stacked) ? openSheetStacked : openSheet;
+  var sheetClose = null;
+  /* opts.onClose fires whenever the bill sheet goes away by any path — save,
+     delete, cancel, tap-outside, swipe, drag-down or the ✕ — so openers
+     (e.g. the transaction form's bill button) can refresh. */
+  function closed(){ if(opts && opts.onClose) opts.onClose(); }
   openIt(function(sh, close){
+    sheetClose = close;
+    close = function(){ sheetClose(); closed(); };
     sh.appendChild(el('h2',null,isEdit?'Edit bill':'Add bill'));
     /* Bill scanner: photo/PDF -> on-device OCR -> pre-fill name/amount/due date. */
     var scanPhoto = null; // {blob, dataUrl, pdfBlob} from the most recent scan
@@ -10651,7 +10714,7 @@ function openBillForm(b, opts){
           await getStore().update('Bills', b.id, row);
           toast('Bill updated.');
         }else{
-          /* Bill created from a transaction ("Add bill reminder"): remember
+          /* Bill created from a transaction ("Create Bill Reminder"): remember
              the source so the transaction shows a 🔔 badge. */
           if(opts && opts.prefill && opts.prefill.sourceTxnId) row.sourceTxnId = opts.prefill.sourceTxnId;
           var tmpId = 'tmp-'+Date.now();
@@ -10669,13 +10732,13 @@ function openBillForm(b, opts){
     bar.appendChild(cancelBtn);
     bar.appendChild(saveBtn);
     if(isEdit){
-      var delBtn = el('button',{class:'btn ghost',type:'button',style:'color:var(--danger)'},'Delete');
+      var delBtn = el('button',{class:'btn ghost',type:'button',style:'color:var(--danger)','aria-label':'Delete'},delLabel());
       delBtn.addEventListener('click', function(){ deleteBill(b, close); });
       bar.appendChild(delBtn);
     }
     sh.appendChild(bar);
     setTimeout(function(){ inName.focus(); }, 60);
-  });
+  }, function(){ if(sheetClose) sheetClose(); closed(); });
 }
 
 /* Mark-paid sheet: optional transaction creation (default OFF — Dave's
@@ -10762,7 +10825,7 @@ function deleteBill(b, closeParent){
     sh.appendChild(el('h2',null,'Delete bill?'));
     sh.appendChild(el('p',{class:'muted'},(b.name||'Bill')+' · '+money(num(b.amount))+' will be removed.'));
     var bar = el('div',{class:'btnrow stickybar-page'});
-    var del = el('button',{class:'btn',type:'button',style:'background:var(--danger)'},'Delete');
+    var del = el('button',{class:'btn',type:'button',style:'background:var(--danger)','aria-label':'Delete'},delLabel());
     del.addEventListener('click', async function(){
       try{ await getStore().remove('Bills', b.id); }
       catch(e){ toast('Could not delete the bill.', true); return; }
