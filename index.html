@@ -5852,7 +5852,15 @@ function openSplitSheet(t, baseRow, closeEditForm){
     addRow('', '');
     sh.appendChild(remEl);
     var addBtn = el('button', {class:'btn ghost', type:'button', style:'margin-bottom:12px'}, '+ Add part');
-    addBtn.addEventListener('click', function(){ var r = addRow('', ''); r.amt.focus(); });
+    addBtn.addEventListener('click', function(){
+      // Auto-fill the new part with whatever is left unallocated, so the
+      // parts add up to the transaction total without mental math.
+      var sum = 0;
+      rows.forEach(function(r){ sum += cents(r.amt.value); });
+      var rem = totalCents - sum;
+      var r = addRow(rem > 0 ? (rem/100).toFixed(2) : '', '');
+      r.amt.focus();
+    });
     sh.appendChild(addBtn);
     cancelBtn.addEventListener('click', close);
     bar.appendChild(cancelBtn); bar.appendChild(saveBtn);
