@@ -1461,7 +1461,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020421';
+var APP_VERSION = '202610020423';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -4864,6 +4864,23 @@ function allTaxCategories(){
   });
   return list;
 }
+/* Multi-word search: every word in the query must occur somewhere in the record
+   (merchant/description/notes/category text, or the amount). So "Safeway
+   Jackson" matches only records containing both words — not "Safeway Fuel". */
+function txnWordsMatch(t, q){
+  var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
+  var amt = String(num(t.amount));
+  var words = String(q).toLowerCase().split(/\s+/).filter(function(w){ return w.length>0; });
+  if(!words.length) return true;
+  for(var i=0;i<words.length;i++){
+    var w = words[i];
+    if(hay.indexOf(w)!==-1) continue;
+    var wAmt = w.replace(/[$,]/g,'');
+    if(wAmt && amt.indexOf(wAmt)>=0) continue;
+    return false;
+  }
+  return true;
+}
 function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
       cat = $('f-cat').value, bk = $('f-bank').value, tx = $('f-tax').value, q = $('f-q').value.trim().toLowerCase();
   var m = String(t.date||'').slice(0,7);
@@ -4898,15 +4915,11 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
     if(dd.minAmt!=null && num(t.amount)<dd.minAmt) return false;
     if(dd.maxAmt!=null && num(t.amount)>=dd.maxAmt) return false;
     if(dd.q){
-      var dhay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
-      if(dhay.indexOf(dd.q)===-1) return false;
+      if(!txnWordsMatch(t, dd.q)) return false;
     }
   }
   if(q){
-    var hay = [t.merchant,t.description,t.notes,t.category].join(' ').toLowerCase();
-    var aq = q.replace(/[$,\s]/g,'');
-    var amtHit = aq && String(num(t.amount)).indexOf(aq)>=0;
-    if(hay.indexOf(q)===-1 && !amtHit) return false;
+    if(!txnWordsMatch(t, q)) return false;
   }
   return true;
 }

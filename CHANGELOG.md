@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Transactions search is now word-based AND: every word typed must occur somewhere in the record (text fields or amount). "Safeway Jackson" matches only records containing both words — no longer "Safeway Fuel".
 - Delete buttons standardized on edit dialogs: the full word "Delete" everywhere except iPhone, which uses 🗑️ to save space (transaction form, bill form, delete confirmations, category delete).
 - Every sheet now has a sticky ✕ in a circle at the top-right that closes it (same as Cancel/tap-outside) — it stays visible while the sheet scrolls, so no scrolling to find Cancel.
 - Dragging the sheet's handle down far enough now dismisses the sheet (drag up still resizes).
