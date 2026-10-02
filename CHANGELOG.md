@@ -1,5 +1,10 @@
 # Changelog
 ## 2026-10-02
+- Update banner: on window focus (and visibility), the app re-checks same-origin `version.json` + `index.html` (throttled) and shows the blue "new version" bar when the tab is stale — including after a git pull / file change without leaving the tab. Refresh reloads past the cache; Dismiss hides until a newer build appears.
+- Add/Edit bill: the category menu now includes ＋ New category… (same as Add/Edit transaction) and saves the new category to the Categories list.
+- Scan bill / receipt: new "Paste from clipboard" option (and ⌘V / Ctrl+V) runs the same on-device recognition as Choose photo — images and PDFs when the browser exposes them.
+- Transactions: opening the page (including on load) no longer auto-focuses the search box — click or tap to type.
+- Desktop: wide mouse/trackpad screens no longer apply `html { zoom: .56 }` (which shrank the 760px column into a tiny strip); full-size type with a wide content column (up to 1600px; sheets 1100px). iPhone and iPad/tablet tiers unchanged.
 - Bills: redesigned bill cards — the name now wraps to two lines instead of truncating, and the due date moved into the meta line (category · account · due date), removing the wasted fixed-width spacer column.
 - Reports: the Monthly Trend month table now fits all columns (Month/Income/Expenses/Net) on iPhone without sideways scrolling.
 - Reports: grouped bar charts pack the month groups tighter (5% gap instead of 20%).
@@ -84,6 +89,14 @@
 
 Running record of what ships in the expense tracker, kept for future
 documentation. Newest first.
+
+## 2026-10-02
+
+### Desktop uses the large layout
+- Wide mouse/trackpad screens no longer apply `html { zoom: .56 }`, which
+  had shrunk the 760px phone column into a tiny centered strip. Desktop now
+  keeps full-size type and a wide content column (up to 1600px; sheets
+  1100px). iPhone (≤560px) and iPad/tablet tiers are unchanged.
 
 ## 2026-10-01
 
@@ -309,7 +322,6 @@ documentation. Newest first.
 - **Fix:** restored `incBotCompute`, which a span edit had accidentally
   deleted along with the old draft/save code — the Income planner card
   rendered empty because its loader threw before painting any rows.
-
 ## 2026-09-30
 
 ### Budget page: planners replace the budget/target cards

@@ -692,20 +692,18 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   .bill-cal .day{min-height:52px;}
 }
 
-/* ---------- desktop: the app is a centered 760px column; scale type down so it
-   doesn't feel oversized on wide screens (body 18px -> ~10px effective).
-   Root-level zoom acts like page zoom, so fixed/sticky chrome keeps working.
-   Gated on pointer:fine so touch tablets never land here (see tablet tier). ---------- */
+/* ---------- desktop: full-size type, wide content column. No html zoom —
+   that shrank the default 760px column into a postage-stamp phone strip on
+   large screens. pointer:fine keeps this off actual iPads (see tablet). ---------- */
 @media (min-width:1200px) and (pointer:fine){
-  html{ zoom:.56; }
-  select{ font-size:19px; }
+  main{max-width:min(1600px, 100%);}
+  .sheet{max-width:1100px;}
 }
 
 /* ---------- tablet (iPad): "medium" layout. Widen the content column so the
    app uses the tablet's width instead of the narrow phone-width column, at
    full-size type. The coarse-pointer branch also covers large tablets
-   (e.g. 12.9" iPad, 1366px) that would otherwise fall into the zoomed-down
-   desktop tier. ---------- */
+   (e.g. 12.9" iPad, 1366px) that would otherwise use the desktop widths. ---------- */
 @media (min-width:761px) and (max-width:1199px),
        (pointer:coarse) and (min-width:761px){
   main{max-width:1000px;}
@@ -1492,8 +1490,9 @@ var LS_USER = 'expenseTracker.userName';
 var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
-   version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610021438';
+   version.json — the in-app update checker compares the two (and also re-fetches
+   index.html to catch disk changes even when the stamp wasn't bumped). */
+var APP_VERSION = '202610021747';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -1504,9 +1503,18 @@ if(IS_IPHONE && document.documentElement) document.documentElement.classList.add
 function delLabel(){ return IS_IPHONE ? '🗑️' : 'Delete'; }
 
 /* ================= in-app update check =================
-   Fetches version.json fresh (never from cache). When the deployed version
-   differs from this build, a banner offers a cache-busting refresh. Silent
-   when offline or running from a local file. */
+   Same-origin only (works for local http.server and GitHub Pages — no GitHub
+   API / raw.githubusercontent, which browsers block with CORS).
+
+   Detects a stale tab by:
+     1) version.json.v vs this build's APP_VERSION (fast deploy marker), and
+     2) re-fetching index.html with cache:'no-store' and comparing an FNV hash
+        of the file to the hash seen at first check (catches git pull / file
+        edits even if APP_VERSION wasn't bumped).
+
+   On mismatch: blue top banner with Refresh (cache-bust reload) and Dismiss
+   (hides until a newer server stamp appears, or the tab is reloaded).
+   Throttled on focus/visibility; pull-to-check and the interval force a check. */
 var _updBase = (function(){
   var p = location.pathname;
   if(p.slice(-1)!=='/'){
@@ -1515,29 +1523,68 @@ var _updBase = (function(){
   }
   return p;
 })();
-var _updDismissed = null;
-function checkAppVersion(){
-  if(!window.fetch) return;
-  fetch(_updBase+'version.json?_='+Date.now(), {cache:'no-store'})
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if(!d || !d.v || d.v===APP_VERSION || _updDismissed===d.v) return;
-      var bar = document.getElementById('updBar');
-      if(!bar) return;
-      bar.classList.add('show');
-      document.getElementById('updGo').onclick = function(){
-        location.href = _updBase + '?v=' + encodeURIComponent(d.v);
-      };
-      document.getElementById('updX').onclick = function(){
-        _updDismissed = d.v;
-        bar.classList.remove('show');
-      };
-    })
-    .catch(function(){});
+var _updDismissed = null;   // server stamp the user dismissed this session
+var _updBootHtmlHash = null; // index.html hash from the first successful fetch
+var _updLastCheck = 0;
+var _updPending = null;
+var UPD_THROTTLE_MS = 2*60*1000; // at most one automatic check every 2 minutes
+function _updHash(s){
+  var h = 2166136261;
+  for(var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h>>>0).toString(36);
 }
-setTimeout(checkAppVersion, 3000);
-setInterval(checkAppVersion, 30*60*1000);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkAppVersion(); });
+function _updShowBanner(stamp){
+  if(!stamp || _updDismissed===stamp) return;
+  var bar = document.getElementById('updBar');
+  if(!bar) return;
+  bar.classList.add('show');
+  document.getElementById('updGo').onclick = function(){
+    location.href = _updBase + '?v=' + encodeURIComponent(stamp) + '&_=' + Date.now();
+  };
+  document.getElementById('updX').onclick = function(){
+    _updDismissed = stamp;
+    bar.classList.remove('show');
+  };
+}
+function checkAppVersion(force){
+  if(!window.fetch) return;
+  if(location.protocol==='file:') return; // no same-origin server to compare
+  var now = Date.now();
+  if(!force && _updLastCheck && (now-_updLastCheck) < UPD_THROTTLE_MS) return;
+  _updLastCheck = now;
+  if(_updPending) return;
+  var stampQ = '?_='+now;
+  _updPending = Promise.all([
+    fetch(_updBase+'version.json'+stampQ, {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; }),
+    fetch(_updBase+'index.html'+stampQ, {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .catch(function(){ return null; })
+  ]).then(function(pair){
+    _updPending = null;
+    var d = pair[0], html = pair[1];
+    var remoteV = (d && d.v) || null;
+    if(html){
+      var m = html.match(/var\s+APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      // Prefer the APP_VERSION embedded in index.html — that is the code
+      // Refresh would load. Fall back to version.json when the HTML parse fails.
+      if(m && m[1]) remoteV = m[1];
+      var hash = _updHash(html);
+      var htmlChanged = !!(_updBootHtmlHash && hash!==_updBootHtmlHash);
+      if(!_updBootHtmlHash) _updBootHtmlHash = hash;
+      if(htmlChanged){
+        _updShowBanner(remoteV || ('h:'+hash));
+        return;
+      }
+    }
+    if(remoteV && remoteV!==APP_VERSION) _updShowBanner(remoteV);
+  }).catch(function(){ _updPending = null; });
+}
+setTimeout(function(){ checkAppVersion(true); }, 800);
+setInterval(function(){ checkAppVersion(true); }, 30*60*1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkAppVersion(false); });
+window.addEventListener('focus', function(){ checkAppVersion(false); });
 
 /* ================= pull to check for updates =================
    The classic pull-to-refresh gesture: dragging down from the very top of a
@@ -1581,7 +1628,7 @@ document.addEventListener('visibilitychange', function(){ if(!document.hidden) c
   document.addEventListener('touchend', function(){
     if(!active) return;
     active=false; hide();
-    if(pull>=THRESH){ toast('Checking for updates…'); checkAppVersion(); }
+    if(pull>=THRESH){ toast('Checking for updates…'); checkAppVersion(true); }
     pull=0;
   }, {passive:true});
   document.addEventListener('touchcancel', function(){ active=false; pull=0; hide(); }, {passive:true});
@@ -2773,7 +2820,6 @@ function rememberScroll(){
 }
 function showScreen(name){
   var same = (state.screen === name);
-  var prevScreen = state.screen;
   // remember each tab's vertical scroll; restore it when coming back
   if(state.screen && !same){ rememberScroll(); }
   state.screen = name;
@@ -2794,15 +2840,6 @@ function showScreen(name){
     else if(name==='info') renderInfo();
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
-  // Switching to Transactions puts the cursor in the search box — except on
-  // iPhone, where the popping keyboard would cover the list. Focus the
-  // floating clone when the in-card box has scrolled off above; not on boot.
-  if(!same && prevScreen && name==='transactions' && !IS_IPHONE){
-    var fq = $('f-q');
-    var fr = fq.getBoundingClientRect();
-    var target = (fr.bottom <= 0) ? $('f-q-stick') : fq;
-    if(target && document.activeElement !== target) target.focus({preventScroll:true});
-  }
 }
 function updateUserChip(){
   $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
@@ -10477,7 +10514,8 @@ function parseReceiptScan(text){
   }
   return res;
 }
-/* Scan sheet: pick/take photo or upload PDF -> progress -> editable review -> Use these details.
+/* Scan sheet: pick/take photo, paste from clipboard, or upload PDF -> progress ->
+   editable review -> Use these details.
    kind: 'bill' | 'receipt'. onDone receives {blob, dataUrl, pdfBlob, values}
    (pdfBlob is the original PDF file when one was uploaded, else null). */
 function openScanSheet(kind, onDone){
@@ -10486,7 +10524,7 @@ function openScanSheet(kind, onDone){
     sh.appendChild(el('h2', null, isBill ? 'Scan bill' : 'Scan receipt'));
     sh.appendChild(el('p', {class:'muted'},
       'Take a photo of the ' + (isBill ? 'bill' : 'receipt') +
-      ' or upload its PDF \u2014 this phone reads the first page and fills in what it finds. ' +
+      ', choose one, paste from the clipboard, or upload its PDF \u2014 this phone reads the first page and fills in what it finds. ' +
       'Check the fields before saving; nothing is uploaded for recognition.'));
     var pickBox = el('div');
     var fileCam = el('input', {type:'file', accept:'image/*', capture:'environment', class:'filepick'});
@@ -10499,11 +10537,14 @@ function openScanSheet(kind, onDone){
     var btnRow = el('div', {class:'btnrow', style:'flex-wrap:wrap'});
     var takeBtn = el('button', {class:'btn', type:'button'}, '\uD83D\uDCF7 Take photo');
     var libBtn = el('button', {class:'btn ghost', type:'button'}, 'Choose photo');
+    var pasteBtn = el('button', {class:'btn ghost', type:'button'}, 'Paste from clipboard');
     var pdfBtn = el('button', {class:'btn ghost', type:'button'}, 'Upload PDF');
     takeBtn.addEventListener('click', function(){ fileCam.click(); });
     libBtn.addEventListener('click', function(){ fileLib.click(); });
+    pasteBtn.addEventListener('click', function(){ pasteFromClipboard(); });
     pdfBtn.addEventListener('click', function(){ filePdf.click(); });
-    btnRow.appendChild(takeBtn); btnRow.appendChild(libBtn); btnRow.appendChild(pdfBtn);
+    btnRow.appendChild(takeBtn); btnRow.appendChild(libBtn);
+    btnRow.appendChild(pasteBtn); btnRow.appendChild(pdfBtn);
     pickBox.appendChild(btnRow);
     var cancelBtn = el('button', {class:'btn ghost', type:'button', style:'margin-top:10px'}, 'Cancel');
     cancelBtn.addEventListener('click', close);
@@ -10540,6 +10581,103 @@ function openScanSheet(kind, onDone){
         'Could not read that PDF. Try again or enter it manually.');
       filePdf.value = '';
     }
+    function pasteShortcutHint(){
+      var mac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || '') ||
+        /Mac OS|iPhone|iPad/i.test(navigator.userAgent || '');
+      return mac ? '\u2318V' : 'Ctrl+V';
+    }
+    /* Pull an image (or PDF) off the clipboard and feed the same OCR path as
+       Choose photo / Upload PDF. ClipboardItem types vary by browser. */
+    function fileFromClipboardBlob(blob, mime){
+      var type = (blob && blob.type) || mime || 'application/octet-stream';
+      var ext = 'bin';
+      if(/^image\/png$/i.test(type)) ext = 'png';
+      else if(/^image\/jpe?g$/i.test(type)) ext = 'jpg';
+      else if(/^image\/webp$/i.test(type)) ext = 'webp';
+      else if(/^image\/gif$/i.test(type)) ext = 'gif';
+      else if(/^application\/pdf$/i.test(type)) ext = 'pdf';
+      else if(/^image\//i.test(type)) ext = (type.split('/')[1] || 'img').replace(/[^a-z0-9]+/gi,'');
+      return new File([blob], 'clipboard.' + ext, {type: type});
+    }
+    function takeClipboardFile(items){
+      var i = 0;
+      function next(){
+        if(i >= items.length) return Promise.resolve(null);
+        var item = items[i++];
+        var types = item.types || [];
+        var imgType = null, pdfType = null;
+        for(var t = 0; t < types.length; t++){
+          var ty = types[t];
+          if(!imgType && /^image\//i.test(ty)) imgType = ty;
+          if(ty === 'application/pdf') pdfType = ty;
+        }
+        var want = imgType || pdfType;
+        if(!want) return next();
+        return item.getType(want).then(function(blob){
+          if(!blob || !blob.size) return next();
+          return {kind: pdfType && want === pdfType ? 'pdf' : 'image',
+            file: fileFromClipboardBlob(blob, want)};
+        }).catch(function(){ return next(); });
+      }
+      return next();
+    }
+    function pasteFromClipboard(){
+      if(!(navigator.clipboard && navigator.clipboard.read)){
+        toast('Paste from clipboard isn\u2019t supported here \u2014 press ' +
+          pasteShortcutHint() + ' after copying an image, or choose a photo.', true);
+        return;
+      }
+      navigator.clipboard.read().then(function(items){
+        return takeClipboardFile(items || []).then(function(got){
+          if(!got){
+            toast('No image or PDF on the clipboard. Copy one, then try again.', true);
+            return;
+          }
+          if(got.kind === 'pdf') onPdfFile(got.file);
+          else onFile(got.file);
+        });
+      }).catch(function(err){
+        var name = err && err.name;
+        if(name === 'NotAllowedError' || name === 'SecurityError'){
+          toast('Clipboard access blocked \u2014 press ' + pasteShortcutHint() +
+            ' to paste, or grant clipboard permission.', true);
+        }else{
+          toast('Could not read the clipboard. Press ' + pasteShortcutHint() +
+            ' or choose a photo.', true);
+        }
+      });
+    }
+    /* Cmd/Ctrl+V while the pick screen is open — covers browsers that only
+       expose images via the paste event (not clipboard.read). */
+    function onDocPaste(e){
+      if(!sh.isConnected){ document.removeEventListener('paste', onDocPaste); return; }
+      if(pickBox.style.display === 'none') return;
+      var cd = e.clipboardData;
+      if(!cd) return;
+      var list = cd.files;
+      if(list && list.length){
+        var f0 = list[0];
+        if(f0 && /^image\//i.test(f0.type)){ e.preventDefault(); onFile(f0); return; }
+        if(f0 && (f0.type === 'application/pdf' || /\.pdf$/i.test(f0.name || ''))){
+          e.preventDefault(); onPdfFile(f0); return;
+        }
+      }
+      if(cd.items){
+        for(var i = 0; i < cd.items.length; i++){
+          var it = cd.items[i];
+          if(it.kind !== 'file') continue;
+          if(/^image\//i.test(it.type)){
+            var img = it.getAsFile();
+            if(img){ e.preventDefault(); onFile(img); return; }
+          }
+          if(it.type === 'application/pdf'){
+            var pdf = it.getAsFile();
+            if(pdf){ e.preventDefault(); onPdfFile(pdf); return; }
+          }
+        }
+      }
+    }
+    document.addEventListener('paste', onDocPaste);
     /* Shared tail: image blob (or {pageBlob, pdfBlob} for PDFs) -> downscale ->
        OCR -> review. src is the prepared input promise. */
     function runOcr(src, prepLabel, failMsg){
@@ -10781,28 +10919,29 @@ function openBillForm(b, opts){
       inRec.appendChild(op);
     });
     sh.appendChild(el('label',{class:'f'},'Repeats')); sh.appendChild(inRec);
+    /* Category: same ＋ New category… pattern as the transaction form —
+       populate via categoryOptionsFor, typed name creates a Categories row. */
+    var curBp = src.account||'Personal';
     var inCat = el('select',{style:'width:100%'});
-    // New bills default to Uncategorized (stored blank, displayed as
-    // "Uncategorized" like everywhere else).
-    var unc = el('option',{value:''},'Uncategorized');
-    if(!src.category) unc.selected = true;
-    inCat.appendChild(unc);
-    allCategories().forEach(function(c){
-      if(c==='Uncategorized') return; // already covered by the blank option above
-      var op = el('option',{value:c},c);
-      if(src.category===c) op.selected = true;
-      inCat.appendChild(op);
-    });
-    sh.appendChild(el('label',{class:'f'},'Category')); sh.appendChild(inCat);
+    var inNewCat = el('input',{type:'text',placeholder:'New category name',autocomplete:'off',style:'display:none;margin-top:8px;width:100%'});
+    function syncNewCat(){ inNewCat.style.display = (inCat.value==='__new__') ? '' : 'none'; if(inCat.value==='__new__') inNewCat.focus(); }
+    function refreshCats(){
+      var prev = inCat.value;
+      categoryOptionsFor(inCat, curBp, prev || src.category || '');
+      syncNewCat();
+    }
+    inCat.addEventListener('change', syncNewCat);
+    sh.appendChild(el('label',{class:'f'},'Category')); sh.appendChild(inCat); sh.appendChild(inNewCat);
+    fitFieldToContent(inNewCat);
     sh.appendChild(el('label',{class:'f'},'Account'));
     var bpSeg = el('div',{class:'seg'});
     var bPer = el('button',{type:'button'},'Personal'), bBiz = el('button',{type:'button'},'Business');
     bpSeg.appendChild(bPer); bpSeg.appendChild(bBiz);
-    var curBp = src.account||'Personal';
     function paintBp(){ bPer.classList.toggle('on',curBp==='Personal'); bBiz.classList.toggle('on',curBp==='Business'); }
-    bPer.onclick = function(){ curBp='Personal'; paintBp(); };
-    bBiz.onclick = function(){ curBp='Business'; paintBp(); };
+    bPer.onclick = function(){ curBp='Personal'; paintBp(); refreshCats(); };
+    bBiz.onclick = function(){ curBp='Business'; paintBp(); refreshCats(); };
     paintBp();
+    refreshCats();
     sh.appendChild(bpSeg);
     var inNotes = autoGrowTextarea(el('textarea',{rows:'2',placeholder:'Optional',style:'width:100%'}));
     if(src.notes) inNotes.value = src.notes;
@@ -10814,10 +10953,15 @@ function openBillForm(b, opts){
       var amt = num(inAmt.value);
       if(!name){ toast('Give the bill a name.', true); return; }
       if(!(amt>0)){ toast('Enter an amount.', true); return; }
+      var typedCat = inCat.value==='__new__' ? inNewCat.value.trim() : inCat.value;
+      if(inCat.value==='__new__' && !typedCat){ toast('Type a name for the new category.', true); return; }
+      var newCatName = typedCat;
+      var existCat = state.categories.find(function(c){ return c.name.toLowerCase()===typedCat.toLowerCase(); });
+      if(existCat) newCatName = existCat.name;
       var row = {
         name:name, amount:Math.round(amt*100)/100,
         dueDate:inDate.value||todayLocal(), recurrence:inRec.value,
-        category:inCat.value||'', account:curBp, notes:inNotes.value.trim(),
+        category:newCatName||'', account:curBp, notes:inNotes.value.trim(),
         createdAt:(b&&b.createdAt)||new Date().toISOString(),
         lastPaid:(b&&b.lastPaid)||null
       };
@@ -10841,6 +10985,12 @@ function openBillForm(b, opts){
         if(b.scanDataUrl) row.scanDataUrl = b.scanDataUrl;
       }
       try{
+        /* Creating a category from the bill form matches the transaction form:
+           append to Categories with the current Personal/Business kind. */
+        if(inCat.value==='__new__' && !existCat){
+          await getStore().append('Categories', {name:newCatName, kind:curBp, tax_category:''});
+          state.categories.push({name:newCatName, kind:curBp, tax_category:''});
+        }
         if(isEdit){
           row.id = b.id;
           /* Keep the transaction link across edits on stores that replace
