@@ -5,6 +5,39 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-02
+### App 202610022340
+- Max Headroom editor: **layer pills** (`.catchip`) — All / None / Grid / Scanlines / Stripes / Glitch / City·shapes / Ambient. Enabled pill shows that layer’s settings card; disabled hides the card and turns the layer off in live preview.
+- Always-visible **Colors** + **Motion** cards above the pills; Grid card holds rotation, vanishing point, VP motion, and randomness.
+### App 202610022330
+- Max Headroom editor: **Esc** dismisses via Cancel when present, else `overlay._dismiss` (same as ✕ / tap-outside) — sticky footers no longer block Esc.
+- Max Headroom editor: sticky stacking — fixed **sheet-head** (title + ✕) above sticky **Live preview** caption/stage; controls scroll underneath; ✕ never over neon artwork.
+- Max Headroom editor: footer uses `btnrow stickybar` — Apply (`.btn.small`), Save & apply / Reset defaults / **Cancel** all `.btn.small.ghost` (Cancel no longer a link).
+- Max Headroom: layer master **All layers off/on**; ambient glow / horizon / vignette / chroma gated; grid plane rotation, vanishing-point X/Y + motion + randomness; all-off = static base color only.
+- Appearance: **AI background…** — on-device keyword→MH recipe (e.g. asteroid field), preview, Apply / Save & apply into My backgrounds.
+### App 202610022220
+- Max Headroom editor: sticky in-dialog **Live preview** (~200px) using the same `mh-custom` layers/CSS vars — updates on every slider change (page bg still live-updates too).
+- Header **Hi, Name** chip is tappable — opens “Who’s entering?” to rename (Dave/Nancy quick picks + field); saves via the same path as Settings.
+### App 202610022216
+- Max Headroom editor: sticky in-dialog **Live preview** (~200px) using the same `mh-custom` layers/CSS vars as the page bg — updates on every slider change.
+### App 202610022210
+- Appearance: polished **Customize** block (Color / Picture / Editor rows) plus **My backgrounds** library with Apply, Export, Copy share code, Delete, and Import.
+- Appearance: portable `.expensebg.json` share format (recipe-first; optional image data with size guard) + paste share-code import.
+- Appearance: **Max Headroom editor** — layered CRT engine (`mh-custom`) with live sliders for colors, grid, scanlines, stripes, glitch, city/shapes, intensity/speed/vignette/chroma, and freeze; Save & apply into My backgrounds.
+### App 202610022155
+- Settings → Appearance: redesigned background card — Subtle/Medium/Bold intensity tabs (one panel at a time), labeled swatch rows, compact tool tiles (color / picture / editor), Motion & effects in a collapsed `<details>`, uniform swatches with a calm accent ring.
+### App 202610022140
+- Settings → Data storage: auth row cleaned up — Sign in primary; Create account / Continue with Google use opaque light ghost fills (no page-bg bleed); Forgot password on its own quiet line.
+- Appearance: decorative backgrounds paint via `--page-bg` so theme chrome (`--bg` / ghost buttons / chips) stays readable on white cards over bold solids, journeys, and Max Headroom.
+- Appearance: **Dynamic gradients** presets (Aurora blobs, Mesh shift, Sunset flow, Conic spin, Wave wash, Candy march) — CSS animations, reduced-motion static.
+- Appearance: **Background editor** — compose solid/gradient + optional pattern; save/apply/delete customs; optional **Animate gradient** toggle.
+### App 202610022118
+- Appearance: Subtle / Medium / Bold preset ranges; Mac-style picture upload (Size to fit + Repeating); Max Headroom contrast fix (dynamics don’t overwrite `--bg`); new **Motion · Journeys** dynamics — space fly-through, aerial mountains, aerial ocean, mountain road.
+### App 202610022114
+- Max Headroom: CRT neon stage no longer overwrites `--bg` — ghost buttons (Create account / Continue with Google) and other card chrome keep light-theme contrast on white cards.
+### App 202610022109
+- Max Headroom backgrounds: darker CRT stage, hotter cyan/magenta/yellow neon, faster grids/scanlines/stripes/glitch/geometry; dynamics work in any theme (solids/gradients/patterns stay light-only).
+### App 202610022106
+- Settings → Appearance: new **Dynamic · Max Headroom** backgrounds (CSS-only) — wireframe grid, CRT scanlines, neon stripes, soft glitch, and city-pulse geometry. Light mode only (same as other page backgrounds); reduced-motion shows a static fallback; animations pause when the tab is hidden.
 ### App 202610022104
 - Ship: Home category chips + Upcoming Bills polish, Settings rename/appearance/compact layouts, trash vs circle-✕ affordances, What’s New (header control, pulse, scroll lock, sticky Load new version only when an update exists), and desktop chart labels ~16–18px.
 ### App 202610022058
