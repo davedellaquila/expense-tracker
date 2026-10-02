@@ -288,9 +288,9 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar .selbar-left .btn{flex:none;}
 .selbar #selbar-update{flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .selbar #selbar-delete{flex:none;}
-/* Delete sits midway between Update and the xmark: the middle zone absorbs
-   the same free space as the left group, keeping Update centered. */
-.selbar .selbar-mid{flex:1; display:flex; align-items:center; justify-content:center; min-width:0;}
+/* Update and Delete share the middle zone, spread evenly between Clear and the
+   far-right xmark so both buttons have breathing room. */
+.selbar .selbar-mid{flex:1; display:flex; align-items:center; justify-content:space-evenly; min-width:0;}
 /* bulk-update bar dismiss: compact xmark at the bar's far right, kept well
    clear of Delete to avoid mis-taps */
 .selbar #selbar-done{flex:none; width:34px; height:34px; padding:0; margin-left:14px;
@@ -1074,9 +1074,9 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
           <button class="btn small ghost" id="selbar-all" type="button">All</button>
           <button class="btn small ghost" id="selbar-clear" type="button">Clear</button>
         </div>
-        <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
         <div class="selbar-mid">
-          <button class="btn small danger" id="selbar-delete" type="button" title="Delete selected" aria-label="Delete selected transactions">🗑️</button>
+          <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
+          <button class="btn small danger" id="selbar-delete" type="button" title="Delete selected" aria-label="Delete selected transactions">Delete</button>
         </div>
         <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
       </div>
@@ -1461,7 +1461,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020423';
+var APP_VERSION = '202610020430';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
