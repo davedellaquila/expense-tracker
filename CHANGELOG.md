@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Category Bars: tapping an "Other" bar now labels the drill "Other" in the info card instead of expanding to the first underlying category ("Rent and Lease + 2 more").
 - Home: Category Bars and Income by category are now Home chart cards too — every chart is available on both Home and Reports from here on; existing installs get the two new cards appended at the bottom.
 - Bulk update: the Delete button now sits midway between Update and the ✕ done button on the selection bar.
 - Bulk update: the "Update N transactions" dialog now puts the cursor in the Merchant name field on open.

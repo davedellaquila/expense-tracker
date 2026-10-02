@@ -4050,7 +4050,9 @@ function renderDashChartBody(pick, box, c){
       return m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5);
     }), function(si, mi){
       var m = cb.months[mi];
-      dashDrill({singleMonth:m, dispCats: cb.isOther(si) ? cb.otherByMonth[m] : [cb.selNames[si]]});
+      var isOther = cb.isOther(si);
+      dashDrill({singleMonth:m, dispCats: isOther ? cb.otherByMonth[m] : [cb.selNames[si]],
+        catLabel: isOther ? 'Other' : null});
     });
   } else if(pick==='inc'){
     var ics = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
@@ -4746,7 +4748,11 @@ function drillPillLabel(d){
   var what = [];
   var cats = (d.dispCats && d.dispCats.length) ? d.dispCats
            : (d.rawCats && d.rawCats.length) ? d.rawCats : null;
-  if(cats) what.push(plusMore(cats));
+  // A grouped "Other" drill keeps its chart label instead of expanding to
+  // the underlying categories ("Rent and Lease + 2 more" is confusing when
+  // you tapped "Other").
+  if(d.catLabel) what.push(d.catLabel);
+  else if(cats) what.push(plusMore(cats));
   if(d.owners && d.owners.length) what.push(plusMore(d.owners));
   if(d.banks && d.banks.length) what.push(plusMore(d.banks));
   if(d.band) what.push(d.band);
@@ -4960,12 +4966,13 @@ function drillToTransactions(o){
   // Single-category drills set the native Transactions category dropdown
   // instead of listing the category in the pill — but only when the category
   // exists as a real dropdown option; display-only names like "Transfers" or
-  // "Uncategorized" keep the pill path so filtering stays correct.
+  // "Uncategorized" keep the pill path so filtering stays correct. A grouped
+  // "Other" drill never takes this path: the pill keeps the "Other" label.
   var union = [];
   [o.carryCats, o.dispCats].forEach(function(arr){
     (arr||[]).forEach(function(c){ if(union.indexOf(c)<0) union.push(c); });
   });
-  var drillCat = (union.length===1 && allCategories().indexOf(union[0])>=0) ? union[0] : null;
+  var drillCat = (!o.catLabel && union.length===1 && allCategories().indexOf(union[0])>=0) ? union[0] : null;
   if(drillCat){
     // ensure the option exists before selecting it (the dropdown may never
     // have been rendered); renderTransactions rebuilds the options from
@@ -4982,6 +4989,7 @@ function drillToTransactions(o){
     from: from, to: to,
     type: o.type || '', bp: o.bp || '', taxCat: o.taxCat || null,
     dispCats: drillCat ? null : effCats, rawCats: o.rawCats || null,
+    catLabel: o.catLabel || null,
     weekday: (o.weekday==null ? null : o.weekday),
     owners: o.owners || null, banks: o.banks || null,
     band: o.band || null,
@@ -11249,8 +11257,10 @@ function renderReports(){
     return m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5);
   }), function(si, mi){
     var m = cb.months[mi];
+    var isOther = cb.isOther(si);
     drillToTransactions({banks:repBanks, singleMonth:m, type:'expense', bp:bpVal,
-      carryCats:repCatSel, dispCats: cb.isOther(si) ? cb.otherByMonth[m] : [cb.selNames[si]]});
+      carryCats:repCatSel, dispCats: isOther ? cb.otherByMonth[m] : [cb.selNames[si]],
+      catLabel: isOther ? 'Other' : null});
   });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
