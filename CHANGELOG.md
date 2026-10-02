@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- iPhone: the parenthetical hints on the Transactions filter labels (Type, Account) are hidden; desktop still shows them.
 - Sheet drag handle keeps its 42px line but the grab target is taller (45px) for easier finger drags.
 - Round-button press grows the button itself to 1.5x in its own color (white ripple removed).
 - Round-button press is now a white 2x ripple: it appears instantly on press and fades quickly on release (replaces the grow effect).
