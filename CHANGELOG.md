@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Largest expenses table: amounts now show whole dollars with no cents (same formatting as the Home summary cards), on both Home and Reports.
 - Largest expenses table: fixed the Category/Amount overlap on iPhone — long category names now truncate with an ellipsis inside their own column instead of spilling under the amount. Category column widened slightly (27%) to compensate. Applies on both Home and Reports.
 - In-app update checker: the app now fetches version.json on launch, every 30 minutes, and whenever it returns to the foreground; when a newer build is deployed it shows a blue "A new version is available" banner with a Refresh button that reloads past the cache — no more deleting/re-adding the home-screen app to get updates.
 - Income by category table: columns now size dynamically to the viewport (no more 640px minimum forcing sideways scroll) — all three columns visible on iPhone, on both Home and Reports.
