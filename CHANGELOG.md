@@ -1,4 +1,6 @@
 # Changelog
+## 2026-10-02
+- Reports: removed the Net tile from the Expense report summary cards.
 ## 2026-10-01
 - iPhone: the parenthetical hints on the Transactions filter labels (Type, Account) are hidden; desktop still shows them.
 - Sheet drag handle keeps its 42px line but the grab target is taller (45px) for easier finger drags.

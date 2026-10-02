@@ -1495,7 +1495,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020823';
+var APP_VERSION = '202610021345';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -11584,7 +11584,6 @@ function renderReports(){
   $('rep-stats').innerHTML =
     statHtml('Income', money(inc), 'pos', rows.filter(function(t){return t.txn_type==='income';}).length + ' transactions', 'data-reptile="income"') +
     statHtml('Expenses', money(exp), 'neg', rows.filter(function(t){return t.txn_type==='expense';}).length + ' transactions', 'data-reptile="expense"') +
-    statHtml('Net', money(net), net>=0?'pos':'neg', net>=0?'surplus':'deficit', 'data-reptile="net"') +
     statHtml('Avg / month', money(exp/Math.max(1, Object.keys(byMonth).length)), '', Object.keys(byMonth).length + ' months', 'data-reptile="avg"');
   // Summary tiles drill into Transactions filtered to the tile's criterion.
   var repTiles = $('rep-stats').querySelectorAll('[data-reptile]');
@@ -11596,7 +11595,6 @@ function renderReports(){
       var o = {from:from, to:to, bp:bpVal, carryCats:repCatSel};
       if(k==='income') o.type = 'income';
       else if(k==='expense' || k==='avg') o.type = 'expense';
-      // Net: no type filter — everything behind the net.
       drillToTransactions(o);
     });
   })(repTiles[rti]);
