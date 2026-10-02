@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- Pull-to-check-for-updates: dragging down from the very top of any screen runs the update check (same as the automatic one) — no sheet open, page scrolled to top.
+- Bills calendar header now shows the month's total on the right, balancing the month title on the left.
 - Transactions selection bar: Update and Delete now spread evenly across the space between Clear and the far-right ✕; Delete is the word "Delete" in white on red instead of the 🗑️ icon.
 - Transactions search is now word-based AND: every word typed must occur somewhere in the record (text fields or amount). "Safeway Jackson" matches only records containing both words — no longer "Safeway Fuel".
 - Delete buttons standardized on edit dialogs: the full word "Delete" everywhere except iPhone, which uses 🗑️ to save space (transaction form, bill form, delete confirmations, category delete).

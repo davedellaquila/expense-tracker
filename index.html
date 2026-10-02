@@ -201,6 +201,8 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   color:var(--muted); margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--border);}
 #bill-list .bill-month:first-child, #bill-paid-list .bill-month:first-child{margin-top:0; padding-top:0; border-top:none;}
 .bill-month-total{font-variant-numeric:tabular-nums;}
+/* Bills calendar header: monthly total at the right, balancing the month title. */
+#bill-cal-total{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:700; font-size:20px; white-space:nowrap;}
 /* Bills page: sticky month header that appears over the upcoming list while
    scrolling — current month, its total, and an Add bill button. Fixed (out of
    flow) so showing/hiding never shifts the list; JS pins it over the card. */
@@ -794,6 +796,14 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
 #updBar .uacts{display:flex;align-items:center;gap:4px;flex:none;}
 #updBar .ubtn{background:#fff;color:#1a3fa0;border:0;border-radius:8px;padding:7px 14px;font-weight:700;font-size:14px;}
 #updX{background:transparent;border:0;color:#fff;font-size:20px;line-height:1;padding:4px 8px;}
+/* Pull-to-check-for-updates indicator: slides down from the top while the
+   user drags down from the very top of a screen. */
+#ptrHint{position:fixed;top:0;left:50%;transform:translate(-50%,-110%);z-index:9000;
+  background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;
+  padding:8px 18px 10px;font-size:14px;color:var(--muted);white-space:nowrap;pointer-events:none;
+  transition:transform .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.18);}
+#ptrHint.show{transform:translate(-50%,0);}
+#ptrHint.armed{color:var(--text);font-weight:600;}
 .ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:13px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
 .ptable input,.ptable select{font-size:14.5px; padding:6px 8px;}
@@ -850,6 +860,8 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
 
 <!-- in-app update banner: shown when version.json reports a newer build -->
 <div id="updBar" role="status"><span>A new version of Expense Tracker is available.</span><span class="uacts"><button id="updGo" class="ubtn">Refresh</button><button id="updX" aria-label="Dismiss">×</button></span></div>
+<!-- pull-to-check-for-updates indicator -->
+<div id="ptrHint" hidden></div>
 
 <!-- ============ SETUP (shown when no API URL configured) ============ -->
 <div id="setup-screen" class="setupwrap" hidden>
@@ -1213,9 +1225,10 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
     <!-- BILLS -->
     <section id="screen-bills" class="screen" hidden>
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <button class="btn small ghost" id="bill-cal-prev" type="button" aria-label="Previous month">‹</button>
           <h2 id="bill-cal-title" style="margin:0"></h2>
+          <span id="bill-cal-total"></span>
           <button class="btn small ghost" id="bill-cal-next" type="button" aria-label="Next month">›</button>
         </div>
         <div id="bill-cal-grid" class="bill-cal"></div>
@@ -1461,7 +1474,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020430';
+var APP_VERSION = '202610020433';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -1506,6 +1519,54 @@ function checkAppVersion(){
 setTimeout(checkAppVersion, 3000);
 setInterval(checkAppVersion, 30*60*1000);
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkAppVersion(); });
+
+/* ================= pull to check for updates =================
+   The classic pull-to-refresh gesture: dragging down from the very top of a
+   screen runs the same version check as the automatic updater. Only when no
+   sheet is open and the page is scrolled all the way up, so it never fights
+   sheet drags or normal scrolling. */
+(function(){
+  var startY=0, startX=0, pull=0, active=false, hint=null;
+  var THRESH=110;
+  function noSheetOpen(){ var r=$('modal-root'); return !r || !r.querySelector('.overlay'); }
+  function atTop(){ return (window.pageYOffset||document.documentElement.scrollTop||0)<=0; }
+  function show(text, armed){
+    if(!hint) hint=$('ptrHint');
+    if(!hint) return;
+    hint.hidden=false;
+    hint.textContent=text;
+    hint.classList.toggle('armed', !!armed);
+    /* force reflow so the slide-down transition plays */
+    void hint.offsetWidth;
+    hint.classList.add('show');
+  }
+  function hide(){
+    if(!hint) return;
+    hint.classList.remove('show');
+    hint.classList.remove('armed');
+    var h=hint;
+    setTimeout(function(){ if(h===hint && !h.classList.contains('show')) h.hidden=true; }, 220);
+  }
+  document.addEventListener('touchstart', function(e){
+    if(e.touches.length!==1 || !noSheetOpen() || !atTop()){ active=false; return; }
+    startY=e.touches[0].clientY; startX=e.touches[0].clientX; pull=0; active=true;
+  }, {passive:true});
+  document.addEventListener('touchmove', function(e){
+    if(!active || e.touches.length!==1) { if(active){ active=false; hide(); } return; }
+    var dx=e.touches[0].clientX-startX, dy=e.touches[0].clientY-startY;
+    if(Math.abs(dx)>Math.abs(dy)){ active=false; hide(); return; } /* horizontal swipe: not a pull */
+    if(dy<=0){ pull=0; hide(); return; }
+    pull=dy;
+    if(dy>12) show(dy>=THRESH ? 'Release to check for updates' : '↓ Pull to check for updates', dy>=THRESH);
+  }, {passive:true});
+  document.addEventListener('touchend', function(){
+    if(!active) return;
+    active=false; hide();
+    if(pull>=THRESH){ toast('Checking for updates…'); checkAppVersion(); }
+    pull=0;
+  }, {passive:true});
+  document.addEventListener('touchcancel', function(){ active=false; pull=0; hide(); }, {passive:true});
+})();
 
 /* ================= theme ================= */
 function themePref(){ try{ return localStorage.getItem(LS_THEME) || 'system'; }catch(e){ return 'system'; } }
@@ -9866,6 +9927,7 @@ function goToBill(billId){
 function renderBillCalendar(){
   var ym = billCalYm;
   $('bill-cal-title').textContent = fmtMonthPretty(ym);
+  $('bill-cal-total').textContent = money(Math.round(billsDueInMonth(ym)));
   var grid = $('bill-cal-grid'); grid.innerHTML = '';
   ['S','M','T','W','T','F','S'].forEach(function(d){ grid.appendChild(el('div',{class:'dow'},d)); });
   var y = parseInt(ym.slice(0,4),10), m = parseInt(ym.slice(5,7),10);
