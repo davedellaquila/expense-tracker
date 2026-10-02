@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-02
+- Reports: the Monthly Trend month table now fits all columns (Month/Income/Expenses/Net) on iPhone without sideways scrolling.
 - Reports: grouped bar charts pack the month groups tighter (5% gap instead of 20%).
 - Reports: the Expense report stat tiles are centered (removed the stale 4-column grid override).
 - Reports: removed the Net tile from the Expense report summary cards.

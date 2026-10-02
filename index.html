@@ -799,6 +799,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
    columns stay compact; the first column takes the remaining space. */
 table.ptable.fit{min-width:0;}
 table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-space:nowrap;}
+table.ptable.fit th, table.ptable.fit td{padding-left:4px; padding-right:4px;}
 /* In-app update banner: shown when version.json reports a newer build. */
 #updBar{position:fixed;top:0;left:0;right:0;z-index:10000;display:none;align-items:center;justify-content:space-between;gap:10px;background:#2456c8;color:#fff;padding:10px 14px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
 #updBar.show{display:flex;}
@@ -1495,7 +1496,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610021357';
+var APP_VERSION = '202610021404';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -11714,7 +11715,7 @@ function renderReports(){
     });
   }
   var mt = $('rep-monthtable');
-  var mh = '<div class="ptablewrap"><table class="ptable"><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr>';
+  var mh = '<div class="ptablewrap"><table class="ptable fit"><tr><th>Month</th><th style="text-align:right">Income</th><th style="text-align:right">Expenses</th><th style="text-align:right">Net</th></tr>';
   months.forEach(function(m){
     var b = byMonth[m], n = b.inc-b.exp;
     mh += '<tr class="rep-click" data-mmonth="'+m+'"><td>'+fmtMonthPretty(m)+'</td><td style="text-align:right">'+money(b.inc)+'</td><td style="text-align:right">'+money(b.exp)+'</td><td style="text-align:right; color:'+(n>=0?'var(--accent)':'var(--danger)')+'">'+money(n)+'</td></tr>';
