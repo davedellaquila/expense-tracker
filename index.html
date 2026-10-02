@@ -1495,7 +1495,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610021352';
+var APP_VERSION = '202610021357';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -11324,7 +11324,7 @@ function repGroupedVBars(el, series, labels, onBar){
   var plotW=W-pad.left-pad.right;
   var max=1, li, si;
   for(si=0; si<series.length; si++) for(li=0; li<n; li++) max=Math.max(max, series[si].values[li]||0);
-  var step=plotW/n, groupW=step*0.8, slotW=groupW/series.length, svg='';
+  var step=plotW/n, groupW=step*0.95, slotW=groupW/series.length, svg='';
   legRows.forEach(function(row, ri){
     var lx=pad.left, ly=8+ri*22;
     row.forEach(function(e){
