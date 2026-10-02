@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-02
+### App 202610022341
+- Charts: text now stays a fixed readable size regardless of content width — no more tiny labels when side margins are large.
 ### App 202610022334
 - Settings → Appearance: new "Side margins" slider controls the left/right margin of the content on wide desktop screens (default 100px, up to 300px), so the page background shows through. Saved on this device.
 ### App 202610022330

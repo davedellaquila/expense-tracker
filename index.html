@@ -3316,7 +3316,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022334';
+var APP_VERSION = '202610022341';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -3672,6 +3672,8 @@ function applySideMargin(){
   var slider = $('set-side-margin'), label = $('set-side-margin-val');
   if(slider) slider.value = v;
   if(label) label.textContent = v+'px';
+  /* Content width changed — re-fit chart text sizes. */
+  if(typeof fixAllChartText === 'function') requestAnimationFrame(fixAllChartText);
 }
 function bgPref(){
   try{    var raw = localStorage.getItem(LS_BG) || '';
@@ -15195,6 +15197,50 @@ function repDonut(el, items, onSlice, emptyMsg){
   }
 }
 function repPhone(){ return window.matchMedia && window.matchMedia('(max-width:560px)').matches; }
+/* Chart text stays readable at any content width. SVG <text> scales with the
+   viewBox, so a narrow content column (large side margins) shrinks labels to
+   nothing. This measures each chart's rendered scale and sets text sizes in
+   SVG units so they land at a fixed readable px size, independent of width.
+   Desired rendered sizes keyed by the original font-size attribute. */
+var CHART_TEXT_TARGETS = {'11':13, '12':14, '13':14, '18':16, '33':20};
+function fixChartText(svg){
+  var vb = svg.viewBox && svg.viewBox.baseVal;
+  if(!vb || !vb.width) return;
+  var w = svg.getBoundingClientRect().width;
+  if(!w) return;
+  var scale = w / vb.width;
+  function fixEl(elm){
+    if(!elm.hasAttribute('data-orig-fs')) elm.setAttribute('data-orig-fs', elm.getAttribute('font-size') || '12');
+    var target = CHART_TEXT_TARGETS[elm.getAttribute('data-orig-fs')] || 14;
+    elm.style.fontSize = (target / scale) + 'px';
+  }
+  svg.querySelectorAll('text').forEach(fixEl);
+  svg.querySelectorAll('g[font-size]').forEach(fixEl);
+}
+function fixAllChartText(){
+  document.querySelectorAll('.rep-svg').forEach(fixChartText);
+}
+if(window.MutationObserver){
+  var chartObs = new MutationObserver(function(muts){
+    var need = false;
+    for(var i=0;i<muts.length && !need;i++){
+      muts[i].addedNodes.forEach(function(n){
+        if(n.nodeType!==1) return;
+        if((n.classList && n.classList.contains('rep-svg')) ||
+           (n.querySelector && n.querySelector('.rep-svg'))) need = true;
+      });
+    }
+    if(need) requestAnimationFrame(fixAllChartText);
+  });
+  chartObs.observe(document.body, {childList:true, subtree:true});
+}
+var chartResizeT = null;
+window.addEventListener('resize', function(){
+  if(chartResizeT) clearTimeout(chartResizeT);
+  chartResizeT = setTimeout(fixAllChartText, 150);
+});
+if(document.readyState === 'complete') fixAllChartText();
+else window.addEventListener('load', fixAllChartText);
 /* Horizontal bars on a subtle track, label left, value right. */
 function repHBars(el, items, color, emptyMsg, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
