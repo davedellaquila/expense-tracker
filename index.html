@@ -741,6 +741,12 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
    columns stay compact; the first column takes the remaining space. */
 table.ptable.fit{min-width:0;}
 table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-space:nowrap;}
+/* In-app update banner: shown when version.json reports a newer build. */
+#updBar{position:fixed;top:0;left:0;right:0;z-index:10000;display:none;align-items:center;justify-content:space-between;gap:10px;background:#2456c8;color:#fff;padding:10px 14px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+#updBar.show{display:flex;}
+#updBar .uacts{display:flex;align-items:center;gap:4px;flex:none;}
+#updBar .ubtn{background:#fff;color:#1a3fa0;border:0;border-radius:8px;padding:7px 14px;font-weight:700;font-size:14px;}
+#updX{background:transparent;border:0;color:#fff;font-size:20px;line-height:1;padding:4px 8px;}
 .ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:13px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
 .ptable input,.ptable select{font-size:14.5px; padding:6px 8px;}
@@ -794,6 +800,9 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
 </style>
 </head>
 <body>
+
+<!-- in-app update banner: shown when version.json reports a newer build -->
+<div id="updBar" role="status"><span>A new version of Expense Tracker is available.</span><span class="uacts"><button id="updGo" class="ubtn">Refresh</button><button id="updX" aria-label="Dismiss">×</button></span></div>
 
 <!-- ============ SETUP (shown when no API URL configured) ============ -->
 <div id="setup-screen" class="setupwrap" hidden>
@@ -1402,6 +1411,46 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
 var LS_API = 'expenseTracker.apiUrl';
 var LS_USER = 'expenseTracker.userName';
 var LS_THEME = 'expenseTracker.theme';
+
+/* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
+   version.json — the in-app update checker compares the two. */
+var APP_VERSION = '202610020243';
+
+/* ================= in-app update check =================
+   Fetches version.json fresh (never from cache). When the deployed version
+   differs from this build, a banner offers a cache-busting refresh. Silent
+   when offline or running from a local file. */
+var _updBase = (function(){
+  var p = location.pathname;
+  if(p.slice(-1)!=='/'){
+    var last = p.split('/').pop();
+    p = (last.indexOf('.')===-1) ? p+'/' : p.split('/').slice(0,-1).join('/')+'/';
+  }
+  return p;
+})();
+var _updDismissed = null;
+function checkAppVersion(){
+  if(!window.fetch) return;
+  fetch(_updBase+'version.json?_='+Date.now(), {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if(!d || !d.v || d.v===APP_VERSION || _updDismissed===d.v) return;
+      var bar = document.getElementById('updBar');
+      if(!bar) return;
+      bar.classList.add('show');
+      document.getElementById('updGo').onclick = function(){
+        location.href = _updBase + '?v=' + encodeURIComponent(d.v);
+      };
+      document.getElementById('updX').onclick = function(){
+        _updDismissed = d.v;
+        bar.classList.remove('show');
+      };
+    })
+    .catch(function(){});
+}
+setTimeout(checkAppVersion, 3000);
+setInterval(checkAppVersion, 30*60*1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) checkAppVersion(); });
 
 /* ================= theme ================= */
 function themePref(){ try{ return localStorage.getItem(LS_THEME) || 'system'; }catch(e){ return 'system'; } }
