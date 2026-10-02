@@ -113,6 +113,10 @@ live copy of this list.
 - Firebase (Firestore) backend with multi-device sync; Google Sheets and
   on-device options.
 - Signed-in status card in Settings with sign-out beside it.
+- Setup → Categories: rename any category (collisions offer merge or a unique
+  name) or delete it (merge into another category or move everything to
+  Unassigned); transactions, budgets, planner state, filters, and drill pills
+  follow.
 - Robust sign-in migration (fixed the stale anonymous identity bug).
 
 ### General

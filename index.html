@@ -232,6 +232,16 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bar.over > div{background:var(--danger);}
 .barrow{margin:10px 0;}
 .barrow + .barrow{border-top:1px solid var(--border); padding-top:12px; margin-top:12px;}
+/* Setup → Categories */
+.catrow{display:flex; align-items:center; gap:8px; padding:9px 2px; border-top:1px solid var(--border);}
+.catrow:first-child{border-top:0;}
+.catrow-info{flex:1; min-width:0;}
+.catrow-name{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.catrow-meta{font-size:12.5px;}
+.btn.small{padding:6px 11px; font-size:13px; width:auto;}
+.danger-text{color:var(--danger);}
+.catdel-opt{display:flex; align-items:center; gap:8px; padding:9px 2px; font-size:15px;}
+.catdel-opt select{flex:1; min-width:0;}
 .barrow .top{display:flex; justify-content:space-between; font-size:15.5px;}
 .barrow .top b{font-weight:700;}
 .sharebar{height:6px; background:var(--track); border-radius:99px; overflow:hidden; margin:8px 0 2px;}
@@ -1326,6 +1336,11 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <input type="text" id="set-user" list="user-suggest" autocomplete="off" placeholder="Dave">
         <datalist id="user-suggest"><option value="Dave"></option><option value="Nancy"></option></datalist>
         <div class="btnrow"><button class="btn" id="set-user-save">Save name</button></div>
+      </div>
+      <div class="card">
+        <h2>Categories</h2>
+        <p class="muted" style="font-size:13px;margin:0 0 10px">Rename or delete a category — its transactions, budgets, and planner settings move with it.</p>
+        <div id="set-cat-list"></div>
       </div>
       <div class="card">
         <h2>Data cleanup</h2>
@@ -3084,6 +3099,315 @@ function wireSettings(){
     $('set-user').value = state.userName || '';
     applyTheme();
     syncStoreSettings();
+    renderCatList();
+  });
+}
+
+/* ================= setup: category editor =================
+   Rename or delete a category everywhere it appears: category records,
+   historical transactions, budgets (all months), planner row order /
+   removed-category memory / padlocks (all months, both planners), saved
+   filters, and the active chart-drill pill. */
+function catRecordByName(name){
+  return state.categories.find(function(c){ return c.name===name; }) || null;
+}
+function catTxCount(name){
+  var n=0;
+  state.transactions.forEach(function(t){ if(t.category===name) n++; });
+  return n;
+}
+function catBudgetMonths(name){
+  var s={};
+  state.budgets.forEach(function(b){ if(b.category===name) s[b.month]=1; });
+  return Object.keys(s).sort();
+}
+/* Remap one category name inside the per-month planner state (row order,
+   removed-category memory, padlocks — both planners). drop=true removes the
+   old name without adding the new one (delete-to-Unassigned); on a merge,
+   duplicate entries collapse. */
+function catRemapPlanner(oldName, newName, drop){
+  var specs=[[BOT_ORDER_LS,'arr'],[INC_BOT_ORDER_LS,'arr'],
+             [BOT_REMOVED_LS,'arr'],[INC_BOT_REMOVED_LS,'arr'],
+             [BOT_FIXED_LS,'obj'],[INC_BOT_FIXED_LS,'obj']];
+  var keys=[];
+  for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k) keys.push(k); }
+  var touched={};
+  specs.forEach(function(sp){
+    var prefix=sp[0], kind=sp[1];
+    keys.forEach(function(k){
+      if(k.indexOf(prefix)!==0) return;
+      var v=null;
+      try{ v=JSON.parse(localStorage.getItem(k)); }catch(e){ return; }
+      var changed=false;
+      if(kind==='arr' && Array.isArray(v)){
+        var nv = drop ? v.filter(function(c){ return c!==oldName; })
+                      : v.map(function(c){ return c===oldName ? newName : c; });
+        var seen={}, dd=[];
+        nv.forEach(function(c){ if(!seen[c]){ seen[c]=1; dd.push(c); } });
+        if(JSON.stringify(dd)!==JSON.stringify(v)){ v=dd; changed=true; }
+      }else if(kind==='obj' && v && typeof v==='object'){
+        if(Object.prototype.hasOwnProperty.call(v, oldName)){
+          if(!drop && !Object.prototype.hasOwnProperty.call(v, newName)) v[newName]=v[oldName];
+          delete v[oldName];
+          changed=true;
+        }
+      }
+      if(changed){
+        try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
+        touched[k.slice(prefix.length)]=1;
+      }
+    });
+  });
+  Object.keys(touched).forEach(function(ym){ botPlannerCloudPush(ym); });
+}
+/* Pure: compute the budget writes for a category rename/merge.
+   Returns {sets:[{month, amount}], removeIds:[...]} — sets go through
+   setBudget (upsert by category+month), removeIds drop the old docs. */
+function catBudgetPlan(budgets, oldName, newName){
+  var byMonth={};
+  budgets.forEach(function(b){
+    if(b.category===oldName || b.category===newName){
+      var g=byMonth[b.month]||(byMonth[b.month]={old:[], keep:null});
+      if(b.category===oldName) g.old.push(b); else g.keep=b;
+    }
+  });
+  var sets=[], removeIds=[];
+  Object.keys(byMonth).sort().forEach(function(m){
+    var g=byMonth[m];
+    if(!g.old.length) return;
+    var amt=g.old.reduce(function(s,b){ return s+(Number(b.amount)||0); },0) +
+            (g.keep ? (Number(g.keep.amount)||0) : 0);
+    sets.push({month:m, amount:Math.round(amt*100)/100});
+    g.old.forEach(function(b){ if(b.id) removeIds.push(b.id); });
+  });
+  return {sets:sets, removeIds:removeIds};
+}
+/* Full migration for a category rename / merge / delete. opts:
+     merge: fold old data into the existing newName (budgets sum per month)
+     deleteRecord: drop the old category record (delete flows)
+     dropPlanner: remove oldName from planner state instead of remapping
+       (delete-to-Unassigned)
+   Serialized with other saves; reconciles from the store at the end and
+   re-renders. Returns {transactions, failed}. */
+async function catMigrate(oldName, newName, opts){
+  opts=opts||{};
+  var st=getStore();
+  // Rows written this session may not carry store ids yet — reload once so
+  // every record and budget row below has a real id.
+  var rec0=catRecordByName(oldName);
+  var needIds = (rec0 && !rec0.id) || state.budgets.some(function(b){ return !b.id; });
+  if(needIds) await loadAll();
+  // ---- transactions ----
+  var txs=state.transactions.filter(function(t){
+    return t.category===oldName && String(t.id||'').indexOf('tmp-')!==0;
+  });
+  var writes=txs.map(function(t){
+    return {id:t.id, row:txnRowForUpdate(t, newName), expect:{category:newName}};
+  });
+  txs.forEach(function(t){ t.category=newName; }); // optimistic
+  var failed=[];
+  if(writes.length){
+    await bulkWriteTxns(writes);
+    await loadAll();
+    failed=bulkWritesFailed(writes);
+    if(failed.length){ // retry once, then report honestly
+      await bulkWriteTxns(writes.filter(function(w){ return failed.indexOf(w.id)>=0; }));
+      await loadAll();
+      failed=bulkWritesFailed(writes);
+    }
+  }
+  // ---- budgets, all months (on merge, the two amounts sum) ----
+  var bplan=catBudgetPlan(state.budgets, oldName, newName);
+  for(var bi=0; bi<bplan.sets.length; bi++)
+    await st.setBudget(newName, bplan.sets[bi].month, bplan.sets[bi].amount);
+  for(var br=0; br<bplan.removeIds.length; br++)
+    await st.remove('Budgets', bplan.removeIds[br]);
+  var nb=state.budgets.filter(function(b){ return b.category!==oldName; }); // optimistic
+  bplan.sets.forEach(function(s){
+    var ex=nb.find(function(b){ return b.category===newName && b.month===s.month; });
+    if(ex) ex.amount=s.amount;
+    else nb.push({month:s.month, category:newName, amount:s.amount});
+  });
+  state.budgets=nb;
+  // ---- category record ----
+  var rec=catRecordByName(oldName);
+  if(opts.merge || opts.deleteRecord){
+    if(rec){
+      var rid=rec.id || (storeKind()==='firebase' ? 'c__'+encodeURIComponent(oldName) : null);
+      if(rid) await st.remove('Categories', rid);
+      state.categories=state.categories.filter(function(c){ return c!==rec; });
+    }
+  }else if(rec){
+    if(storeKind()==='firebase'){ // doc ids derive from the name: create + delete
+      await st.append('Categories', {name:newName, kind:rec.kind||'Personal', tax_category:rec.tax_category||''});
+      await st.remove('Categories', rec.id || ('c__'+encodeURIComponent(oldName)));
+    }else if(rec.id){
+      await st.update('Categories', rec.id, Object.assign({}, rec, {name:newName}));
+    }
+    rec.name=newName;
+  }
+  // ---- planner state (all months, both planners) ----
+  catRemapPlanner(oldName, newName, !!opts.dropPlanner);
+  // ---- saved filters & the active drill pill ----
+  if($('f-cat') && $('f-cat').value===oldName){
+    ensureSelOption('f-cat', newName);
+    $('f-cat').value=newName;
+  }
+  saveTxnFilters();
+  var ci=repCatSel.indexOf(oldName);
+  if(ci>=0){
+    if(opts.merge && repCatSel.indexOf(newName)>=0) repCatSel.splice(ci,1);
+    else repCatSel[ci]=newName;
+    saveRepFilters();
+  }
+  if(txnDrill && Array.isArray(txnDrill.dispCats)){
+    var dc=txnDrill.dispCats.map(function(c){ return c===oldName ? newName : c; });
+    if(opts.merge) dc=dc.filter(function(c,ix){ return dc.indexOf(c)===ix; });
+    txnDrill.dispCats=dc;
+  }
+  // ---- reconcile & re-render ----
+  await loadAll();
+  renderCatList();
+  syncDrillDock();
+  var sc=state.screen;
+  if(sc==='transactions') renderTransactions();
+  else if(sc==='reports') renderReports();
+  else if(sc==='budgets') renderBudgets();
+  return {transactions:writes.length, failed:failed};
+}
+function catMigrateRun(oldName, newName, opts, doneMsg){
+  toast('Updating category…');
+  return withSaveLock(async function(){
+    try{
+      var r=await catMigrate(oldName, newName, opts);
+      if(r.failed && r.failed.length) toast(r.failed.length+' transaction(s) did not update — please retry.', true);
+      else toast(doneMsg||'Done.');
+    }catch(err){
+      try{ await loadAll(); }catch(e2){}
+      renderCatList();
+      toast('Category update failed: '+((err&&err.message)||err), true);
+    }
+  });
+}
+/* The Setup list: every known category (records + names seen on
+   transactions), with rename/delete per row. */
+function renderCatList(){
+  var box=$('set-cat-list');
+  if(!box) return;
+  box.innerHTML='';
+  var cats=allCategories();
+  if(!cats.length){ box.appendChild(el('p',{class:'muted'},'No categories yet.')); return; }
+  cats.forEach(function(name){
+    var rec=catRecordByName(name);
+    var row=el('div',{class:'catrow'});
+    var info=el('div',{class:'catrow-info'});
+    info.appendChild(el('div',{class:'catrow-name'},name));
+    var nTx=catTxCount(name);
+    info.appendChild(el('div',{class:'muted catrow-meta'},
+      (rec&&rec.kind ? rec.kind+' · ' : '')+nTx+' transaction'+(nTx===1?'':'s')));
+    row.appendChild(info);
+    var rn=el('button',{class:'btn ghost small'},'Rename');
+    rn.onclick=function(){ openCatRename(name); };
+    var del=el('button',{class:'btn ghost small danger-text'},'Delete');
+    del.onclick=function(){ openCatDelete(name); };
+    row.appendChild(rn);
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+function openCatRename(oldName){
+  var nTx=catTxCount(oldName), nBM=catBudgetMonths(oldName).length;
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,'Rename category'));
+    var sub='“'+oldName+'” has '+nTx+' transaction'+(nTx===1?'':'s')+
+      (nBM ? ' and budgets in '+nBM+' month'+(nBM===1?'':'s') : '')+
+      '. Everything moves to the new name.';
+    sh.appendChild(el('p',{class:'muted'},sub));
+    sh.appendChild(el('label',{class:'f',for:'cat-rename-input'},'New name'));
+    var inp=el('input',{id:'cat-rename-input',type:'text',autocomplete:'off',autocapitalize:'off',spellcheck:'false'});
+    inp.value=oldName;
+    sh.appendChild(inp);
+    var row=el('div',{class:'btnrow'});
+    var cancel=el('button',{class:'btn ghost'},'Cancel');
+    var save=el('button',{class:'btn go'},'Save');
+    cancel.onclick=function(){ close(); };
+    save.onclick=async function(){
+      var v=inp.value.trim();
+      if(!v){ toast('Enter a name.', true); return; }
+      if(v===oldName){ close(); return; }
+      // Collision is case-insensitive, like the transaction form's check.
+      var clash=allCategories().find(function(c){ return c.toLowerCase()===v.toLowerCase() && c!==oldName; });
+      if(clash){
+        openSheetStacked(function(sh2, close2){
+          sh2.appendChild(el('h2',null,'Category exists'));
+          sh2.appendChild(el('p',{class:'muted'},'“'+clash+'” already exists. Merge “'+oldName+
+            '” into it, or go back and choose a unique name.'));
+          var r2=el('div',{class:'btnrow'});
+          var back=el('button',{class:'btn ghost'},'Keep editing');
+          var merge=el('button',{class:'btn go'},'Merge into “'+clash+'”');
+          back.onclick=function(){ close2(); };
+          merge.onclick=async function(){
+            close2(); close();
+            await catMigrateRun(oldName, clash, {merge:true}, 'Merged into “'+clash+'”.');
+          };
+          r2.appendChild(back); r2.appendChild(merge);
+          sh2.appendChild(r2);
+        });
+        return;
+      }
+      close();
+      await catMigrateRun(oldName, v, {}, 'Renamed to “'+v+'”.');
+    };
+    row.appendChild(cancel); row.appendChild(save);
+    sh.appendChild(row);
+    setTimeout(function(){ try{ inp.focus(); inp.select(); }catch(e){} },60);
+  });
+}
+function openCatDelete(oldName){
+  var nTx=catTxCount(oldName), nBM=catBudgetMonths(oldName).length;
+  var others=allCategories().filter(function(c){ return c!==oldName; }).sort();
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',null,'Delete category'));
+    sh.appendChild(el('p',{class:'muted'},'“'+oldName+'” has '+nTx+' transaction'+(nTx===1?'':'s')+
+      (nBM ? ' and budgets in '+nBM+' month'+(nBM===1?'':'s') : '')+
+      '. What should happen to them?'));
+    var mergeWrap=el('label',{class:'catdel-opt'});
+    var rMerge=document.createElement('input');
+    rMerge.type='radio'; rMerge.name='catdel-how'; rMerge.value='merge';
+    var sel=document.createElement('select');
+    others.forEach(function(c){
+      var o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o);
+    });
+    mergeWrap.appendChild(rMerge);
+    mergeWrap.appendChild(document.createTextNode(' Merge into '));
+    mergeWrap.appendChild(sel);
+    sh.appendChild(mergeWrap);
+    var unasWrap=el('label',{class:'catdel-opt'});
+    var rUnas=document.createElement('input');
+    rUnas.type='radio'; rUnas.name='catdel-how'; rUnas.value='unassigned';
+    unasWrap.appendChild(rUnas);
+    unasWrap.appendChild(document.createTextNode(' Move everything to Unassigned'));
+    sh.appendChild(unasWrap);
+    if(!others.length){ rMerge.disabled=true; sel.disabled=true; }
+    else rMerge.checked=true;
+    if(!others.length) rUnas.checked=true;
+    var row=el('div',{class:'btnrow'});
+    var cancel=el('button',{class:'btn ghost'},'Cancel');
+    var del=el('button',{class:'btn danger'},'Delete');
+    cancel.onclick=function(){ close(); };
+    del.onclick=async function(){
+      var target=sel.value;
+      close();
+      if(rUnas.checked){
+        await catMigrateRun(oldName, 'Unassigned', {deleteRecord:true, dropPlanner:true},
+          'Deleted — moved to Unassigned.');
+      }else{
+        if(!target){ toast('Pick a category to merge into.', true); return; }
+        await catMigrateRun(oldName, target, {merge:true}, 'Deleted — merged into “'+target+'”.');
+      }
+    };
+    row.appendChild(cancel); row.appendChild(del);
+    sh.appendChild(row);
   });
 }
 

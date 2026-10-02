@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Setup: new Categories card — rename or delete any category. Rename collisions offer merging into the existing category or picking a unique name; delete offers merging into another category or moving everything to Unassigned. Transactions, budgets (all months), planner order/removed-memory/padlocks, saved filters, and the drill pill all follow the change.
 - Reports: "Category Bars" reworked — each month now shows every category side by side (grouped vertical bars), top 7 categories + Other like the donut; tapping a bar drills into that month + category.
 - Reports: "Category Bars" readability fix — with many categories it now shows the top 12 + a combined Other bar (tap Other to drill into its categories); crowded charts drop per-bar value labels and stagger x labels over two rows.
 - Reports: new "Category Bars" chart — vertical bars comparing categories side by side (not stacked), with tap-to-drill like the other charts.
