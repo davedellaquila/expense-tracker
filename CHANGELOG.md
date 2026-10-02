@@ -57,16 +57,27 @@
 - Scan bill / receipt: new "Paste from clipboard" option (and ⌘V / Ctrl+V) runs the same on-device recognition as Choose photo — images and PDFs when the browser exposes them.
 - Transactions: opening the page (including on load) no longer auto-focuses the search box — click or tap to type.
 - Desktop: wide mouse/trackpad screens no longer apply `html { zoom: .56 }` (which shrank the 760px column into a tiny strip); full-size type with a wide content column (up to 1600px; sheets 1100px). iPhone and iPad/tablet tiers unchanged.
+### App 202610021438
 - Bills: redesigned bill cards — the name now wraps to two lines instead of truncating, and the due date moved into the meta line (category · account · due date), removing the wasted fixed-width spacer column.
+### App 202610021404
 - Reports: the Monthly Trend month table now fits all columns (Month/Income/Expenses/Net) on iPhone without sideways scrolling.
+### App 202610021357
 - Reports: grouped bar charts pack the month groups tighter (5% gap instead of 20%).
+### App 202610021352
 - Reports: the Expense report stat tiles are centered (removed the stale 4-column grid override).
+### App 202610021345
 - Reports: removed the Net tile from the Expense report summary cards.
 ## 2026-10-01
+### App 202610020823
 - iPhone: the parenthetical hints on the Transactions filter labels (Type, Account) are hidden; desktop still shows them.
+### App 202610020816
 - Sheet drag handle keeps its 42px line but the grab target is taller (45px) for easier finger drags.
 - Round-button press grows the button itself to 1.5x in its own color (white ripple removed).
-- Round-button press is now a white 2x ripple: it appears instantly on press and fades quickly on release (replaces the grow effect).
+### App 202610020540
+- Round-button press ripple is 25% smaller (1.5x diameter).
+### App 202610020535
+- Round-button press is now a white ripple: it appears instantly on press and fades quickly on release (replaces the grow effect).
+### App 202610020532
 - Sheet ✕ close button: fixed the top margin so it truly matches the right margin (the sticky offset was measured from below the sheet's padding, pushing the button down).
 - Round buttons (sheet ✕, selection-bar ✕, + FAB, search clear ×) now grow 25% and brighten on press, easing back on release.
 - Sheet ✕ close button is 50% bigger (45px) with equal margins on the top and right.
