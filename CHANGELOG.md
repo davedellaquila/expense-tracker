@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Sheet ✕ close button: fixed the top margin so it truly matches the right margin (the sticky offset was measured from below the sheet's padding, pushing the button down).
 - Round buttons (sheet ✕, selection-bar ✕, + FAB, search clear ×) now grow 25% and brighten on press, easing back on release.
 - Sheet ✕ close button is 50% bigger (45px) with equal margins on the top and right.
 - Bills calendar header: the next-month › button now sits right after the month/year, with the monthly total alone on the far right.
