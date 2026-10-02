@@ -804,6 +804,11 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
   transition:transform .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.18);}
 #ptrHint.show{transform:translate(-50%,0);}
 #ptrHint.armed{color:var(--text);font-weight:600;}
+/* Info page: change log rendered from CHANGELOG.md. */
+#info-version{margin:0 0 12px;}
+#screen-info h3{margin:20px 0 6px; font-size:16px;}
+ul.info-list{margin:0 0 8px; padding-left:20px;}
+ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 .ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:13px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
 .ptable input,.ptable select{font-size:14.5px; padding:6px 8px;}
@@ -1447,6 +1452,12 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
       </div>
       <p class="muted" id="build-stamp" style="text-align:center"></p>
     </section>
+    <section id="screen-info" class="screen" hidden>
+      <div class="card">
+        <p class="muted" id="info-version" style="margin-top:0"></p>
+        <div id="info-body"><p class="muted">Loading…</p></div>
+      </div>
+    </section>
   </main>
 
   <nav class="tabbar" id="tabbar">
@@ -1458,6 +1469,7 @@ table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-spa
     <button data-screen="bills" data-tip="Bills — recurring bills and due dates (shortcut: 6)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
     <button data-screen="tax" data-tip="Tax — categories and summaries for tax time (shortcut: 7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
     <button data-screen="settings" data-tip="Setup — accounts, categories, sync and app settings (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
+    <button data-screen="info" data-tip="Info — change log and documentation (shortcut: 9)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>Info</button>
   </nav>
 </div>
 
@@ -1474,7 +1486,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020439';
+var APP_VERSION = '202610020441';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -2694,7 +2706,7 @@ async function loadAll(){
 function num(v){ var n = Number(String(v).replace(/[$,]/g,'')); return isFinite(n)?n:0; }
 
 /* ================= navigation ================= */
-var SCREENS = ['dashboard','transactions','import','budgets','bills','tax','reports','settings'];
+var SCREENS = ['dashboard','transactions','import','budgets','bills','tax','reports','settings','info'];
 var screenPersistOk = false; // boot-time renders (dash cache) must not clobber the saved tab
 function lastScreen(){
   try{
@@ -2772,6 +2784,7 @@ function showScreen(name){
     else if(name==='tax') renderTax();
     else if(name==='reports') renderReports();
     else if(name==='settings') refreshSettingsScreen();
+    else if(name==='info') renderInfo();
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
   // Switching to Transactions puts the cursor in the search box — except on
@@ -2786,6 +2799,49 @@ function showScreen(name){
 }
 function updateUserChip(){
   $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
+}
+
+/* ================= info screen =================
+   Change log, rendered live from CHANGELOG.md so the repo file stays the
+   single source of truth. Room here later for documentation sections. */
+var _infoLoaded = false;
+function renderInfoChangelog(md){
+  var html = '', inList = false;
+  md.split('\n').forEach(function(line){
+    var t = line.replace(/\s+$/,'');
+    if(t.indexOf('## ')===0){
+      if(inList){ html+='</ul>'; inList=false; }
+      html += '<h3>'+esc(t.slice(3))+'</h3>';
+    }else if(t.indexOf('# ')===0){
+      if(inList){ html+='</ul>'; inList=false; }
+      html += '<h2 style="margin-top:0">'+esc(t.slice(2))+'</h2>';
+    }else if(t.indexOf('- ')===0){
+      if(!inList){ html+='<ul class="info-list">'; inList=true; }
+      html += '<li>'+esc(t.slice(2))+'</li>';
+    }else if(t.trim()===''){
+      if(inList){ html+='</ul>'; inList=false; }
+    }else{
+      if(inList){ html+='</ul>'; inList=false; }
+      html += '<p>'+esc(t)+'</p>';
+    }
+  });
+  if(inList) html+='</ul>';
+  return html || '<p class="muted">No changes logged yet.</p>';
+}
+function renderInfo(){
+  var vv = $('info-version');
+  if(vv) vv.textContent = 'Version ' + APP_VERSION;
+  if(_infoLoaded) return;
+  _infoLoaded = true;
+  var body = $('info-body');
+  if(!window.fetch || !body){ return; }
+  fetch(_updBase+'CHANGELOG.md?_='+Date.now(), {cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.text(); })
+    .then(function(md){ body.innerHTML = renderInfoChangelog(md); })
+    .catch(function(){
+      _infoLoaded = false;
+      body.innerHTML = '<p class="muted">Could not load the change log. Check your connection and try again.</p>';
+    });
 }
 
 /* ================= boot ================= */
@@ -2809,17 +2865,17 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 /* Keyboard shortcuts: number keys 1-8 jump straight to tabs (browsers reserve
    Cmd+1..8 for their own tab switching and never deliver them to the page),
-   and Cmd+Shift+1..8 (or Ctrl+Shift+1..8) does the same with a modifier.
+   and Cmd+Shift+1..9 (or Ctrl+Shift+1..9) does the same with a modifier.
    Ignored while typing in a field or when a sheet is open.
    Escape clicks the visible Cancel or Done button of the topmost open sheet. */
 (function(){
-  var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings'];
+  var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings','info'];
   document.addEventListener('keydown', function(e){
     var name = null;
     if(!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey){
-      if(e.key >= '1' && e.key <= '8') name = order[+e.key - 1];
+      if(e.key >= '1' && e.key <= '9') name = order[+e.key - 1];
     }else if((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey){
-      var m = /^(?:Digit|Numpad)([1-8])$/.exec(e.code || '');
+      var m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code || '');
       if(m) name = order[+m[1] - 1];
     }
     if(!name) return;

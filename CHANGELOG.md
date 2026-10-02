@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- New Info tab (far right): shows the app version and renders this change log live from the repo — room to add documentation sections later.
 - Pull-to-check-for-updates: dragging down from the very top of any screen runs the update check (same as the automatic one) — no sheet open, page scrolled to top.
 - Bills calendar header now shows the month's total on the right, balancing the month title on the left.
 - Transactions selection bar: Update and Delete now spread evenly across the space between Clear and the far-right ✕; Delete is the word "Delete" in white on red instead of the 🗑️ icon.
