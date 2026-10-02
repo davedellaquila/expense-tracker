@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Setup Categories: per-row delete is now the ✕ icon, matching the delete buttons used in the Bills list and budget planner (replacing the one-off 🗑️).
 - Fixed: reloading the app while on the Setup tab left the Categories list empty — showing Settings now always refreshes the list, not just when the tab is tapped.
 - Setup Categories: the per-row Delete button is now a 🗑️ trash can icon (with a "Delete category" label for accessibility).
 - Transaction form: when the transaction already has a bill reminder, the "🔔 Add bill reminder" button becomes "🔔 Open bill reminder" and opens that bill's edit form (stacked, so unsaved transaction edits are kept).
