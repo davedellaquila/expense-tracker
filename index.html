@@ -148,6 +148,7 @@
   --track:#edf0f3; --th-bg:#f0f3f6; --input-bg:#ffffff; --seg-bg:#edf0f3;
   --tabbar-bg:rgba(255,255,255,.96);
   --radius:14px; --tabbar-h:64px;
+  --side-margin:100px; /* desktop content side margins, adjustable in Settings → Appearance */
 }
 [data-theme="dark"]{
   --bg:#0f141a; --card:#182028; --text:#edf1f5; --muted:#9aa7b4;
@@ -904,7 +905,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    that shrank the default 760px column into a postage-stamp phone strip on
    large screens. pointer:fine keeps this off actual iPads (see tablet). ---------- */
 @media (min-width:1200px) and (pointer:fine){
-  main{max-width:min(1600px, 100%);}
+  main{max-width:min(1600px, calc(100% - var(--side-margin)*2));}
   .sheet{max-width:1100px;}
 }
 
@@ -3105,6 +3106,15 @@ html.bg-paused body{
 
           <p class="bg-hint">Presets, color, picture, and the editor are for <b>Light</b> mode. Motion effects work in any theme and pause with reduced-motion. Saved on this device.</p>
         </div>
+
+        <div class="bg-section">
+          <div class="bg-head">
+            <label class="f" for="set-side-margin">Side margins</label>
+            <span class="muted" id="set-side-margin-val" style="font-size:13px">100px</span>
+          </div>
+          <input type="range" id="set-side-margin" min="0" max="300" step="10" value="100" style="width:100%" aria-label="Side margins on wide screens">
+          <p class="bg-hint">Space on the left and right of the content on wide desktop screens, so the page background shows through. Saved on this device.</p>
+        </div>
       </div>
       <div class="card" id="set-steps-card">
         <h2>Setup steps</h2>
@@ -3306,7 +3316,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022330';
+var APP_VERSION = '202610022334';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -3646,9 +3656,25 @@ function effectiveDark(){
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 /* Parse stored bg: JSON config or legacy "#rrggbb". */
-function bgPref(){
+/* Settings → Appearance: side margins on wide desktop screens (px each side).
+   Saved per device like the background. */
+var LS_SIDE_MARGIN = 'expenseTracker.sideMargin';
+function sideMarginVal(){
   try{
-    var raw = localStorage.getItem(LS_BG) || '';
+    var v = parseInt(localStorage.getItem(LS_SIDE_MARGIN), 10);
+    if(isNaN(v)) return 100;
+    return Math.max(0, Math.min(300, v));
+  }catch(e){ return 100; }
+}
+function applySideMargin(){
+  var v = sideMarginVal();
+  document.documentElement.style.setProperty('--side-margin', v+'px');
+  var slider = $('set-side-margin'), label = $('set-side-margin-val');
+  if(slider) slider.value = v;
+  if(label) label.textContent = v+'px';
+}
+function bgPref(){
+  try{    var raw = localStorage.getItem(LS_BG) || '';
     if(!raw) return null;
     if(raw.charAt(0)==='{'){
       var cfg = JSON.parse(raw);
@@ -7246,6 +7272,14 @@ function wireSettings(){
     setBgConfig(null);
     toast('Background reset.');
   });
+  /* Side margins (desktop): slider in Settings → Appearance. */
+  var smSlider = $('set-side-margin');
+  if(smSlider) smSlider.addEventListener('input', function(){
+    var v = Math.max(0, Math.min(300, parseInt(smSlider.value,10)||0));
+    try{ localStorage.setItem(LS_SIDE_MARGIN, String(v)); }catch(e){}
+    applySideMargin();
+  });
+  applySideMargin();
   // prefill when settings shown
   document.querySelector('#tabbar button[data-screen="settings"]').addEventListener('click', function(){
     refreshSettingsScreen();
