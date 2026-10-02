@@ -1239,6 +1239,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
       </div>
       <div class="card" data-repchart="catmix"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div></div>
+      <div class="card" data-repchart="catbars"><h2>Category Bars</h2><p class="chart-sub">Spend by category, side by side — tap a bar to drill in</p><div id="rep-catbars"></div></div>
       <div class="card" data-repchart="catmixtable"><h2>Category Mix table</h2><p class="chart-sub">Income and expenses by category</p><div id="rep-cattable"></div></div>
       <div class="card" data-repchart="budget"><h2>Budget vs Actual</h2><p class="chart-sub">Budgeted vs spent by category for the selected period</p><div id="rep-budgetchart"></div><div id="rep-budgettable"></div></div>
       <div class="card" data-repchart="trend"><h2>Monthly Trend</h2><p class="chart-sub">Spend and cumulative total by month</p><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
@@ -3355,7 +3356,7 @@ function setDashCatCollapsed(c){
   var head = document.getElementById('dash-catfilter-head'); if(head) head.setAttribute('aria-expanded', c?'false':'true');
 }
 var REP_CHARTS = {
-  catmix:'Category Mix', catmixtable:'Category Mix table', budget:'Budget vs Actual',
+  catmix:'Category Mix', catbars:'Category Bars', catmixtable:'Category Mix table', budget:'Budget vs Actual',
   trend:'Monthly Trend', merch:'Top Merchants', week:'Weekday Pattern',
   largest:'Largest expenses', inc:'Income by category', bands:'Transaction Size Bands',
   owner:'Owner Split', card:'Card Split', catvol:'Category Volume',
@@ -10820,6 +10821,12 @@ function renderReports(){
     drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
       dispCats: (it.names && it.names.length ? it.names : [it.name])});
   });
+  // --- category bars: vertical bars side by side (not stacked), same data as the donut ---
+  repVBars($('rep-catbars'), cats.map(function(c){ return {name:c, value:byCat[c]}; }),
+    REP_CORAL, 'No expenses in this period.', money, function(it){
+      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
+        dispCats:[it.name]});
+    });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
   $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {periodMonths:monthsInRange(from, to),
