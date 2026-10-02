@@ -213,6 +213,13 @@ body{
 .card-grip:active{ cursor:grabbing; color:var(--text); }
 .card-drop-ph{ border:2px dashed var(--accent); border-radius:var(--radius);
   margin:0 0 12px; background:rgba(127,127,127,.08); }
+/* Settings card collapse toggle */
+.set-collapse{ flex:none; width:36px; height:36px; border:0; background:none; cursor:pointer;
+  color:var(--muted); font-size:18px; line-height:1; border-radius:8px; padding:0; }
+.set-collapse:hover{ color:var(--text); background:rgba(127,127,127,.12); }
+/* Collapsed: hide everything except the header row */
+.card[data-setcard].set-collapsed > :not(.set-chead):not(.set-card-head){ display:none; }
+.card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead){ display:none; }
 .card-dragging{ position:fixed !important; z-index:70; pointer-events:none;
   opacity:.95; box-shadow:0 14px 34px rgba(0,0,0,.35); margin:0 !important; }
 .rep-svg text{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
@@ -3316,7 +3323,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022355';
+var APP_VERSION = '202610022356';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -8027,12 +8034,24 @@ function wireSetCards(){
     var h2 = card.querySelector('h2');
     if(!h2 || h2.dataset.gripped) return;
     h2.dataset.gripped = '1';
-    var head = el('div',{style:'display:flex;align-items:center;gap:8px;flex:1;min-width:0'});
+    var head = el('div',{class:'set-chead', style:'display:flex;align-items:center;gap:8px;flex:1;min-width:0'});
     h2.parentNode.insertBefore(head, h2);
     head.appendChild(el('span',{class:'card-grip no-print',title:'Drag to reorder '+(SET_CARD_NAMES[key]||key)},'\u283f'));
     head.appendChild(h2);
     h2.style.margin = '0';
     h2.style.flex = '1';
+    /* Collapse toggle: chevron at the right of the header. */
+    var chev = el('button',{class:'set-collapse no-print', type:'button',
+      title:'Collapse '+(SET_CARD_NAMES[key]||key), 'aria-label':'Collapse '+(SET_CARD_NAMES[key]||key)},'\u25be');
+    chev.addEventListener('click', function(e){
+      e.stopPropagation();
+      var collapsed = setCollapsed();
+      var i = collapsed.indexOf(key);
+      if(i>=0) collapsed.splice(i,1); else collapsed.push(key);
+      saveSetCollapsed(collapsed);
+      applySetCollapsed();
+    });
+    head.appendChild(chev);
   });
   wireCardReorder({
     container: sec,
@@ -8042,6 +8061,35 @@ function wireSetCards(){
     endRef: $('build-stamp')
   });
   applySetCardOrder();
+  applySetCollapsed();
+}
+/* Collapsed Settings cards: remembered per device. */
+var SET_COLLAPSED_KEY = 'expenseTracker.setCollapsed';
+function setCollapsed(){
+  try{
+    var l = JSON.parse(localStorage.getItem(SET_COLLAPSED_KEY)||'null');
+    if(Array.isArray(l)) return l.filter(function(k){ return SET_CARDS.indexOf(k)>=0; });
+  }catch(e){}
+  return [];
+}
+function saveSetCollapsed(l){
+  try{ localStorage.setItem(SET_COLLAPSED_KEY, JSON.stringify(l)); }catch(e){}
+}
+function applySetCollapsed(){
+  var sec = $('screen-settings');
+  if(!sec) return;
+  var collapsed = setCollapsed();
+  sec.querySelectorAll('[data-setcard]').forEach(function(card){
+    var key = card.getAttribute('data-setcard');
+    var isCol = collapsed.indexOf(key)>=0;
+    card.classList.toggle('set-collapsed', isCol);
+    var chev = card.querySelector('.set-collapse');
+    if(chev){
+      chev.textContent = isCol ? '\u25b8' : '\u25be';
+      chev.title = (isCol ? 'Expand ' : 'Collapse ') + (SET_CARD_NAMES[key]||key);
+      chev.setAttribute('aria-label', chev.title);
+    }
+  });
 }
 /* ---- drag-to-reorder chart cards (Home + Reports) ----
    Pointer Events (not HTML5 drag-and-drop) so touch dragging works on iPhone.

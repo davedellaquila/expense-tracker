@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-02
+### App 202610022356
+- Settings: cards are now collapsible too — tap the chevron in any card header to collapse/expand it. Collapsed state is saved on this device.
 ### App 202610022355
 - Settings: cards can now be rearranged by dragging the ⋮⋮ grip in each card header. Order is saved on this device.
 ### App 202610022341
