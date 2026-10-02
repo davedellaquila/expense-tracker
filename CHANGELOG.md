@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- iPhone: sheet button bars (bulk update, transaction form) no longer float — they're a static end-of-content row, since the floating panel could cover the focused field when the keyboard is open. Other platforms keep the floating bar.
 - Transactions selection bar: Delete is now a 🗑️ trash can icon (narrower, so the single row no longer overlaps on iPhone); All/Clear no longer get squeezed under the Update button.
 - Setup Categories: per-row delete is now the ✕ icon, matching the delete buttons used in the Bills list and budget planner (replacing the one-off 🗑️).
 - Fixed: reloading the app while on the Setup tab left the Categories list empty — showing Settings now always refreshes the list, not just when the tab is tapped.
