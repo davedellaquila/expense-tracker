@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- Bulk update: the Delete button now sits midway between Update and the ✕ done button on the selection bar.
+- Bulk update: the "Update N transactions" dialog now puts the cursor in the Merchant name field on open.
 - Setup: new Categories card — rename or delete any category. Rename collisions offer merging into the existing category or picking a unique name; delete offers merging into another category or moving everything to Unassigned. Transactions, budgets (all months), planner order/removed-memory/padlocks, saved filters, and the drill pill all follow the change.
 - Reports: "Category Bars" reworked — each month now shows every category side by side (grouped vertical bars), top 7 categories + Other like the donut; tapping a bar drills into that month + category.
 - Reports: "Category Bars" readability fix — with many categories it now shows the top 12 + a combined Other bar (tap Other to drill into its categories); crowded charts drop per-bar value labels and stagger x labels over two rows.
