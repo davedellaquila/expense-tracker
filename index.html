@@ -1416,7 +1416,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020258';
+var APP_VERSION = '202610020303';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -2599,9 +2599,11 @@ function showScreen(name){
     else if(name==='settings') syncStoreSettings();
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
-  // Switching to Transactions puts the cursor in the search box. Focus the
+  // Switching to Transactions puts the cursor in the search box — except on
+  // iPhone, where the popping keyboard would cover the list. Focus the
   // floating clone when the in-card box has scrolled off above; not on boot.
-  if(!same && prevScreen && name==='transactions'){
+  var isIPhone = /iPhone/.test(navigator.userAgent || '');
+  if(!same && prevScreen && name==='transactions' && !isIPhone){
     var fq = $('f-q');
     var fr = fq.getBoundingClientRect();
     var target = (fr.bottom <= 0) ? $('f-q-stick') : fq;

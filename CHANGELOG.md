@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Transactions: no longer auto-focuses the search box on iPhone (the popping keyboard covered the list); desktop and iPad keep the auto-focus.
 - Largest expenses table: category names now wrap to multiple lines instead of truncating with an ellipsis, on both Home and Reports.
 - Largest expenses table: amounts now show whole dollars with no cents (same formatting as the Home summary cards), on both Home and Reports.
 - Largest expenses table: fixed the Category/Amount overlap on iPhone — long category names now truncate with an ellipsis inside their own column instead of spilling under the amount. Category column widened slightly (27%) to compensate. Applies on both Home and Reports.
