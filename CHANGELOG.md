@@ -1,5 +1,7 @@
 # Changelog
 ## 2026-10-01
+- Sheet drag handle keeps its 42px line but the grab target is taller (45px) for easier finger drags.
+- Round-button press grows the button itself to 1.5x in its own color (white ripple removed).
 - Round-button press is now a white 2x ripple: it appears instantly on press and fades quickly on release (replaces the grow effect).
 - Sheet ✕ close button: fixed the top margin so it truly matches the right margin (the sticky offset was measured from below the sheet's padding, pushing the button down).
 - Round buttons (sheet ✕, selection-bar ✕, + FAB, search clear ×) now grow 25% and brighten on press, easing back on release.

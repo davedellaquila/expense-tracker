@@ -297,7 +297,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
    clear of Delete to avoid mis-taps */
 .selbar #selbar-done{flex:none; width:34px; height:34px; padding:0; margin-left:14px;
   border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
-  font-size:16px; line-height:1; cursor:pointer; position:relative;
+  font-size:16px; line-height:1; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;}
 /* docked: while the floating sticky card is visible, the bulk-update bar
    becomes an attached section inside it */
@@ -739,25 +739,18 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* top:-6px matches margin-top:-6px: the sticky offset is measured from the
    sheet's scrollport (below its 18px padding), so top must equal the negative
    margin for the stuck position to match the in-flow position exactly. */
-/* Round-button press ripple: a white circle at 2x the button's diameter appears
-   instantly on press, then fades quickly on release. */
-.sheet-x::after, #selbar-done::after, .fab::after, .clearbtn::after{
-  content:''; position:absolute; left:50%; top:50%;
-  width:100%; height:100%; border-radius:50%;
-  background:rgba(255,255,255,.55);
-  transform:translate(-50%,-50%) scale(1.5);
-  opacity:0; pointer-events:none;
-  transition:opacity .18s ease-out;
+/* Round-button press: the button itself grows while pressed (keeping its own
+   color), then eases back on release. */
+.sheet-x, #selbar-done, .fab, .clearbtn{
+  transition:transform .15s ease-out;
 }
-.sheet-x:active::after, #selbar-done:active::after,
-.fab:active::after, .clearbtn:active::after{
-  opacity:1; transition:none;
-}
+.sheet-x:active, #selbar-done:active, .fab:active{transform:scale(1.5);}
+.clearbtn:active{transform:translateY(-50%) scale(1.5);}
 .sheet h2{margin:0 0 4px; font-size:18px;}
 /* Drag handle at the top of every bottom sheet: a full-width hit area with
    the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
    footer stays pinned at the bottom while content slides behind it. */
-.grab{width:100%; padding:10px 0; margin:0 auto; cursor:grab; touch-action:none;
+.grab{width:100%; padding:20px 0; margin:0 auto; cursor:grab; touch-action:none;
   user-select:none; -webkit-user-select:none;}
 .grab::after{content:''; display:block; width:42px; height:5px; border-radius:99px;
   background:var(--border); margin:0 auto;}
@@ -1500,7 +1493,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020540';
+var APP_VERSION = '202610020816';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
