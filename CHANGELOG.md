@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Fixed: reloading the app while on the Setup tab left the Categories list empty — showing Settings now always refreshes the list, not just when the tab is tapped.
 - Setup Categories: the per-row Delete button is now a 🗑️ trash can icon (with a "Delete category" label for accessibility).
 - Transaction form: when the transaction already has a bill reminder, the "🔔 Add bill reminder" button becomes "🔔 Open bill reminder" and opens that bill's edit form (stacked, so unsaved transaction edits are kept).
 - Tapping a transaction's 🔔 bell badge now jumps to the Bills page with the linked bill reminder scrolled into view and flashed, instead of opening the edit form (tapping the bill itself still opens the form).

@@ -1420,7 +1420,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020327';
+var APP_VERSION = '202610020332';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -2600,7 +2600,7 @@ function showScreen(name){
     else if(name==='bills') renderBills();
     else if(name==='tax') renderTax();
     else if(name==='reports') renderReports();
-    else if(name==='settings') syncStoreSettings();
+    else if(name==='settings') refreshSettingsScreen();
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
   // Switching to Transactions puts the cursor in the search box — except on
@@ -3159,12 +3159,18 @@ function wireSettings(){
   });
   // prefill when settings shown
   document.querySelector('#tabbar button[data-screen="settings"]').addEventListener('click', function(){
-    $('set-url').value = state.apiUrl || '';
-    $('set-user').value = state.userName || '';
-    applyTheme();
-    syncStoreSettings();
-    renderCatList();
+    refreshSettingsScreen();
   });
+}
+/* Everything the Setup tab needs on show: field values, store status, and
+   the category list. Used by the tab button AND by showScreen so a reload
+   that lands on Setup renders the list too. */
+function refreshSettingsScreen(){
+  $('set-url').value = state.apiUrl || '';
+  $('set-user').value = state.userName || '';
+  applyTheme();
+  syncStoreSettings();
+  renderCatList();
 }
 
 /* ================= setup: category editor =================
