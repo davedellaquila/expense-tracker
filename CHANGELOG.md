@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Round buttons (sheet ✕, selection-bar ✕, + FAB, search clear ×) now grow 25% and brighten on press, easing back on release.
 - Sheet ✕ close button is 50% bigger (45px) with equal margins on the top and right.
 - Bills calendar header: the next-month › button now sits right after the month/year, with the monthly total alone on the far right.
 - New Info tab (far right): shows the app version and renders this change log live from the repo — room to add documentation sections later.

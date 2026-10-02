@@ -299,7 +299,7 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
   border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
   font-size:16px; line-height:1; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center;}
-.selbar #selbar-done:active{opacity:.7;}
+.selbar #selbar-done:active{transform:scale(1.25); filter:brightness(1.35);}
 /* docked: while the floating sticky card is visible, the bulk-update bar
    becomes an attached section inside it */
 .selbar.stuck{
@@ -624,7 +624,6 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
   background:color-mix(in srgb, var(--accent) 85%, transparent); color:#fff; font-size:30px; line-height:1; cursor:pointer;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
-.fab:active{transform:scale(.94);}
 
 /* ---------- tab bar ---------- */
 .tabbar{
@@ -738,7 +737,13 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   background:rgba(127,127,127,.22); color:var(--text);
   font-size:22px; line-height:1; display:flex; align-items:center; justify-content:center;
 }
-.sheet-x:active{transform:scale(.9);}
+.sheet-x:active{transform:scale(1.25); filter:brightness(1.35);}
+/* Round-button press: grow + brighten on press (with a ramp), ease back on release. */
+.sheet-x, #selbar-done, .fab, .clearbtn{
+  transition:transform .18s ease-out, filter .18s ease-out;
+}
+.fab:active{transform:scale(1.25); filter:brightness(1.35);}
+.clearbtn:active{transform:translateY(-50%) scale(1.25); filter:brightness(1.35);}
 .sheet h2{margin:0 0 4px; font-size:18px;}
 /* Drag handle at the top of every bottom sheet: a full-width hit area with
    the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
@@ -1486,7 +1491,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020513';
+var APP_VERSION = '202610020523';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
