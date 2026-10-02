@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Reports: new "Category Bars" chart — vertical bars comparing categories side by side (not stacked), with tap-to-drill like the other charts.
 - Split sheet: tapping "+ Add part" auto-fills the new part with the remaining unallocated amount (when there is one).
 - Sheets no longer dismiss when a text-selection drag slides off the dialog edge — only a tap that starts outside the dialog closes it, so edits are never lost this way.
 - Bills: new "Every 6 months" option in the Repeats menu.
