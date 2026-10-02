@@ -565,13 +565,13 @@ textarea{resize:vertical; min-height:64px;}
 .repfilterstick .rf-sum{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 #rep-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
 #dash-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
-/* Largest expenses: fixed layout so Category/Amount stay visible; merchant wraps.
-   Category truncates with an ellipsis inside its column (never overlaps Amount). */
+/* Largest expenses: fixed layout so Category/Amount stay visible; merchant and
+   category wrap instead of clipping. */
 table.ptable.top-table{min-width:0; table-layout:fixed; width:100%;}
 table.ptable.top-table th:nth-child(1){width:18%;}
 table.ptable.top-table th:nth-child(3){width:27%;}
 table.ptable.top-table th:nth-child(4){width:22%;}
-table.ptable.top-table td:nth-child(3){overflow:hidden; text-overflow:ellipsis;}
+table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
 .top-cell{min-width:0;}
 .top-merch{font-weight:600; overflow-wrap:anywhere;}
 .top-desc{font-size:12px; color:var(--muted); overflow-wrap:anywhere;}
@@ -1416,7 +1416,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020255';
+var APP_VERSION = '202610020258';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -4258,7 +4258,7 @@ function renderDashChartBody(pick, box, c){
         var merchCell = merch
           ? '<div class="top-merch">'+esc(merch)+'</div>' + ((desc && desc!==merch) ? '<div class="top-desc">'+esc(desc)+'</div>' : '')
           : '<div class="top-merch">'+esc(desc)+'</div>';
-        leH += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money0(num(t.amount))+'</td></tr>';
+        leH += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td class="top-cat">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money0(num(t.amount))+'</td></tr>';
       });
       box.innerHTML = leH + '</table></div>';
       var leRows = box.querySelectorAll('[data-tid]');
@@ -11460,7 +11460,7 @@ function renderReports(){
       var merchCell = merch
         ? '<div class="top-merch">'+esc(merch)+'</div>' + ((desc && desc!==merch) ? '<div class="top-desc">'+esc(desc)+'</div>' : '')
         : '<div class="top-merch">'+esc(desc)+'</div>';
-      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td style="white-space:nowrap">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money0(num(t.amount))+'</td></tr>';
+      th += '<tr class="rep-click" data-tid="'+esc(t.id)+'"><td style="white-space:nowrap">'+esc(fmtDatePretty(t.date))+'</td><td class="top-cell">'+merchCell+'</td><td class="top-cat">'+esc(repDisplayCat(t))+'</td><td style="text-align:right;white-space:nowrap">'+money0(num(t.amount))+'</td></tr>';
     });
     tp.innerHTML = th + '</table></div>';
     var tpRows = tp.querySelectorAll('[data-tid]');
