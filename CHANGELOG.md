@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-02
+### App 202610022330
+- Budget: the "Prev month" stat now shows last month's budget (not actuals); tapping it copies that budget into the current month.
 ### App 202610022328
 - Bill scan: scanned values only fill blank fields — if you've already typed a name, amount, or changed the due date, the scan won't overwrite them. Re-scanning also won't wipe edits you made to previously scanned values.
 

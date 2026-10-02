@@ -3306,7 +3306,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022328';
+var APP_VERSION = '202610022330';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -13306,6 +13306,9 @@ function botRenderTable(){
   var host = $('bot-rows'); host.innerHTML = '';
   if(!botBudget){ return; }
   var rows = botBudget.rows, ym = botBudget.month;
+  /* Prev-month budgets (not actuals) for the "Prev month" stat — tapping a
+     stat copies it into this month's budget. Computed once per render. */
+  var prevMoBudgets = savedBudgetsFor(monthAdd(ym,-1), false);
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
@@ -13356,7 +13359,7 @@ function botRenderTable(){
     var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
     /* YTD average + last-month actual, grouped with labels for planning. */
     var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    var ytdV = Math.round(ytd), lastV = Math.round(r.last);
+    var ytdV = Math.round(ytd), lastV = Math.round(prevMoBudgets[r.category]||0);
     stats.appendChild(botStat('YTD avg', money(ytdV), '', function(){ botTapStat(r, inp, sld, line, check, ym, ytdV, false); }));
     stats.appendChild(botStat('Prev month', money(lastV), '', function(){ botTapStat(r, inp, sld, line, check, ym, lastV, false); }));
     line.appendChild(stats);
@@ -13714,6 +13717,8 @@ function incBotRenderTable(){
   if(!incBotBudget){ return; }
   var rows = incBotBudget.rows, ym = incBotBudget.month;
   var months = incBotBudget.months||1;
+  /* Prev-month targets (not actuals) for the "Prev month" stat. */
+  var prevMoTargets = savedBudgetsFor(monthAdd(ym,-1), true);
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
@@ -13762,7 +13767,7 @@ function incBotRenderTable(){
     line.appendChild(nm);
     /* YTD average + last-month actual, grouped with labels for planning. */
     var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    var iytdV = Math.round((r.ytd||0)/months), ilastV = Math.round(r.lastMo||0);
+    var iytdV = Math.round((r.ytd||0)/months), ilastV = Math.round(prevMoTargets[r.category]||0);
     istats.appendChild(botStat('YTD avg', money(iytdV)+'/mo', '', function(){ botTapStat(r, inp, null, line, check, ym, iytdV, true); }));
     istats.appendChild(botStat('Prev month', money(ilastV), '', function(){ botTapStat(r, inp, null, line, check, ym, ilastV, true); }));
     line.appendChild(istats);
