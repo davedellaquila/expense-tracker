@@ -181,18 +181,15 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-tile:last-child{margin-bottom:2px;}
 .bill-fill{position:absolute; left:0; top:0; bottom:0; width:0; pointer-events:none;}
 .bill-tile-main{position:relative;}
-.bill-line1{display:flex; align-items:baseline; gap:10px;}
-.bill-line1 .bn{flex:1; min-width:0; font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.bill-line1 .bdue{flex:0 0 96px; color:var(--muted); font-size:13px; white-space:nowrap; font-variant-numeric:tabular-nums;}
-.bill-line1 .bdue-sp{flex:0 0 96px;}
-.bill-line1 .amt{font-weight:800; font-size:17px; white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:-.2px;}
+.bill-line1{display:flex; align-items:flex-start; gap:10px;}
+.bill-line1 .bn{flex:1; min-width:0; font-weight:700; font-size:16px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.bill-line1 .amt{flex:none; font-weight:800; font-size:17px; white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:-.2px;}
 .bill-line2{display:flex; align-items:center; gap:8px; margin-top:6px;}
 .bill-line2 .bm{flex:1; min-width:0; font-size:13px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.bill-line2 .bdue-sp{flex:0 0 96px;}
 .bill-line2 .bill-badge{flex:none;}
 .bill-line2 .btn.small{padding:7px 12px; font-size:15px; border-radius:10px;}
 @media (max-width:560px){
-  .bill-line1 .bdue, .bill-line1 .bdue-sp, .bill-line2 .bdue-sp{flex-basis:78px;}
   .bill-tile{padding:11px 14px;}
 }
 /* Bills page: month group headers above the bill tiles, with the month's total. */
@@ -1496,7 +1493,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610021404';
+var APP_VERSION = '202610021438';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -10073,17 +10070,17 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
     }
   }
   var main = el('div',{class:'bill-tile-main'});
-  // Line 1: name | due date (aligned column) | amount
+  // Line 1: name (wraps to 2 lines) | amount
   var l1 = el('div',{class:'bill-line1'});
   var nm = el('div',{class:'bn'}, b.name||'Unnamed bill');
   l1.appendChild(nm);
-  l1.appendChild(el('div',{class: showDate ? 'bdue' : 'bdue-sp'}, showDate ? 'due '+fmtBillDate(b.dueDate) : ''));
   l1.appendChild(el('div',{class:'amt'},money(num(b.amount))));
   main.appendChild(l1);
-  // Line 2: meta | spacer | days left | Paid
+  // Line 2: meta (category · account · recurrence · due date) | days left | Paid | delete
   var l2 = el('div',{class:'bill-line2'});
   var meta = (b.category||'Uncategorized')+' · '+(b.account||'Personal');
   if(b.recurrence && b.recurrence!=='once') meta += ' · '+b.recurrence;
+  if(showDate && b.dueDate) meta += ' · due '+fmtBillDate(b.dueDate);
   var metaEl = el('div',{class:'bm'},meta);
   if(b.scanPath || b.scanDataUrl){
     var sc = el('span',{class:'scanbadge', title:'Scanned photo attached'},'📷');
@@ -10093,7 +10090,6 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
     metaEl.appendChild(sc);
   }
   l2.appendChild(metaEl);
-  l2.appendChild(el('div',{class:'bdue-sp'}));
   var days = billDaysUntil(b);
   if(days !== null){
     var dl = el('div',{class:'bill-badge'+(days<0?' over':days<=7?' soon':'')});
