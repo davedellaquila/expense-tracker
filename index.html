@@ -10481,17 +10481,25 @@ function repWeekday(el, days, onBar){
 /* Vertical bars (generic): value above, label below. fmtFn formats the value text. */
 function repVBars(el, items, color, emptyMsg, fmtFn, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
-  var W=640, H=260, pad={top:28, right:12, bottom:46, left:12};
+  /* Crowded charts (many bars): drop the per-bar value labels — exact values
+     stay in the tooltips — and stagger the x labels over two rows so nothing
+     overlaps. Few-bar charts render exactly as before. */
+  var crowded = items.length > 8, staggered = items.length > 6;
+  var W=640, H=staggered?282:260, pad={top:28, right:12, bottom:staggered?66:46, left:12};
   var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
   var max=Math.max.apply(null, items.map(function(i){ return i.value; }).concat([1]));
   var step=plotW/items.length, barW=Math.min(56, step*0.6), svg='';
+  var labMax = crowded ? 10 : 14;
   items.forEach(function(it, i){
     var cx=pad.left+(i+0.5)*step, bh=Math.max(2,(it.value/max)*plotH);
     var x=Math.round(cx-barW/2), y=Math.round(pad.top+plotH-bh);
-    var lbl = it.name.length>14 ? it.name.slice(0,13)+'…' : it.name;
-    svg += '<rect x="'+x+'" y="'+y+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+esc(fmtFn(it.value))+'</title></rect>'+
-      '<text x="'+Math.round(cx)+'" y="'+Math.round(y-8)+'" text-anchor="middle" font-size="12" font-weight="600" class="cx-text">'+esc(fmtFn(it.value))+'</text>'+
-      '<text x="'+Math.round(cx)+'" y="'+(H-12)+'" text-anchor="middle" font-size="12" class="cx-mut"><title>'+esc(it.name)+'</title>'+esc(lbl)+'</text>';
+    var lbl = it.name.length>labMax ? it.name.slice(0,labMax-1)+'…' : it.name;
+    svg += '<rect x="'+x+'" y="'+y+'" width="'+Math.round(barW)+'" height="'+Math.round(bh)+'" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+esc(fmtFn(it.value))+'</title></rect>';
+    if(!crowded){
+      svg += '<text x="'+Math.round(cx)+'" y="'+Math.round(y-8)+'" text-anchor="middle" font-size="12" font-weight="600" class="cx-text">'+esc(fmtFn(it.value))+'</text>';
+    }
+    var ly = staggered ? (H-14-(i%2)*20) : (H-12);
+    svg += '<text x="'+Math.round(cx)+'" y="'+ly+'" text-anchor="middle" font-size="12" class="cx-mut"><title>'+esc(it.name)+'</title>'+esc(lbl)+'</text>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
   if(onBar){
@@ -10821,11 +10829,19 @@ function renderReports(){
     drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
       dispCats: (it.names && it.names.length ? it.names : [it.name])});
   });
-  // --- category bars: vertical bars side by side (not stacked), same data as the donut ---
-  repVBars($('rep-catbars'), cats.map(function(c){ return {name:c, value:byCat[c]}; }),
+  // --- category bars: vertical bars side by side (not stacked), same data as
+  // the donut. Top 12 categories + Other, like the donut's long-tail grouping.
+  var topBars = cats.slice(0, 12);
+  var barItems = topBars.map(function(c){ return {name:c, value:byCat[c]}; });
+  var restNames = cats.slice(12);
+  if(restNames.length){
+    var restSum = restNames.reduce(function(s,c){ return s + byCat[c]; }, 0);
+    if(restSum > 0.005) barItems.push({name:'Other', value:restSum, names:restNames});
+  }
+  repVBars($('rep-catbars'), barItems,
     REP_CORAL, 'No expenses in this period.', money, function(it){
       drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
-        dispCats:[it.name]});
+        dispCats: (it.names && it.names.length ? it.names : [it.name])});
     });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
