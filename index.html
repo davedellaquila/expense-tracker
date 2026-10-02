@@ -1420,7 +1420,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020317';
+var APP_VERSION = '202610020322';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -6506,10 +6506,18 @@ function openTxnForm(t){
       scanRow.appendChild(splitBtn);
       /* Bill reminder from this transaction: name/amount/date/category/
          account pre-fill; the bill sheet stacks above so unsaved edits here
-         are kept. Frequency is picked in the bill form. */
-      var billBtn = el('button',{class:'btn ghost', type:'button'},'🔔 Add bill reminder');
+         are kept. Frequency is picked in the bill form. If the transaction
+         already has a bill reminder, the button opens that bill instead. */
+      var linkedBill = null;
+      if(t && t.id){
+        var lb = state.bills.filter(function(bd){ return bd.sourceTxnId===t.id; });
+        if(lb.length) linkedBill = lb[0];
+      }
+      var billBtn = el('button',{class:'btn ghost', type:'button'},
+        linkedBill ? '🔔 Open bill reminder' : '🔔 Add bill reminder');
       billBtn.addEventListener('click', function(){
-        openBillForm(null, {prefill: billPrefillFromTxn(t), stacked:true});
+        if(linkedBill) openBillForm(linkedBill, {stacked:true});
+        else openBillForm(null, {prefill: billPrefillFromTxn(t), stacked:true});
       });
       scanRow.appendChild(billBtn);
     }
