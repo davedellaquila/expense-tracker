@@ -3559,7 +3559,7 @@ function renderDashboard(){
   }
   var rangeLabel = from===to ? fmtMonthPretty(from) : (fmtMonthPretty(from)+' – '+fmtMonthPretty(to));
   var inc=0, exp=0, incB=0, incP=0, expB=0, expP=0;
-  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatNInc = {}, byMonth = {};
+  var byCatInc = {}, byCatExp = {}, byCatXfer = {}, byCatNExp = {}, byCatNInc = {}, byMonth = {}, byMC = {};
   rows.forEach(function(t){
     var a = num(t.amount), bp = t.business_personal;
     var m = String(t.date||'').slice(0,7);
@@ -3579,6 +3579,7 @@ function renderDashboard(){
     else if(t.txn_type==='expense'){ exp+=a; if(bp==='Business')expB+=a; else expP+=a;
       byCatExp[dc] = (byCatExp[dc]||0)+a;
       byCatNExp[dc] = (byCatNExp[dc]||0)+1;
+      if(m.length>=7){ var bmc=byMC[m]||(byMC[m]={}); bmc[dc]=(bmc[dc]||0)+a; }
     }
   });
   var net = inc-exp;
@@ -3647,7 +3648,7 @@ function renderDashboard(){
   });
   // stash computed data, then render whichever chart is picked
   dashData = {from:from, to:to, acct:acct, bpVal:bpVal, bank:dashBank, rows:rows, rangeLabel:rangeLabel,
-              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth, catSelBudget:dashCatSelBudget};
+              byCatInc:byCatInc, byCatExp:byCatExp, byCatXfer:byCatXfer, byCatNExp:byCatNExp, byCatNInc:byCatNInc, byMerch:byMerch, byDay:byDay, byMonth:byMonth, byMC:byMC, catSelBudget:dashCatSelBudget};
   renderDashCharts();
   saveDashCache(); // persist filters + data so the home page restores instantly
 }
@@ -3874,7 +3875,9 @@ var DASH_CHARTS = {
   ownercat: {title:'Owner vs Category',      sub:'Top categories compared by owner'},
   pareto:   {title:'Spend Pareto',           sub:'Cumulative share of spend by category (80/20)'},
   heatmap:  {title:'Category \u00D7 Month Heatmap', sub:'Spend intensity by category and month'},
-  largest:  {title:'Largest expenses', sub:'Top 10 expenses in the period'}
+  largest:  {title:'Largest expenses', sub:'Top 10 expenses in the period'},
+  catbars:  {title:'Category Bars', sub:'Monthly spend by category, side by side'},
+  inc:      {title:'Income by category', sub:'Income by category'}
 };
 var DASH_CHART_DEFAULTS = ['catmix','catmixtable','merch','week','trend','budget','largest'];
 /* Ordered list of visible Home chart cards. Re-adding a chart appends it at
@@ -3893,17 +3896,23 @@ function dashChartList(){
 function saveDashChartList(l){
   try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(l)); }catch(e){}
 }
-/* One-time migration: 'largest' never existed on the Home page before, so any
-   saved list missing it gets it appended at the bottom (nobody could have
-   deliberately removed it). Versioned so it runs exactly once. */
+/* One-time migrations: 'largest' never existed on the Home page before v1, and
+   'catbars'/'inc' never did before v2, so any saved list missing them gets
+   them appended at the bottom (nobody could have deliberately removed them).
+   Versioned so each step runs exactly once. */
 var HOME_CHARTS_V_KEY = 'expenseTracker.homeChartsV';
-var HOME_CHARTS_V = 1;
+var HOME_CHARTS_V = 2;
 function migrateDashCharts(){
   try{
     var v = parseInt(localStorage.getItem(HOME_CHARTS_V_KEY)||'0', 10);
     if(v < HOME_CHARTS_V){
       var l = dashChartList();
-      if(l.indexOf('largest')<0){ l.push('largest'); saveDashChartList(l); }
+      if(v < 1 && l.indexOf('largest')<0) l.push('largest');
+      if(v < 2){
+        if(l.indexOf('catbars')<0) l.push('catbars');
+        if(l.indexOf('inc')<0) l.push('inc');
+      }
+      saveDashChartList(l);
       localStorage.setItem(HOME_CHARTS_V_KEY, String(HOME_CHARTS_V));
     }
   }catch(e){}
@@ -4032,6 +4041,34 @@ function renderDashChartBody(pick, box, c){
     }), function(it){
       dashDrill({singleMonth: it.key});
     });
+  } else if(pick==='catbars'){
+    // Same monthly grouped bars as Reports: each month shows every category
+    // side by side (top 7 + Other). Home rows are already selection-filtered.
+    var cbMonths = Object.keys(d.byMonth).sort();
+    var cb = catBarsGrouped(d.byCatExp, d.byMC||{}, cbMonths, null, 7);
+    repGroupedVBars(box, cb.series, cbMonths.map(function(m){
+      return m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5);
+    }), function(si, mi){
+      var m = cb.months[mi];
+      dashDrill({singleMonth:m, dispCats: cb.isOther(si) ? cb.otherByMonth[m] : [cb.selNames[si]]});
+    });
+  } else if(pick==='inc'){
+    var ics = Object.keys(d.byCatInc).sort(function(a,b){ return d.byCatInc[b]-d.byCatInc[a]; });
+    var tI = ics.reduce(function(s,c){ return s+d.byCatInc[c]; },0);
+    if(!ics.length){ box.innerHTML = '<p class="muted">No income in this period.</p>'; }
+    else{
+      var ih = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
+      ics.forEach(function(c){
+        ih += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(d.byCatInc[c])+'</td><td style="text-align:right">'+(tI>0?Math.round(d.byCatInc[c]/tI*100):0)+'%</td></tr>';
+      });
+      box.innerHTML = ih + '</table></div>';
+      var icRows = box.querySelectorAll('[data-icat]');
+      for(var ici=0; ici<icRows.length; ici++)(function(n){
+        n.addEventListener('click', function(){
+          dashDrill({type:'income', dispCats:[n.getAttribute('data-icat')]});
+        });
+      })(icRows[ici]);
+    }
   } else if(pick==='budget'){
     renderDashBudgets(box, d, dashDrill);
   } else if(pick==='bands'){
