@@ -10,11 +10,27 @@
 <meta name="theme-color" content="#177a52">
 <title>Expense Tracker</title>
 <script>
-/* Apply saved theme before first paint to avoid a flash. */
+/* Apply saved theme + optional custom background before first paint. */
 (function(){ try{
   var t = localStorage.getItem('expenseTracker.theme') || 'system';
   var dark = t==='dark' || (t==='system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  /* Custom page bg (solid / gradient / pattern) is light-mode only. */
+  if(dark) return;
+  var raw = localStorage.getItem('expenseTracker.bg');
+  if(!raw) return;
+  var cfg = null;
+  if(raw.charAt(0)==='{'){ try{ cfg = JSON.parse(raw); }catch(e){} }
+  else if(/^#[0-9a-fA-F]{6}$/.test(raw)) cfg = {type:'solid', value:raw, base:raw};
+  if(!cfg || !cfg.value) return;
+  var root = document.documentElement;
+  if(cfg.type==='solid'){
+    root.style.setProperty('--bg', cfg.value);
+  }else{
+    root.style.setProperty('--bg', cfg.base || '#f3f5f7');
+    root.style.setProperty('--bg-extra', cfg.value);
+    if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
+  }
 }catch(e){} })();
 </script>
 <style>
@@ -54,7 +70,9 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%; overflow-x:clip;}
 body{
-  margin:0; background:var(--bg); color:var(--text);
+  margin:0; background-color:var(--bg); background-image:var(--bg-extra, none);
+  background-size:var(--bg-size, auto); background-attachment:fixed;
+  color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:18px; line-height:1.5; overflow-x:clip;
 }
@@ -113,6 +131,27 @@ body{
 .app-header h1{font-size:21px; margin:0; font-weight:700; letter-spacing:-.2px;}
 .brand{display:flex; align-items:center; gap:10px;}
 .brand-icon{width:30px; height:30px; border-radius:8px; display:block;}
+.header-actions{display:flex; align-items:center; gap:8px; flex:none; min-width:0;}
+.hdr-news{
+  flex:none; font-size:13px; font-weight:600; color:var(--blue);
+  background:transparent; border:1px solid var(--border);
+  border-radius:999px; padding:5px 11px; cursor:pointer; white-space:nowrap;
+}
+.hdr-news:hover, .hdr-news:focus-visible{background:var(--blue-soft); border-color:color-mix(in srgb, var(--blue) 35%, var(--border));}
+/* Slow pulse while an update is available — cleared when the user opens
+   What's new from the header, dismisses the banner, or loads the new build. */
+@keyframes hdrNewsPulse{
+  0%, 100%{ opacity:1; transform:scale(1); }
+  50%{ opacity:.68; transform:scale(1.045); }
+}
+.hdr-news.pulse{ animation:hdrNewsPulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){
+  .hdr-news.pulse{
+    animation:none; opacity:1; transform:none;
+    background:var(--blue-soft);
+    border-color:color-mix(in srgb, var(--blue) 40%, var(--border));
+  }
+}
 .user-chip{
   font-size:15px; color:var(--muted); background:var(--bg);
   border:1px solid var(--border); border-radius:999px; padding:4px 12px;
@@ -171,6 +210,15 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .bill-row .bn{font-weight:700;}
 .bill-row .bm{font-size:14px; color:var(--muted);}
 .bill-row .amt{font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums;}
+/* Home Bills card: compact upcoming list (next 14 days + overdue). */
+#dash-bills-list{margin-top:4px;}
+#dash-bills-list .bill-row{padding:8px 0;}
+#dash-bills-list .bill-row:first-child{border-top:1px solid var(--border); margin-top:6px; padding-top:10px;}
+#dash-bills-list .bn{font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+#dash-bills-list .bm{font-size:13px;}
+#dash-bills-list .amt{flex:none;}
+#dash-bills-list .btn.small{flex:none; padding:7px 12px; font-size:14px; border-radius:10px;}
+#dash-bills-more{display:block; margin-top:6px; font-size:13px;}
 .bill-badge{font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-faint); color:var(--accent);}
 .bill-badge.over{background:color-mix(in srgb, var(--danger) 15%, transparent); color:var(--danger);}
 .bill-badge.soon{background:color-mix(in srgb, #f6c85f 20%, transparent); color:#b8860b;}
@@ -429,6 +477,29 @@ textarea{resize:vertical; min-height:64px;}
 .btn.small{width:auto; padding:8px 14px; font-size:16px;}
 .btnrow{display:flex; gap:10px; margin-top:14px;}
 .btnrow .btn{margin:0;}
+/* Settings cards: compact action rows (not full-bleed primary blocks) */
+#screen-settings .set-actions{
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px;
+}
+#screen-settings .set-actions .btn{width:auto; flex:none; margin:0;}
+#screen-settings .set-actions .linkbtn{font-size:14px; padding:6px 4px;}
+#screen-settings .set-util{margin-top:12px;}
+#screen-settings .set-util .linkbtn{font-size:14px;}
+#screen-settings .set-fieldrow{
+  display:flex; gap:8px; align-items:center; margin-top:4px;
+}
+#screen-settings .set-fieldrow input,
+#screen-settings .set-fieldrow select{flex:1; min-width:0; margin:0; width:auto;}
+#screen-settings .set-fieldrow .btn{flex:none; width:auto; margin:0;}
+#screen-settings .set-card-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+}
+#screen-settings .set-card-head h2{margin:0; flex:1; min-width:0;}
+#screen-settings .set-card-head .btn{flex:none; width:auto; margin:0;}
+@media (max-width:420px){
+  #screen-settings .set-fieldrow{flex-wrap:wrap;}
+  #screen-settings .set-fieldrow .btn{width:100%;}
+}
 /* sticky action bar: floats at the bottom of a sheet while scrolling,
    settles as the last element when scrolled to the end */
 .stickybar{
@@ -608,6 +679,15 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
 }
 .iconbtn:active{opacity:.7;}
 .iconbtn svg{width:20px; height:20px;}
+/* Row delete (Home Upcoming Bills, Bills tiles / paid list): soft-danger + trash SVG */
+.row-del{
+  flex:none; width:36px; height:36px; padding:0; margin:0; border:none;
+  border-radius:10px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--danger-soft); color:var(--danger);
+}
+.row-del:active{opacity:.75;}
+.row-del svg{width:18px; height:18px; display:block;}
 .reclist{max-height:38vh; overflow-y:auto; margin:10px 0; border:1px solid var(--border); border-radius:12px;}
 .recrow{display:flex; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid var(--border); font-size:15.5px; cursor:pointer;}
 .recrow:first-child{border-top:0;}
@@ -692,6 +772,19 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   .bill-cal .day{min-height:52px;}
 }
 
+/* Desktop/tablet charts: CSS font-size on SVG <text> still lives in viewBox
+   user space and scales with the CTM (~2× on wide cards). Use ~half of the
+   desired screen size so labels land ~16–18px. Phone keeps the larger 2×
+   overrides in the max-width:560px block above. */
+@media (min-width:561px){
+  .rep-svg text[font-size="11"]{font-size:8px;}
+  .rep-svg text[font-size="12"]{font-size:9px;}
+  .rep-svg text[font-size="13"]{font-size:9px;}
+  .rep-svg text[font-size="18"]{font-size:9px;}
+  .rep-svg text[font-size="33"]{font-size:10px;}
+  .rep-svg g[font-size="12"]{font-size:9px;}
+}
+
 /* ---------- desktop: full-size type, wide content column. No html zoom —
    that shrank the default 760px column into a postage-stamp phone strip on
    large screens. pointer:fine keeps this off actual iPads (see tablet). ---------- */
@@ -736,13 +829,26 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* top:-6px matches margin-top:-6px: the sticky offset is measured from the
    sheet's scrollport (below its 18px padding), so top must equal the negative
    margin for the stuck position to match the in-flow position exactly. */
-/* Round-button press: the button itself grows while pressed (keeping its own
-   color), then eases back on release. */
-.sheet-x, #selbar-done, .fab, .clearbtn{
-  transition:transform .15s ease-out;
+/* Round-button press: grow to 1.5× and fade to invisible in sync (150ms).
+   Buttons that stay on screen (FAB, search clear) ease back on release;
+   sheet ✕ / card ✕ use .press-out + a matching delay so the fade finishes as
+   the sheet dismisses or the card is removed. */
+.sheet-x, .card-x, #selbar-done, .fab, .clearbtn{
+  transition:transform .15s ease-out, opacity .15s ease-out;
 }
-.sheet-x:active, #selbar-done:active, .fab:active{transform:scale(1.5);}
-.clearbtn:active{transform:translateY(-50%) scale(1.5);}
+.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active,
+.sheet-x.press-out, .card-x.press-out, #selbar-done.press-out{
+  transform:scale(1.5); opacity:0;
+}
+.clearbtn:active, .clearbtn.press-out{
+  transform:translateY(-50%) scale(1.5); opacity:0;
+}
+/* Small circle ✕ to hide/remove a chart card (Home / Reports) — not a data delete. */
+.card-x{
+  flex:none; width:32px; height:32px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  background:rgba(127,127,127,.18); color:var(--muted);
+  font-size:18px; line-height:1; display:inline-flex; align-items:center; justify-content:center;
+}
 .sheet h2{margin:0 0 4px; font-size:18px;}
 /* Drag handle at the top of every bottom sheet: a full-width hit area with
    the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
@@ -796,11 +902,73 @@ table.ptable.fit{min-width:0;}
 table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-space:nowrap;}
 table.ptable.fit th, table.ptable.fit td{padding-left:4px; padding-right:4px;}
 /* In-app update banner: shown when version.json reports a newer build. */
-#updBar{position:fixed;top:0;left:0;right:0;z-index:10000;display:none;align-items:center;justify-content:space-between;gap:10px;background:#2456c8;color:#fff;padding:10px 14px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+#updBar{position:fixed;top:0;left:0;right:0;z-index:10000;display:none;align-items:center;justify-content:space-between;gap:12px;background:#2456c8;color:#fff;padding:10px 14px;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);flex-wrap:wrap;}
 #updBar.show{display:flex;}
-#updBar .uacts{display:flex;align-items:center;gap:4px;flex:none;}
-#updBar .ubtn{background:#fff;color:#1a3fa0;border:0;border-radius:8px;padding:7px 14px;font-weight:700;font-size:14px;}
-#updX{background:transparent;border:0;color:#fff;font-size:20px;line-height:1;padding:4px 8px;}
+#updBar .umsg{flex:1; min-width:min(100%,220px); line-height:1.35;}
+#updBar .utitle{font-weight:700; font-size:15px;}
+#updBar .usub{font-size:13px; opacity:.92; margin-top:2px;}
+#updBar .uacts{display:flex;align-items:center;gap:8px;flex:none;}
+/* Banner dismiss: circle ✕ on the blue bar (same grow+fade as .card-x). */
+#updBar .card-x{background:rgba(255,255,255,.22); color:#fff;}
+#updBar .card-x:hover{background:rgba(255,255,255,.34);}
+/* Lightweight "What's new" panel under the update banner — z below the banner
+   so banner dismiss stays usable. Scrim + Esc + circle ✕ close only the panel. */
+#updNews{position:fixed;inset:0;z-index:9999;display:none;}
+#updNews.show{display:block;}
+#updNews .updNews-scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);}
+#updNews .updNews-card{
+  position:absolute;left:50%;top:86px;transform:translateX(-50%);
+  width:min(560px,calc(100% - 24px));
+  max-height:min(70vh, calc(100dvh - 110px));
+  display:flex;flex-direction:column;background:var(--card);color:var(--text);
+  border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.28);
+  overflow:hidden; overscroll-behavior:contain;
+}
+#updNews .updNews-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px 4px;flex:none;}
+#updNews .updNews-head h2{margin:0;font-size:17px;}
+#updNews .updNews-sub{margin:0;padding:0 14px 8px;font-size:13px;flex:none;}
+/* One scrollport for the whole changelog. Load-new-version sticks under the
+   head while Earlier (and long New) content scrolls beneath it. */
+#updNews .updNews-body{
+  flex:1 1 auto; min-height:0; max-height:100%;
+  padding:0 14px 12px; overflow-x:hidden; overflow-y:auto;
+  -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  font-size:14.5px;
+}
+#updNews .updNews-new{ overflow:visible; }
+#updNews .updNews-body h2{font-size:16px;margin:4px 0 8px;}
+#updNews .updNews-body h3{font-size:15px;margin:14px 0 6px;}
+#updNews .updNews-body h4{font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px;}
+#updNews .updNews-body ul.info-list{margin:0 0 4px;}
+#updNews .updNews-body li{font-size:14px;line-height:1.4;margin:5px 0;}
+#updNews .updNews-refresh{
+  position:sticky; top:0; z-index:2;
+  display:flex; justify-content:center; align-items:center;
+  margin:0 -14px; padding:12px 14px;
+  background:var(--card); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+}
+#updNews .updNews-refresh .ubtn{
+  width:auto; min-width:168px; max-width:100%;
+  background:var(--blue); color:#fff; border:0; border-radius:10px;
+  padding:12px 22px; font-weight:700; font-size:15px; cursor:pointer;
+}
+#updNews .updNews-earlier{
+  margin:0; border-top:none; padding-top:10px; overflow:visible;
+}
+#updNews .updNews-earlier>summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);list-style:none;}
+#updNews .updNews-earlier>summary::-webkit-details-marker{display:none;}
+#updNews .updNews-earlier>summary::before{content:'▸ '; color:var(--muted);}
+#updNews .updNews-earlier[open]>summary::before{content:'▾ ';}
+#updNews .updNews-earlier .updNews-earlier-body{margin-top:8px;opacity:.92;}
+/* Hard page lock while the panel is open — body is position:fixed via JS so
+   wheel/touch cannot move Home underneath. */
+html.upd-news-open, html.upd-news-open body{
+  overflow:hidden !important; overscroll-behavior:none; touch-action:none;
+}
+html.upd-news-open #updNews, html.upd-news-open #updNews *{ touch-action:auto; }
+html.upd-news-open #updNews .updNews-body{ touch-action:pan-y; }
+/* Info page version markers under date headings */
+#info-body h4{font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px;}
 /* Pull-to-check-for-updates indicator: slides down from the top while the
    user drags down from the very top of a screen. */
 #ptrHint{position:fixed;top:0;left:50%;transform:translate(-50%,-110%);z-index:9000;
@@ -828,6 +996,28 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 .dupbadge{display:inline-block;font-size:11px;font-weight:700;margin-left:6px;padding:1px 7px;border-radius:9px;white-space:nowrap;vertical-align:middle;background:#fdecea;color:#b3261e}
 .applyall{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0;}
 .applyall label{font-size:12px; color:var(--muted); font-weight:600;}
+/* Settings → Appearance: background presets (solid / gradient / pattern) */
+.bg-section{margin-top:14px;}
+.bg-section-label{font-size:13px; font-weight:700; color:var(--muted); margin:10px 0 6px; text-transform:uppercase; letter-spacing:.03em;}
+.bg-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;}
+.bg-row input[type=color]{width:42px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:transparent; cursor:pointer;}
+.bg-presets{display:flex; gap:8px; flex-wrap:wrap;}
+.bg-presets button{
+  width:34px; height:34px; border-radius:10px; border:2px solid var(--border);
+  padding:0; cursor:pointer; background-color:var(--bg); background-size:cover; flex:none;
+}
+.bg-presets button.solid{border-radius:50%;}
+.bg-presets button.on{outline:2px solid var(--accent); outline-offset:2px; border-color:var(--accent);}
+.bg-custom{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.bg-custom input[type=color]{
+  width:42px; height:36px; padding:0; border:2px solid var(--border); border-radius:8px;
+  background:transparent; cursor:pointer;
+}
+.bg-custom input[type=color].on{outline:2px solid var(--accent); outline-offset:2px; border-color:var(--accent);}
+.bg-custom .bg-custom-lbl{font-size:14px; font-weight:600; color:var(--text);}
+.bg-hint{font-size:13px; margin:8px 0 0;}
+/* Page backgrounds are light-mode only — keep the picker visible but inert in dark. */
+[data-theme="dark"] .bg-section{opacity:.48; pointer-events:none;}
 
 /* ---------- setup ---------- */
 .setupwrap{max-width:560px; margin:0 auto; padding:26px 18px 40px;}
@@ -869,7 +1059,27 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 <body>
 
 <!-- in-app update banner: shown when version.json reports a newer build -->
-<div id="updBar" role="status"><span>A new version of Expense Tracker is available.</span><span class="uacts"><button id="updGo" class="ubtn">Refresh</button><button id="updX" aria-label="Dismiss">×</button></span></div>
+<div id="updBar" role="status">
+  <div class="umsg">
+    <div class="utitle">A newer version is available</div>
+    <div class="usub">Review what’s new below, then refresh when you’re ready.</div>
+  </div>
+  <span class="uacts">
+    <button id="updX" class="card-x" type="button" aria-label="Dismiss update banner">✕</button>
+  </span>
+</div>
+<!-- Lightweight changelog peek for the update banner (below banner z-index). -->
+<div id="updNews" hidden>
+  <div class="updNews-scrim" id="updNewsScrim"></div>
+  <div class="updNews-card" role="dialog" aria-modal="false" aria-labelledby="updNewsTitle">
+    <div class="updNews-head">
+      <h2 id="updNewsTitle">What’s new</h2>
+      <button type="button" class="card-x" id="updNewsClose" aria-label="Close">✕</button>
+    </div>
+    <p class="muted updNews-sub">Changes since the version you’re running — older history stays collapsed below.</p>
+    <div class="updNews-body" id="updNewsBody"></div>
+  </div>
+</div>
 <!-- pull-to-check-for-updates indicator -->
 <div id="ptrHint" hidden></div>
 
@@ -894,7 +1104,7 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
     <div class="btnrow">
       <button class="btn" id="setup-local-go">Start tracking</button>
     </div>
-    <p class="muted">Your data stays in this browser on this device — private and available offline. It isn't shared or synced. Back it up from Setup → Data storage.</p>
+    <p class="muted">Your data stays in this browser on this device — private and available offline. It isn't shared or synced. Back it up from Settings → Data storage.</p>
   </div>
   <div id="setup-sheets-box" hidden>
   <div class="steps">
@@ -920,7 +1130,10 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 <div id="app" hidden>
   <header class="app-header">
     <div class="brand"><img class="brand-icon" src="icons/apple-touch-icon.png" alt=""><h1>Expense Tracker</h1></div>
-    <span class="user-chip" id="user-chip"></span>
+    <div class="header-actions">
+      <button type="button" class="hdr-news" id="hdr-whats-new" title="See recent changes">What’s new</button>
+      <span class="user-chip" id="user-chip"></span>
+    </div>
   </header>
   <div id="refresh-pill" aria-live="polite"><span class="spin"></span>Updating&hellip;</div>
 
@@ -976,10 +1189,11 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
       </div>
       <div class="card" id="dash-bills-card" style="cursor:pointer">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <b>Bills</b>
+          <b>Upcoming Bills</b>
           <button class="linkbtn" id="dash-bill-add" type="button" style="flex:none">+ Add bill</button>
         </div>
-        <div id="dash-bills-vals" style="font-weight:800;margin-top:6px"></div>
+        <div id="dash-bills-vals" style="margin-top:6px"></div>
+        <div id="dash-bills-list"></div>
       </div>
       <div id="dash-charts"></div>
       <div class="card no-print" style="text-align:center">
@@ -1374,9 +1588,9 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
         <div id="set-sheets-box">
           <label class="f" for="set-url">Web app URL</label>
           <input type="url" id="set-url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
-          <div class="btnrow">
-            <button class="btn ghost" id="set-test">Test connection</button>
-            <button class="btn" id="set-save">Save</button>
+          <div class="set-actions">
+            <button class="btn small ghost" id="set-test" type="button">Test connection</button>
+            <button class="btn small" id="set-save" type="button">Save</button>
           </div>
           <div class="privacy"><b>Keep this URL private.</b> Anyone with it can read and write your expense data.</div>
         </div>
@@ -1389,7 +1603,7 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
                 <div class="muted" id="set-auth-desc" style="font-size:13px;margin-top:3px"></div>
               </div>
             </div>
-            <button class="btn ghost" id="set-auth-signout" hidden style="flex:none;width:auto">Sign out</button>
+            <button class="btn small ghost" id="set-auth-signout" hidden style="flex:none">Sign out</button>
           </div>
           <div><button class="linkbtn" id="set-firebase-console" type="button">🔥 Open Firebase console</button></div>
           <div id="set-auth-box">
@@ -1399,29 +1613,29 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
               <input type="email" id="set-auth-email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com">
               <label class="f" for="set-auth-pass">Password</label>
               <input type="password" id="set-auth-pass" autocomplete="current-password" placeholder="6+ characters">
-              <div class="btnrow">
-                <button class="btn" id="set-auth-signin">Sign in</button>
-                <button class="btn ghost" id="set-auth-signup">Create account</button>
-              </div>
-              <div class="btnrow">
-                <button class="btn ghost" id="set-auth-google">Continue with Google</button>
-                <button class="btn ghost" id="set-auth-forgot">Forgot password?</button>
+              <div class="set-actions">
+                <button class="btn small" id="set-auth-signin" type="button">Sign in</button>
+                <button class="btn small ghost" id="set-auth-signup" type="button">Create account</button>
+                <button class="btn small ghost" id="set-auth-google" type="button">Continue with Google</button>
+                <button class="linkbtn" id="set-auth-forgot" type="button">Forgot password?</button>
               </div>
             </div>
           </div>
         </div>
         <div id="set-copy-list"></div>
-        <div class="btnrow">
-          <button class="btn ghost" id="set-backup">Download backup (JSON)</button>
+        <div class="set-util">
+          <button class="linkbtn" id="set-backup" type="button">Download backup (JSON)</button>
         </div>
         <p class="muted">Switching storage only changes where new reads and writes go — the data in the other location stays untouched until you copy it over.</p>
       </div>
       <div class="card">
         <h2>Who's entering?</h2>
         <label class="f" for="set-user">Your name (saved on each transaction)</label>
-        <input type="text" id="set-user" list="user-suggest" autocomplete="off" placeholder="Dave">
+        <div class="set-fieldrow">
+          <input type="text" id="set-user" list="user-suggest" autocomplete="off" placeholder="Dave">
+          <button class="btn small" id="set-user-save" type="button">Save name</button>
+        </div>
         <datalist id="user-suggest"><option value="Dave"></option><option value="Nancy"></option></datalist>
-        <div class="btnrow"><button class="btn" id="set-user-save">Save name</button></div>
       </div>
       <div class="card">
         <h2>Categories</h2>
@@ -1429,9 +1643,11 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
         <div id="set-cat-list"></div>
       </div>
       <div class="card">
-        <h2>Data cleanup</h2>
-        <p class="muted" style="font-size:13px;margin:0 0 10px">Older PDF imports sometimes glued statement text onto merchant names — section headers (like "JANE DOE #1234: Transactions"), debit-card prefixes (like "Purchase authorized on 08/15 …") or fine print (like "Important Information You Should Know …"). Scan finds those rows so you can review and fix them — with undo.</p>
-        <div class="btnrow"><button class="btn" id="set-scrub">Scan for statement junk</button></div>
+        <div class="set-card-head">
+          <h2>Data cleanup</h2>
+          <button class="btn small" id="set-scrub" type="button">Scan for statement junk</button>
+        </div>
+        <p class="muted" style="font-size:13px;margin:10px 0 0">Older PDF imports sometimes glued statement text onto merchant names — section headers (like "JANE DOE #1234: Transactions"), debit-card prefixes (like "Purchase authorized on 08/15 …") or fine print (like "Important Information You Should Know …"). Scan finds those rows so you can review and fix them — with undo.</p>
         <div id="set-scrub-results" style="margin-top:6px"></div>
       </div>
       <div class="card">
@@ -1440,6 +1656,22 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
           <button data-theme-opt="light">☀️ Light</button>
           <button data-theme-opt="dark">🌙 Dark</button>
           <button data-theme-opt="system">🌓 System</button>
+        </div>
+        <div class="bg-section">
+          <label class="f" style="margin-top:4px">Page background</label>
+          <div class="bg-section-label">Solids</div>
+          <div class="bg-presets" id="bg-presets-solid"></div>
+          <div class="bg-section-label">Gradients</div>
+          <div class="bg-presets" id="bg-presets-gradient"></div>
+          <div class="bg-section-label">Patterns</div>
+          <div class="bg-presets" id="bg-presets-pattern"></div>
+          <div class="bg-section-label">Custom</div>
+          <div class="bg-custom">
+            <input type="color" id="set-bg" value="#f3f5f7" title="Pick any color" aria-label="Custom background color">
+            <span class="bg-custom-lbl">Pick any color</span>
+            <button type="button" class="btn small ghost" id="set-bg-reset">Reset to default</button>
+          </div>
+          <p class="muted bg-hint">Fun backgrounds for Light mode (and System when your device is light). Cards stay white so text stays readable. Dark mode keeps its own look. Saved on this device.</p>
         </div>
       </div>
       <div class="card" id="set-steps-card">
@@ -1473,7 +1705,7 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
     <button data-screen="budgets" data-tip="Budget — monthly budgets and Bot proposals (shortcut: 5)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Budget</button>
     <button data-screen="bills" data-tip="Bills — recurring bills and due dates (shortcut: 6)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Bills</button>
     <button data-screen="tax" data-tip="Tax — categories and summaries for tax time (shortcut: 7)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg>Tax</button>
-    <button data-screen="settings" data-tip="Setup — accounts, categories, sync and app settings (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Setup</button>
+    <button data-screen="settings" data-tip="Settings — accounts, categories, sync and app settings (shortcut: 8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg>Settings</button>
     <button data-screen="info" data-tip="Info — change log and documentation (shortcut: 9)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>Info</button>
   </nav>
 </div>
@@ -1488,11 +1720,59 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 var LS_API = 'expenseTracker.apiUrl';
 var LS_USER = 'expenseTracker.userName';
 var LS_THEME = 'expenseTracker.theme';
+var LS_BG = 'expenseTracker.bg';
+var DEFAULT_BG = '#f3f5f7';
+/* Light-mode page backgrounds: solids, gradients, and subtle patterns.
+   Stored as JSON {type, id?, value, base?, size?}. Legacy bare "#rrggbb" still loads. */
+var BG_PRESETS = [
+  {id:'default', type:'solid', label:'Default gray', value:'#f3f5f7', base:'#f3f5f7'},
+  {id:'sage', type:'solid', label:'Sage', value:'#eef6f1', base:'#eef6f1'},
+  {id:'sky', type:'solid', label:'Sky mist', value:'#eef2f8', base:'#eef2f8'},
+  {id:'parchment', type:'solid', label:'Warm parchment', value:'#f7f1ea', base:'#f7f1ea'},
+  {id:'lilac', type:'solid', label:'Soft lilac', value:'#f4eef6', base:'#f4eef6'},
+  {id:'mint', type:'solid', label:'Soft mint', value:'#e8f5f0', base:'#e8f5f0'},
+  {id:'blush', type:'solid', label:'Soft blush', value:'#f8eef0', base:'#f8eef0'},
+  {id:'slate', type:'solid', label:'Cool slate', value:'#e8ecf0', base:'#e8ecf0'},
+  {id:'cream', type:'solid', label:'Cream', value:'#faf6f0', base:'#faf6f0'},
+  {id:'g-sage', type:'gradient', label:'Sage wash',
+    value:'linear-gradient(160deg,#e4f0e9 0%,#eef6f1 48%,#f4f7f5 100%)', base:'#eef6f1'},
+  {id:'g-sky', type:'gradient', label:'Sky mist',
+    value:'linear-gradient(165deg,#e4eef9 0%,#eef2f8 50%,#f5f7fa 100%)', base:'#eef2f8'},
+  {id:'g-parchment', type:'gradient', label:'Warm parchment',
+    value:'linear-gradient(158deg,#f5eadc 0%,#f7f1ea 46%,#f8f5f0 100%)', base:'#f7f1ea'},
+  {id:'g-slate', type:'gradient', label:'Cool slate mist',
+    value:'linear-gradient(170deg,#dde3ea 0%,#e8ecf0 52%,#f2f4f6 100%)', base:'#e8ecf0'},
+  {id:'g-mint', type:'gradient', label:'Mint breeze',
+    value:'linear-gradient(155deg,#dcefe7 0%,#e8f5f0 50%,#f2f8f5 100%)', base:'#e8f5f0'},
+  {id:'g-dawn', type:'gradient', label:'Soft dawn',
+    value:'linear-gradient(135deg,#f3ebe3 0%,#eef2f6 100%)', base:'#f0eeea'},
+  {id:'p-dots', type:'pattern', label:'Mint dots',
+    value:'radial-gradient(rgba(23,122,82,.16) 1.15px, transparent 1.2px)',
+    base:'#eef6f1', size:'15px 15px'},
+  {id:'p-grid', type:'pattern', label:'Soft grid',
+    value:'linear-gradient(rgba(23,32,42,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(23,32,42,.05) 1px, transparent 1px)',
+    base:'#f3f5f7', size:'18px 18px, 18px 18px'},
+  {id:'p-paper', type:'pattern', label:'Paper lines',
+    value:'repeating-linear-gradient(0deg, transparent, transparent 11px, rgba(120,90,50,.07) 11px, rgba(120,90,50,.07) 12px)',
+    base:'#faf6f0', size:'auto'},
+  {id:'p-diag', type:'pattern', label:'Sky diagonals',
+    value:'repeating-linear-gradient(-32deg, transparent, transparent 9px, rgba(37,99,235,.07) 9px, rgba(37,99,235,.07) 10px)',
+    base:'#eef2f8', size:'auto'},
+  {id:'p-mesh', type:'pattern', label:'Soft mesh',
+    value:'radial-gradient(at 20% 20%, rgba(23,122,82,.10) 0, transparent 45%), radial-gradient(at 80% 10%, rgba(37,99,235,.10) 0, transparent 42%), radial-gradient(at 50% 80%, rgba(154,107,26,.08) 0, transparent 48%)',
+    base:'#f3f5f7', size:'auto'}
+];
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two (and also re-fetches
-   index.html to catch disk changes even when the stamp wasn't bumped). */
-var APP_VERSION = '202610021747';
+   index.html to catch disk changes even when the stamp wasn't bumped).
+
+   CHANGELOG convention: under the matching ## date, add a heading
+     ### App YYYYMMDDHHMM
+   (same stamp as APP_VERSION) with that deploy's bullets, newest first.
+   "See what's new" uses these markers to show everything newer than the
+   tab's running APP_VERSION (skipped versions grouped together). */
+var APP_VERSION = '202610022104';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -1501,6 +1781,17 @@ if(IS_IPHONE && document.documentElement) document.documentElement.classList.add
 /* Standard delete-button label: the full word everywhere except iPhone,
    where the 🗑️ icon saves space. */
 function delLabel(){ return IS_IPHONE ? '🗑️' : 'Delete'; }
+/* Shared trash icon for data deletes (bills, categories, split parts, etc.).
+   Card/UI chrome hide uses cardDismissBtn (circle ✕) instead. */
+var TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+function rowDeleteBtn(ariaLabel){
+  var label = ariaLabel || 'Delete';
+  return el('button',{class:'row-del',type:'button',title:label,'aria-label':label,html:TRASH_SVG});
+}
+function cardDismissBtn(ariaLabel){
+  var label = ariaLabel || 'Remove';
+  return el('button',{class:'card-x no-print',type:'button',title:label,'aria-label':label},'✕');
+}
 
 /* ================= in-app update check =================
    Same-origin only (works for local http.server and GitHub Pages — no GitHub
@@ -1512,8 +1803,9 @@ function delLabel(){ return IS_IPHONE ? '🗑️' : 'Delete'; }
         of the file to the hash seen at first check (catches git pull / file
         edits even if APP_VERSION wasn't bumped).
 
-   On mismatch: blue top banner with Refresh (cache-bust reload) and Dismiss
-   (hides until a newer server stamp appears, or the tab is reloaded).
+   On mismatch: blue top banner with What's new (recent CHANGELOG), Refresh
+   (cache-bust reload), and Dismiss (hides until a newer server stamp appears,
+   or the tab is reloaded).
    Throttled on focus/visibility; pull-to-check and the interval force a check. */
 var _updBase = (function(){
   var p = location.pathname;
@@ -1524,28 +1816,205 @@ var _updBase = (function(){
   return p;
 })();
 var _updDismissed = null;   // server stamp the user dismissed this session
+var _updBannerStamp = null; // stamp currently shown on the banner (if any)
+var _updPulseCleared = null; // stamp for which header pulse was cleared (seen)
 var _updBootHtmlHash = null; // index.html hash from the first successful fetch
 var _updLastCheck = 0;
 var _updPending = null;
+var _updLockScrollY = 0;    // page scroll restored when What's new closes
 var UPD_THROTTLE_MS = 2*60*1000; // at most one automatic check every 2 minutes
 function _updHash(s){
   var h = 2166136261;
   for(var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h>>>0).toString(36);
 }
+function _updSetPulse(on){
+  var btn = document.getElementById('hdr-whats-new');
+  if(btn) btn.classList.toggle('pulse', !!on);
+}
+function _updClearPulse(stamp){
+  if(stamp) _updPulseCleared = stamp;
+  _updSetPulse(false);
+}
+/* Freeze the page under the dialog. overflow:hidden alone is not enough — it
+   also breaks position:sticky on the app header, so getBoundingClientRect()
+   goes negative and the card was parked off-screen (top:-600px). */
+function _updLockPage(on){
+  var html = document.documentElement;
+  var body = document.body;
+  if(on){
+    if(html.classList.contains('upd-news-open')) return;
+    _updLockScrollY = window.scrollY || html.scrollTop || 0;
+    html.classList.add('upd-news-open');
+    body.style.position = 'fixed';
+    body.style.top = (-_updLockScrollY) + 'px';
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+  }else{
+    if(!html.classList.contains('upd-news-open')) return;
+    html.classList.remove('upd-news-open');
+    body.style.position = '';
+    body.style.top = '';
+    body.style.left = '';
+    body.style.right = '';
+    body.style.width = '';
+    window.scrollTo(0, _updLockScrollY);
+  }
+}
+function _updNewsPosition(){
+  var bar = document.getElementById('updBar');
+  var card = document.querySelector('#updNews .updNews-card');
+  if(!card) return;
+  var gap = 30;
+  var topAnchor = 0;
+  if(bar && bar.classList.contains('show')){
+    topAnchor = bar.getBoundingClientRect().bottom;
+  }else{
+    var hdr = document.querySelector('#app:not([hidden]) .app-header') || document.querySelector('.app-header');
+    topAnchor = hdr ? hdr.getBoundingClientRect().bottom : 0;
+  }
+  /* Never place the card above the viewport — a negative rect means sticky
+     header measurement failed (e.g. before the page lock settled). */
+  if(!(topAnchor > 0)){
+    topAnchor = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--headH')) || 64;
+  }
+  topAnchor = Math.max(0, topAnchor);
+  var top = topAnchor + gap;
+  card.style.top = top + 'px';
+  card.style.maxHeight = 'min(70vh, calc(100dvh - ' + (top + 16) + 'px))';
+}
+function _updWireRefreshBtn(host){
+  var go = host && host.querySelector('#updGo');
+  if(!go) return;
+  go.onclick = function(){
+    var stamp = _updBannerStamp || String(Date.now());
+    _updClearPulse(stamp);
+    location.href = _updBase + '?v=' + encodeURIComponent(stamp) + '&_=' + Date.now();
+  };
+}
+function _updNewsOpen(){
+  var n = document.getElementById('updNews');
+  var body = document.getElementById('updNewsBody');
+  if(!n || !body) return;
+  n.hidden = false;
+  n.classList.add('show');
+  _updLockPage(true);
+  _updNewsPosition();
+  body.innerHTML = '<div class="updNews-new"><p class="muted" style="margin-top:0">Loading…</p></div>';
+  if(!window.fetch){
+    body.innerHTML =
+      '<div class="updNews-new"><p class="muted" style="margin-top:0">Could not load the change log in this browser.</p></div>'+
+      (_updBannerStamp
+        ? '<div class="updNews-refresh"><button type="button" class="ubtn" id="updGo">Load new version</button></div>'
+        : '');
+    _updWireRefreshBtn(body);
+    _updNewsPosition();
+    return;
+  }
+  fetch(_updBase+'CHANGELOG.md?_='+Date.now(), {cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.text(); })
+    .then(function(md){
+      body.innerHTML = renderUpdNewsChangelog(md, APP_VERSION);
+      _updWireRefreshBtn(body);
+      _updNewsPosition();
+    })
+    .catch(function(){
+      body.innerHTML =
+        '<div class="updNews-new"><p class="muted" style="margin-top:0">Could not load the change log. Check your connection and try again.</p></div>'+
+        (_updBannerStamp
+          ? '<div class="updNews-refresh"><button type="button" class="ubtn" id="updGo">Load new version</button></div>'
+          : '');
+      _updWireRefreshBtn(body);
+      _updNewsPosition();
+    });
+}
+function _updNewsClose(){
+  var n = document.getElementById('updNews');
+  if(!n) return;
+  n.classList.remove('show');
+  n.hidden = true;
+  _updLockPage(false);
+}
 function _updShowBanner(stamp){
   if(!stamp || _updDismissed===stamp) return;
   var bar = document.getElementById('updBar');
   if(!bar) return;
+  /* Auto-open What's new once when the banner first appears for this stamp.
+     Later focus/interval checks keep the banner up without re-opening the panel
+     if the user closed it. */
+  var freshlyShown = !bar.classList.contains('show') || _updBannerStamp!==stamp;
+  _updBannerStamp = stamp;
   bar.classList.add('show');
-  document.getElementById('updGo').onclick = function(){
-    location.href = _updBase + '?v=' + encodeURIComponent(stamp) + '&_=' + Date.now();
-  };
+  /* Pulse the header control until the user opens it from the header, dismisses
+     the banner, or loads the new build — auto-open alone does not clear it. */
+  if(_updPulseCleared!==stamp) _updSetPulse(true);
   document.getElementById('updX').onclick = function(){
-    _updDismissed = stamp;
-    bar.classList.remove('show');
+    var x = document.getElementById('updX');
+    roundPressOut(x, function(){
+      _updDismissed = stamp;
+      _updBannerStamp = null;
+      _updClearPulse(stamp);
+      _updNewsClose();
+      bar.classList.remove('show');
+      if(x){ x.classList.remove('press-out'); x.style.pointerEvents = ''; }
+    });
   };
+  if(freshlyShown) _updNewsOpen();
+  else _updNewsPosition();
 }
+(function wireUpdNewsDismiss(){
+  var scrim = document.getElementById('updNewsScrim');
+  var close = document.getElementById('updNewsClose');
+  if(scrim) scrim.addEventListener('click', _updNewsClose);
+  if(close) close.addEventListener('click', function(){
+    roundPressOut(close, function(){
+      _updNewsClose();
+      close.classList.remove('press-out');
+      close.style.pointerEvents = '';
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Escape') return;
+    var n = document.getElementById('updNews');
+    if(n && n.classList.contains('show')){
+      e.stopPropagation();
+      _updNewsClose();
+    }
+  });
+  window.addEventListener('resize', function(){
+    var n = document.getElementById('updNews');
+    if(n && n.classList.contains('show')) _updNewsPosition();
+  });
+  /* Own the wheel while the panel is up: always prevent page scroll and drive
+     the single .updNews-body scrollport (Earlier is no longer its own scroller). */
+  var news = document.getElementById('updNews');
+  if(news){
+    news.addEventListener('wheel', function(e){
+      if(!news.classList.contains('show')) return;
+      e.preventDefault();
+      var scroller = document.getElementById('updNewsBody');
+      if(!scroller) return;
+      if(e.target && e.target.closest && e.target.closest('.updNews-card')){
+        scroller.scrollTop += e.deltaY;
+      }
+    }, {passive:false});
+    news.addEventListener('touchmove', function(e){
+      if(!news.classList.contains('show')) return;
+      var inBody = e.target && e.target.closest && e.target.closest('.updNews-body');
+      if(!inBody) e.preventDefault();
+    }, {passive:false});
+  }
+  var hdrNews = document.getElementById('hdr-whats-new');
+  if(hdrNews) hdrNews.addEventListener('click', function(){
+    var n = document.getElementById('updNews');
+    if(n && n.classList.contains('show')){ _updNewsClose(); return; }
+    /* Header opens the changelog panel alone — no fake update banner.
+       Opening from the header clears the update pulse for the current stamp. */
+    if(_updBannerStamp) _updClearPulse(_updBannerStamp);
+    _updNewsOpen();
+  });
+})();
 function checkAppVersion(force){
   if(!window.fetch) return;
   if(location.protocol==='file:') return; // no same-origin server to compare
@@ -1634,7 +2103,7 @@ window.addEventListener('focus', function(){ checkAppVersion(false); });
   document.addEventListener('touchcancel', function(){ active=false; pull=0; hide(); }, {passive:true});
 })();
 
-/* ================= theme ================= */
+/* ================= theme & background ================= */
 function themePref(){ try{ return localStorage.getItem(LS_THEME) || 'system'; }catch(e){ return 'system'; } }
 function effectiveDark(){
   var t = themePref();
@@ -1642,11 +2111,131 @@ function effectiveDark(){
   if(t==='light') return false;
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
+/* Parse stored bg: JSON config or legacy "#rrggbb". */
+function bgPref(){
+  try{
+    var raw = localStorage.getItem(LS_BG) || '';
+    if(!raw) return null;
+    if(raw.charAt(0)==='{'){
+      var cfg = JSON.parse(raw);
+      if(cfg && cfg.value) return cfg;
+      return null;
+    }
+    if(/^#[0-9a-fA-F]{6}$/.test(raw)){
+      return {type:'solid', id:'custom', value:raw.toLowerCase(), base:raw.toLowerCase()};
+    }
+  }catch(e){}
+  return null;
+}
+function clearBgCss(){
+  var root = document.documentElement;
+  root.style.removeProperty('--bg');
+  root.style.removeProperty('--bg-extra');
+  root.style.removeProperty('--bg-size');
+}
+function applyBgCss(cfg){
+  var root = document.documentElement;
+  clearBgCss();
+  if(!cfg || !cfg.value) return;
+  if(cfg.type==='solid'){
+    root.style.setProperty('--bg', cfg.value);
+    return;
+  }
+  root.style.setProperty('--bg', cfg.base || DEFAULT_BG);
+  root.style.setProperty('--bg-extra', cfg.value);
+  if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
+}
+function bgConfigsEqual(a, b){
+  if(!a && !b) return true;
+  if(!a || !b) return false;
+  if(a.id && b.id) return a.id===b.id;
+  return a.type===b.type && a.value===b.value;
+}
+function paintBgPresetButtons(){
+  ['solid','gradient','pattern'].forEach(function(type){
+    var host = $('bg-presets-'+type);
+    if(!host || host.getAttribute('data-wired')==='1') return;
+    host.setAttribute('data-wired','1');
+    BG_PRESETS.filter(function(p){ return p.type===type; }).forEach(function(p){
+      var b = el('button',{
+        type:'button',
+        title:p.label,
+        'aria-label':p.label,
+        'data-bg-id':p.id,
+        class: type==='solid' ? 'solid' : ''
+      });
+      if(type==='solid'){
+        b.style.background = p.value;
+      }else{
+        b.style.backgroundColor = p.base || DEFAULT_BG;
+        b.style.backgroundImage = p.value;
+        if(p.size) b.style.backgroundSize = p.size;
+      }
+      b.addEventListener('click', function(){
+        setBgConfig(p.id==='default' ? null : Object.assign({}, p));
+        toast(p.id==='default' ? 'Background reset.' : 'Background updated.');
+      });
+      host.appendChild(b);
+    });
+  });
+}
+function syncBgControls(){
+  var cfg = bgPref();
+  paintBgPresetButtons();
+  var picker = $('set-bg');
+  if(picker){
+    if(cfg && cfg.type==='solid') picker.value = cfg.value;
+    else if(!cfg) picker.value = DEFAULT_BG;
+  }
+  document.querySelectorAll('.bg-presets button[data-bg-id]').forEach(function(b){
+    var id = b.getAttribute('data-bg-id');
+    var preset = BG_PRESETS.find(function(p){ return p.id===id; });
+    var on = false;
+    if(!cfg && id==='default') on = true;
+    else if(cfg && preset) on = bgConfigsEqual(cfg, preset);
+    else if(cfg && cfg.type==='solid' && cfg.id==='custom' && id==='default') on = false;
+    b.classList.toggle('on', on);
+  });
+  // Custom picker selected when user picked via color input (id=custom), or a solid hex that isn't a named swatch
+  var customOn = !!(cfg && cfg.type==='solid' && (
+    cfg.id==='custom' ||
+    !BG_PRESETS.some(function(p){
+      return p.type==='solid' && p.value.toLowerCase()===(cfg.value||'').toLowerCase();
+    })
+  ));
+  if(picker) picker.classList.toggle('on', customOn);
+}
+function applyBg(){
+  var cfg = bgPref();
+  if(cfg && !effectiveDark()) applyBgCss(cfg);
+  else clearBgCss();
+  syncBgControls();
+}
+function setBgConfig(cfg){
+  try{
+    if(!cfg || cfg.id==='default'){
+      localStorage.removeItem(LS_BG);
+    }else{
+      var out = {type:cfg.type, value:cfg.value, base:cfg.base||cfg.value};
+      if(cfg.id) out.id = cfg.id;
+      if(cfg.size) out.size = cfg.size;
+      localStorage.setItem(LS_BG, JSON.stringify(out));
+    }
+  }catch(e){}
+  applyBg();
+}
+function setBg(hex){
+  hex = String(hex||'').toLowerCase();
+  if(hex && !/^#[0-9a-f]{6}$/.test(hex)) return;
+  if(!hex){ setBgConfig(null); return; }
+  setBgConfig({type:'solid', id:'custom', value:hex, base:hex});
+}
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', effectiveDark()?'dark':'light');
   document.querySelectorAll('#theme-seg button').forEach(function(b){
     b.classList.toggle('on', b.getAttribute('data-theme-opt')===themePref());
   });
+  applyBg();
 }
 if(window.matchMedia){
   try{
@@ -2022,6 +2611,15 @@ function wireOverlayDismiss(ov, onDismiss, close){
     if(e.target===ov && ok){ if(onDismiss) onDismiss(); else close(); }
   });
 }
+/* Round-button press-out: grow+fade plays for ROUND_PRESS_MS, then `then`
+   runs (e.g. dismiss the sheet). Matches the CSS transition duration. */
+var ROUND_PRESS_MS = 150;
+function roundPressOut(btn, then){
+  if(!btn){ if(then) then(); return; }
+  btn.classList.add('press-out');
+  btn.style.pointerEvents = 'none';
+  setTimeout(function(){ if(then) then(); }, ROUND_PRESS_MS);
+}
 function openSheet(build, onDismiss){
   var root = $('modal-root');
   root.innerHTML='';
@@ -2034,9 +2632,9 @@ function openSheet(build, onDismiss){
   wireOverlayDismiss(ov, onDismiss, close);
   ov._dismiss = function(){ if(onDismiss) onDismiss(); else close(); }; // swipe-right closes like tap-outside
   /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
-     First child + sticky so it stays visible while the sheet scrolls. */
+     First child + sticky so it stays reachable while the sheet scrolls. */
   var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
-  xBtn.addEventListener('click', function(){ ov._dismiss(); });
+  xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
   sh.insertBefore(xBtn, sh.firstChild);
   build(sh, close);
   padStickyBars(sh);
@@ -2062,7 +2660,7 @@ function openSheetStacked(build, onDismiss){
   /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
      First child + sticky so it stays visible while the sheet scrolls. */
   var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
-  xBtn.addEventListener('click', function(){ ov._dismiss(); });
+  xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
   sh.insertBefore(xBtn, sh.firstChild);
   build(sh, close);
   padStickyBars(sh);
@@ -2849,11 +3447,114 @@ function updateUserChip(){
    Change log, rendered live from CHANGELOG.md so the repo file stays the
    single source of truth. Room here later for documentation sections. */
 var _infoLoaded = false;
+/* Match "### App 202610021858" or "### App version 202610021858". */
+var APP_VER_HEAD_RE = /^###\s+App(?:\s+version)?\s+(\d{12})\s*$/i;
+
+/* Parse CHANGELOG into blocks tagged by optional ### App stamp + ## date. */
+function parseChangelogBlocks(md){
+  var lines = String(md||'').split('\n');
+  var blocks = [];
+  var cur = null;
+  var curDate = '';
+  function flush(){
+    if(cur && (cur.bullets.length || cur.version)) blocks.push(cur);
+    cur = null;
+  }
+  for(var i=0;i<lines.length;i++){
+    var t = lines[i].replace(/\s+$/,'');
+    if(t.indexOf('## ')===0 && t.indexOf('### ')!==0){
+      flush();
+      curDate = t.slice(3).trim();
+      cur = {version:null, date:curDate, bullets:[]};
+      continue;
+    }
+    var vm = t.match(APP_VER_HEAD_RE);
+    if(vm){
+      flush();
+      cur = {version:vm[1], date:curDate, bullets:[]};
+      continue;
+    }
+    if(t.indexOf('# ')===0) continue;
+    if(t.indexOf('- ')===0){
+      if(!cur) cur = {version:null, date:curDate, bullets:[]};
+      cur.bullets.push(t.slice(2));
+    }
+  }
+  flush();
+  return blocks;
+}
+function changelogBlocksToMd(blocks){
+  var out = [];
+  var lastDate = null;
+  blocks.forEach(function(b){
+    if(b.date && b.date!==lastDate){
+      out.push('## '+b.date);
+      lastDate = b.date;
+    }
+    if(b.version) out.push('### App '+b.version);
+    b.bullets.forEach(function(item){ out.push('- '+item); });
+  });
+  return out.join('\n');
+}
+/* Update-banner panel: primary = everything newer than the running APP_VERSION
+   (all skipped builds together). Earlier history in a collapsed <details>.
+   Fallback when no ### App markers exist: newest 2 ## date sections.
+   "Load new version" only when there is newer changelog content and/or an
+   update was detected (banner stamp) — not when browsing history up-to-date. */
+function renderUpdNewsChangelog(md, sinceVer){
+  sinceVer = String(sinceVer||'');
+  var blocks = parseChangelogBlocks(md);
+  var hasVer = blocks.some(function(b){ return !!b.version; });
+  var newer = [], older = [];
+  if(hasVer){
+    blocks.forEach(function(b){
+      if(b.version && b.version > sinceVer) newer.push(b);
+      else older.push(b);
+    });
+  }else{
+    var dates = [], seen = {};
+    blocks.forEach(function(b){
+      if(b.date && !seen[b.date]){ seen[b.date]=1; dates.push(b.date); }
+    });
+    var keep = {};
+    dates.slice(0,2).forEach(function(d){ keep[d]=1; });
+    blocks.forEach(function(b){
+      if(b.date && keep[b.date]) newer.push(b);
+      else older.push(b);
+    });
+  }
+  var hasNewer = !!(newer.length && newer.some(function(b){ return b.bullets.length; }));
+  var showLoad = hasNewer || !!_updBannerStamp;
+  var html = '';
+  html += '<div class="updNews-new">';
+  if(hasNewer){
+    html += '<h2 style="margin-top:0">New since your version</h2>';
+    html += '<p class="muted" style="margin:0 0 10px;font-size:13px">You’re on <code>'+esc(sinceVer||'unknown')+'</code>. Everything below is newer (including any builds you skipped).</p>';
+    html += renderInfoChangelog(changelogBlocksToMd(newer));
+  }else if(showLoad){
+    html += '<p class="muted" style="margin-top:0">No changelog entries newer than your version (<code>'+esc(sinceVer||'unknown')+'</code>). Load the new version to pick up the latest build.</p>';
+  }else{
+    html += '<p class="muted" style="margin-top:0">You’re on <code>'+esc(sinceVer||'unknown')+'</code> — no newer changelog entries. Earlier history is below.</p>';
+  }
+  html += '</div>';
+  if(showLoad){
+    html += '<div class="updNews-refresh"><button type="button" class="ubtn" id="updGo">Load new version</button></div>';
+  }
+  if(older.length && older.some(function(b){ return b.bullets.length; })){
+    html += '<details class="updNews-earlier"><summary>Earlier changes</summary>';
+    html += '<div class="updNews-earlier-body">'+renderInfoChangelog(changelogBlocksToMd(older))+'</div>';
+    html += '</details>';
+  }
+  return html;
+}
 function renderInfoChangelog(md){
   var html = '', inList = false;
   md.split('\n').forEach(function(line){
     var t = line.replace(/\s+$/,'');
-    if(t.indexOf('## ')===0){
+    if(t.indexOf('### ')===0){
+      if(inList){ html+='</ul>'; inList=false; }
+      html += '<h4>'+esc(t.slice(4))+'</h4>';
+    }else if(t.indexOf('## ')===0){
       if(inList){ html+='</ul>'; inList=false; }
       html += '<h3>'+esc(t.slice(3))+'</h3>';
     }else if(t.indexOf('# ')===0){
@@ -3427,14 +4128,29 @@ function wireSettings(){
       toast('Theme updated.');
     });
   });
+  // background (light mode) — solids / gradients / patterns / custom
+  paintBgPresetButtons();
+  var bgPick = $('set-bg');
+  if(bgPick){
+    bgPick.addEventListener('input', function(){ setBg(bgPick.value); });
+    bgPick.addEventListener('change', function(){
+      setBg(bgPick.value);
+      toast('Background updated.');
+    });
+  }
+  var bgReset = $('set-bg-reset');
+  if(bgReset) bgReset.addEventListener('click', function(){
+    setBgConfig(null);
+    toast('Background reset.');
+  });
   // prefill when settings shown
   document.querySelector('#tabbar button[data-screen="settings"]').addEventListener('click', function(){
     refreshSettingsScreen();
   });
 }
-/* Everything the Setup tab needs on show: field values, store status, and
+/* Everything the Settings tab needs on show: field values, store status, and
    the category list. Used by the tab button AND by showScreen so a reload
-   that lands on Setup renders the list too. */
+   that lands on Settings renders the list too. */
 function refreshSettingsScreen(){
   $('set-url').value = state.apiUrl || '';
   $('set-user').value = state.userName || '';
@@ -3648,7 +4364,7 @@ function renderCatList(){
     row.appendChild(info);
     var rn=el('button',{class:'btn ghost small'},'Rename');
     rn.onclick=function(){ openCatRename(name); };
-    var del=el('button',{class:'btn ghost small',title:'Delete category','aria-label':'Delete '+name},'✕');
+    var del=rowDeleteBtn('Delete '+name);
     del.onclick=function(){ openCatDelete(name); };
     row.appendChild(rn);
     row.appendChild(del);
@@ -3866,6 +4582,9 @@ function renderDashboard(){
     if(_cc==='Transfers') return;
     if(!_dCatSeen[_cc]){ _dCatSeen[_cc] = 1; _dAllCats.push(_cc); }
   });
+  // Include Categories-sheet names (e.g. just created on Add bill) even when
+  // no transaction in this period uses them yet — matches Transactions' menu.
+  mergeCatalogCats(_dCatSeen, _dAllCats, bpVal);
   _dAllCats.sort();
   var dashCatSelBudget = dashCatSel.slice(); // budget card keeps budget-category picks across filter views
   dashCatSel = dashCatSel.filter(function(c){ return !!_dCatSeen[c]; }); // prune cats absent this period
@@ -3938,10 +4657,12 @@ function renderDashboard(){
     dfsT.textContent = rangeLabel + ' · ' + dfsCats + (acct==='all' ? '' : ' · '+acct) + (dashBank==='all' ? '' : ' · '+dashBank) + ' · ' + rows.length + ' transactions';
   }
 
-  // Bills card: due this week + overdue. Tap to open the Bills page.
+  // Upcoming Bills card: overdue + due-this-week summary, plus a short list
+  // of bills due in the next 14 days (overdue included). Tap the card → Bills
+  // page; tap a row → edit that bill; Paid opens the same mark-paid sheet.
   (function(){
-    var today = todayLocal();
-    var d1 = new Date(today+'T12:00:00');
+    var DASH_BILL_HORIZON = 14; // days ahead (inclusive); overdue always included
+    var DASH_BILL_LIST_MAX = 6;  // keep the Home card scannable
     var over = 0, soon = 0;
     billsActive().forEach(function(b){
       var st = billStatus(b);
@@ -3954,7 +4675,66 @@ function renderDashboard(){
       if(over>0) vals.appendChild(el('span',{style:'color:var(--danger)'},over+' overdue'));
       if(over>0 && soon>0) vals.appendChild(document.createTextNode(' · '));
       if(soon>0) vals.appendChild(el('span',null,soon+' due this week'));
-      if(!over && !soon) vals.appendChild(el('span',{class:'muted'},'all clear'));
+      if(!over && !soon) vals.appendChild(el('span',{class:'muted'},'All clear! Yay!'));
+    }
+    var list = $('dash-bills-list');
+    if(list){
+      list.innerHTML = '';
+      var upcoming = billsActive().filter(function(b){
+        var d = billDaysUntil(b);
+        return d !== null && d <= DASH_BILL_HORIZON;
+      }).sort(function(a,b){
+        return String(a.dueDate||'').localeCompare(String(b.dueDate||''))
+          || String(a.name||'').localeCompare(String(b.name||''));
+      });
+      var shown = upcoming.slice(0, DASH_BILL_LIST_MAX);
+      shown.forEach(function(b){
+        var days = billDaysUntil(b);
+        var row = el('div',{class:'bill-row','data-bill-id':b.id});
+        row.style.cursor = 'pointer';
+        var info = el('div',{class:'bi'});
+        info.appendChild(el('div',{class:'bn'}, b.name||'Unnamed bill'));
+        var meta = 'due '+fmtBillDate(b.dueDate);
+        if(days !== null){
+          meta += ' · '+(days < 0 ? Math.abs(days)+' days overdue'
+            : days === 0 ? 'due today'
+            : days === 1 ? '1 day left' : days+' days left');
+        }
+        var bm = el('div',{class:'bm'}, meta);
+        // Color the meta line for urgency (same hues as bill badges).
+        var st = billStatus(b);
+        if(st==='overdue') bm.style.color = 'var(--danger)';
+        else if(st==='due-soon') bm.style.color = '#b8860b';
+        info.appendChild(bm);
+        row.appendChild(info);
+        row.appendChild(el('div',{class:'amt'}, money(num(b.amount))));
+        var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
+        paidBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          openBillPaidSheet(b);
+        });
+        row.appendChild(paidBtn);
+        var delBtn = rowDeleteBtn('Delete '+(b.name||'bill'));
+        delBtn.addEventListener('click', function(e){
+          e.stopPropagation();
+          deleteBill(b);
+        });
+        row.appendChild(delBtn);
+        row.addEventListener('click', function(e){
+          e.stopPropagation();
+          openBillForm(b);
+        });
+        list.appendChild(row);
+      });
+      if(upcoming.length > shown.length){
+        var more = el('button',{class:'linkbtn', id:'dash-bills-more', type:'button'},
+          '+'+(upcoming.length-shown.length)+' more on Bills');
+        more.addEventListener('click', function(e){
+          e.stopPropagation();
+          showScreen('bills');
+        });
+        list.appendChild(more);
+      }
     }
     var card = $('dash-bills-card');
     if(card) card.onclick = function(){ showScreen('bills'); };
@@ -4148,12 +4928,13 @@ function wireRepChartCards(){
         head.appendChild(h2);
         head.insertBefore(el('span',{class:'card-grip no-print',title:'Drag to reorder '+(REP_CHARTS[key]||key)},'\u283f'), h2);
         h2.style.margin = '0';
-        var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+(REP_CHARTS[key]||key)+' from reports page'},'\u00D7');
-        rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
+        var rm = cardDismissBtn('Remove '+(REP_CHARTS[key]||key)+' from reports page');
         rm.addEventListener('click', function(){
-          saveRepHiddenCharts(repHiddenCharts().concat([key]));
-          saveRepChartOrder(repChartOrder().filter(function(k){ return k!==key; }));
-          wireRepChartCards();
+          roundPressOut(rm, function(){
+            saveRepHiddenCharts(repHiddenCharts().concat([key]));
+            saveRepChartOrder(repChartOrder().filter(function(k){ return k!==key; }));
+            wireRepChartCards();
+          });
         });
         head.appendChild(rm);
       }
@@ -4292,11 +5073,12 @@ function renderDashCharts(){
     var head = el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:8px'});
     head.appendChild(el('span',{class:'card-grip no-print',title:'Drag to reorder '+meta.title},'\u283f'));
     head.appendChild(el('h2',{style:'margin:0'}, meta.title));
-    var rm = el('button',{class:'linkbtn no-print','aria-label':'Remove '+meta.title+' from home page'},'\u00D7');
-    rm.style.fontSize = '22px'; rm.style.lineHeight = '1'; rm.style.padding = '4px 8px';
+    var rm = cardDismissBtn('Remove '+meta.title+' from home page');
     (function(k){ rm.onclick = function(){
-      saveDashChartList(dashChartList().filter(function(x){ return x!==k; }));
-      renderDashCharts();
+      roundPressOut(rm, function(){
+        saveDashChartList(dashChartList().filter(function(x){ return x!==k; }));
+        renderDashCharts();
+      });
     }; })(pick);
     head.appendChild(rm);
     card.appendChild(head);
@@ -4611,6 +5393,16 @@ function allCategories(){
   state.categories.forEach(function(c){ if(c.name) s[c.name]=true; });
   state.transactions.forEach(function(t){ if(t.category) s[t.category]=true; });
   return Object.keys(s).sort();
+}
+/* Fold Categories-sheet names into a Home/Reports chip accumulator so a
+   category created via Add bill / Add transaction appears in the filter
+   before any transaction uses it. bpKind '' = all kinds. */
+function mergeCatalogCats(seen, list, bpKind){
+  state.categories.forEach(function(c){
+    if(!c || !c.name || c.name==='Transfers') return;
+    if(bpKind && c.kind && c.kind!==bpKind) return;
+    if(!seen[c.name]){ seen[c.name] = 1; list.push(c.name); }
+  });
 }
 function syncAllChips(){
   ['f-type','f-bp','f-cat','f-bank','f-tax'].forEach(function(id){
@@ -6566,7 +7358,7 @@ function openSplitSheet(t, baseRow, closeEditForm){
         placeholder:'0.00', value:(amount||''), style:'width:104px;flex:none'});
       var sel = el('select', {style:'flex:1;min-width:0'});
       categoryOptionsFor(sel, bpKind, cat||'');
-      var del = el('button', {class:'linkbtn', type:'button', style:'flex:none', 'aria-label':'Remove part'}, '\u00d7');
+      var del = rowDeleteBtn('Remove part');
       rowEl.appendChild(amt); rowEl.appendChild(sel); rowEl.appendChild(del);
       var r = {amt:amt, sel:sel, el:rowEl};
       del.addEventListener('click', function(){
@@ -9478,7 +10270,7 @@ function botRenderTable(){
     });
     amtCell.appendChild(inp);
     line.appendChild(amtCell);
-    var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    var del = rowDeleteBtn('Remove category');
     del.addEventListener('click', function(){
       botRememberRemoved(BOT_REMOVED_LS, ym, r.category);
       botFixedSet(BOT_FIXED_LS, ym, r.category, false);
@@ -9884,7 +10676,7 @@ function incBotRenderTable(){
     });
     amtCell.appendChild(inp);
     line.appendChild(amtCell);
-    var del = el('button',{class:'btn small ghost lockbtn',type:'button',title:'Remove category',style:'padding:4px 0'},'✕');
+    var del = rowDeleteBtn('Remove category');
     del.addEventListener('click', function(){
       botRememberRemoved(INC_BOT_REMOVED_LS, ym, r.category);
       botFixedSet(INC_BOT_FIXED_LS, ym, r.category, false);
@@ -10138,8 +10930,7 @@ function billRow(b, showDate, maxAmt, dueMin, dueMax){
   var paidBtn = el('button',{class:'btn small',type:'button'},'Paid');
   paidBtn.addEventListener('click', function(e){ e.stopPropagation(); openBillPaidSheet(b); });
   l2.appendChild(paidBtn);
-  var delBtn = el('button',{class:'btn small ghost',type:'button',title:'Delete bill','aria-label':'Delete '+(b.name||'bill')},'✕');
-  delBtn.style.color = 'var(--danger)';
+  var delBtn = rowDeleteBtn('Delete '+(b.name||'bill'));
   delBtn.addEventListener('click', function(e){ e.stopPropagation(); deleteBill(b); });
   l2.appendChild(delBtn);
   main.appendChild(l2);
@@ -10281,7 +11072,7 @@ function renderBillList(){
     info.appendChild(el('div',{class:'bm'},(b.category||'Uncategorized')+' · paid '+fmtBillDate(b.lastPaid)));
     row.appendChild(info);
     row.appendChild(el('div',{class:'amt'},money(num(b.amount))));
-    var del = el('button',{class:'btn small ghost',type:'button'},'✕');
+    var del = rowDeleteBtn('Delete '+(b.name||'bill'));
     del.addEventListener('click', function(){ deleteBill(b); });
     row.appendChild(del);
     pl.appendChild(row);
@@ -11013,6 +11804,9 @@ function openBillForm(b, opts){
         }
       }catch(e){ toast('Could not save the bill.', true); return; }
       close(); renderBills();
+      // Home Upcoming Bills is rendered by the dashboard — refresh it too when
+      // the bill was added/edited from that card (otherwise the list stays stale).
+      if(state.screen==='dashboard') renderDashboard();
     });
     var cancelBtn = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancelBtn.addEventListener('click', close);
@@ -11105,13 +11899,20 @@ async function markBillPaid(b, createTxn){
   }
   toast('Marked paid.');
   renderBills();
+  // Home Upcoming Bills is rendered by the dashboard — refresh it too when
+  // mark-paid was started from that card (otherwise the row stays put).
+  if(state.screen==='dashboard') renderDashboard();
 }
 
 function deleteBill(b, closeParent){
   openSheetStacked(function(sh, close){
     sh.appendChild(el('h2',null,'Delete bill?'));
-    sh.appendChild(el('p',{class:'muted'},(b.name||'Bill')+' · '+money(num(b.amount))+' will be removed.'));
-    var bar = el('div',{class:'btnrow stickybar-page'});
+    // Extra space under the payee line before Cancel/Delete (padding so it
+    // doesn't collapse into the button row's margin-top). Plain btnrow — not
+    // stickybar-page — keeps a short confirm from docking/overlapping.
+    sh.appendChild(el('p',{class:'muted',style:'margin:4px 0 0;padding-bottom:24px'},
+      (b.name||'Bill')+' · '+money(num(b.amount))+' will be removed.'));
+    var bar = el('div',{class:'btnrow',style:'margin-top:18px'});
     var del = el('button',{class:'btn',type:'button',style:'background:var(--danger)','aria-label':'Delete'},delLabel());
     del.addEventListener('click', async function(){
       try{ await getStore().remove('Bills', b.id); }
@@ -11121,6 +11922,7 @@ function deleteBill(b, closeParent){
       if(closeParent) closeParent();
       toast('Bill deleted.');
       renderBills();
+      if(state.screen==='dashboard') renderDashboard();
     });
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.addEventListener('click', close);
@@ -11663,6 +12465,9 @@ function renderReports(){
     var cc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
     if(!_catSeen[cc]){ _catSeen[cc] = 1; _allCats.push(cc); }
   });
+  // Same as Home: include Categories-sheet names so newly created categories
+  // show up before any transaction in the period uses them.
+  mergeCatalogCats(_catSeen, _allCats, bpVal);
   _allCats.sort();
   // Snapshot the selection before pruning: the Budget vs Actual chart honors what
   // was selected even for budgeted categories with no transactions in the period

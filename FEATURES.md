@@ -62,7 +62,8 @@ live copy of this list.
   jumps back to the filters).
 - Category Mix donut + table, tappable; Income listed above Expenses.
 - Category chips: multi-select filter for the whole page ("All" clears).
-- Bills card: overdue and due-this-week at a glance; "+ Add bill" button opens
+- Upcoming Bills card: overdue and due-this-week at a glance, plus a short list of
+  bills due in the next 14 days (name, due date, amount, Paid); "+ Add bill" opens
   the bill form right from the home page.
 - Chart cards: add/remove, drag to reorder, order saved.
 
