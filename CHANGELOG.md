@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-02
+### App 202610022351
+- Max Headroom Grid card: plane rotation can **animate continuously** between a **lower** and **upper** limit (plus period). Fixed rotation remains when Animate is off.
 ### App 202610022340
 - Max Headroom editor: **layer pills** (`.catchip`) — All / None / Grid / Scanlines / Stripes / Glitch / City·shapes / Ambient. Enabled pill shows that layer’s settings card; disabled hides the card and turns the layer off in live preview.
 - Always-visible **Colors** + **Motion** cards above the pills; Grid card holds rotation, vanishing point, VP motion, and randomness.

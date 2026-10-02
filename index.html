@@ -36,7 +36,9 @@
           washOn:'--mh-wash-on', horizonOn:'--mh-horizon-on', vignetteOn:'--mh-vignette-on', chromaOn:'--mh-chroma-on',
           gridOn:'--mh-grid-on', gridSize:'--mh-grid-size', gridThick:'--mh-grid-thick', gridOpacity:'--mh-grid-opacity',
           gridPersp:'--mh-grid-persp', gridDepth:'--mh-grid-depth', gridDur:'--mh-grid-dur',
-          gridRot:'--mh-grid-rot', vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
+          gridRot:'--mh-grid-rot', gridRotAnimate:'--mh-grid-rot-animate',
+          gridRotMin:'--mh-grid-rot-min', gridRotMax:'--mh-grid-rot-max', gridRotDur:'--mh-grid-rot-dur-num',
+          vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
           vpAmp:'--mh-vp-amp-num', vpDur:'--mh-vp-dur-num', gridRand:'--mh-grid-rand',
           scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
           beam:'--mh-beam', flicker:'--mh-flicker',
@@ -59,6 +61,11 @@
         root.style.setProperty('--mh-grid-depth-deg', (r.gridDepth||64)+'deg');
         root.style.setProperty('--mh-grid-dur', (r.gridDur||3.2)+'s');
         root.style.setProperty('--mh-grid-rot-deg', (r.gridRot||0)+'deg');
+        var rMin = (r.gridRotMin!=null?r.gridRotMin:-18), rMax = (r.gridRotMax!=null?r.gridRotMax:18);
+        if(rMin>rMax){ var _rt=rMin; rMin=rMax; rMax=_rt; }
+        root.style.setProperty('--mh-grid-rot-min-deg', rMin+'deg');
+        root.style.setProperty('--mh-grid-rot-max-deg', rMax+'deg');
+        root.style.setProperty('--mh-grid-rot-dur', (r.gridRotDur!=null?r.gridRotDur:8)+'s');
         root.style.setProperty('--mh-vp-x', (r.vpX!=null?r.vpX:50)+'%');
         root.style.setProperty('--mh-vp-y', (r.vpY!=null?r.vpY:47)+'%');
         root.style.setProperty('--mh-vp-amp', (r.vpAmp!=null?r.vpAmp:8)+'%');
@@ -85,6 +92,7 @@
             st.setAttribute('data-mh-vignette', r.vignetteOn===false?'0':'1');
             st.setAttribute('data-mh-chroma', r.chromaOn===false?'0':'1');
             st.setAttribute('data-vp-move', (r.vpMove && r.gridOn!==false)?'1':'0');
+            st.setAttribute('data-grid-rot', (r.gridRotAnimate && r.gridOn!==false)?'1':'0');
             st.setAttribute('data-grid-rand', ((r.gridRand||0)>0 && r.gridOn!==false)?'1':'0');
           }
         }catch(_e){}
@@ -1628,7 +1636,8 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
   --mh-intensity:1; --mh-speed:1; --mh-vignette:.5; --mh-chroma:0;
   --mh-grid-on:1; --mh-grid-size:36; --mh-grid-thick:2; --mh-grid-opacity:.72;
   --mh-grid-persp:480; --mh-grid-depth:64; --mh-grid-dur:3.2;
-  --mh-grid-rot:0; --mh-grid-rot-deg:0deg; --mh-vp-x:50%; --mh-vp-y:47%; --mh-vp-amp:8%; --mh-vp-dur:6s; --mh-grid-rand:0;
+  --mh-grid-rot:0; --mh-grid-rot-deg:0deg; --mh-grid-rot-min-deg:-18deg; --mh-grid-rot-max-deg:18deg; --mh-grid-rot-dur:8s;
+  --mh-vp-x:50%; --mh-vp-y:47%; --mh-vp-amp:8%; --mh-vp-dur:6s; --mh-grid-rand:0;
   --mh-wash-on:1; --mh-horizon-on:1; --mh-vignette-on:1; --mh-chroma-on:0;
   --mh-scan-on:1; --mh-scan-gap:3; --mh-scan-opacity:.55; --mh-scan-dur:1.4;
   --mh-beam:0.55; --mh-flicker:0.35;
@@ -1660,6 +1669,14 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
 }
 .mh-custom[data-mh-grid="1"][data-vp-move="1"] .mhc-grid{
   animation:mhc-vp-drift calc(var(--mh-vp-dur,6s) / var(--_spd)) ease-in-out infinite;
+}
+.mh-custom[data-mh-grid="1"][data-grid-rot="1"] .mhc-grid{
+  animation:mhc-grid-rot calc(var(--mh-grid-rot-dur,8s) / var(--_spd)) ease-in-out infinite;
+}
+.mh-custom[data-mh-grid="1"][data-vp-move="1"][data-grid-rot="1"] .mhc-grid{
+  animation:
+    mhc-vp-drift calc(var(--mh-vp-dur,6s) / var(--_spd)) ease-in-out infinite,
+    mhc-grid-rot calc(var(--mh-grid-rot-dur,8s) / var(--_spd)) ease-in-out infinite;
 }
 .mh-custom .mhc-plane{
   position:absolute; left:-50%; width:200%; height:58%;
@@ -1722,6 +1739,10 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
   25%{ perspective-origin:calc(var(--mh-vp-x,50%) + var(--mh-vp-amp,8%)) calc(var(--mh-vp-y,47%) - var(--mh-vp-amp,8%) * .55); }
   50%{ perspective-origin:calc(var(--mh-vp-x,50%) - var(--mh-vp-amp,8%) * .35) calc(var(--mh-vp-y,47%) + var(--mh-vp-amp,8%) * .4); }
   75%{ perspective-origin:calc(var(--mh-vp-x,50%) + var(--mh-vp-amp,8%) * .5) calc(var(--mh-vp-y,47%) + var(--mh-vp-amp,8%) * .25); }
+}
+@keyframes mhc-grid-rot{
+  0%,100%{ transform:rotateZ(var(--mh-grid-rot-min-deg,-18deg)); }
+  50%{ transform:rotateZ(var(--mh-grid-rot-max-deg,18deg)); }
 }
 @keyframes mhc-horizon-wander{
   0%,100%{ transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35)); }
@@ -3285,7 +3306,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022340';
+var APP_VERSION = '202610022351';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -4284,7 +4305,8 @@ function mhDefaultRecipe(){
     intensity:1, speed:1, vignette:0.5, chroma:0, freeze:false,
     washOn:true, horizonOn:true, vignetteOn:true, chromaOn:false,
     gridOn:true, gridSize:36, gridThick:2, gridOpacity:0.72, gridPersp:480, gridDepth:64, gridDur:3.2,
-    gridRot:0, vpX:50, vpY:47, vpMove:false, vpAmp:8, vpDur:6, gridRand:0,
+    gridRot:0, gridRotAnimate:false, gridRotMin:-18, gridRotMax:18, gridRotDur:8,
+    vpX:50, vpY:47, vpMove:false, vpAmp:8, vpDur:6, gridRand:0,
     scanOn:true, scanGap:3, scanOpacity:0.55, scanDur:1.4, beam:0.55, flicker:0.35,
     stripeOn:true, stripeThick:28, stripeAngle:-32, stripeOpacity:0.55, stripeDur:4,
     glitchOn:true, tear:1, glitchDur:2.2, rgb:6, noise:0.2, stutter:1,
@@ -4297,7 +4319,9 @@ var MH_CSS_MAP = {
   washOn:'--mh-wash-on', horizonOn:'--mh-horizon-on', vignetteOn:'--mh-vignette-on', chromaOn:'--mh-chroma-on',
   gridOn:'--mh-grid-on', gridSize:'--mh-grid-size', gridThick:'--mh-grid-thick', gridOpacity:'--mh-grid-opacity',
   gridPersp:'--mh-grid-persp', gridDepth:'--mh-grid-depth', gridDur:'--mh-grid-dur',
-  gridRot:'--mh-grid-rot', vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
+  gridRot:'--mh-grid-rot', gridRotAnimate:'--mh-grid-rot-animate',
+  gridRotMin:'--mh-grid-rot-min', gridRotMax:'--mh-grid-rot-max', gridRotDur:'--mh-grid-rot-dur-num',
+  vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
   vpAmp:'--mh-vp-amp-num', vpDur:'--mh-vp-dur-num', gridRand:'--mh-grid-rand',
   scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
   beam:'--mh-beam', flicker:'--mh-flicker',
@@ -4312,7 +4336,8 @@ function clearMhCssVars(){
   var root = document.documentElement;
   Object.keys(MH_CSS_MAP).forEach(function(k){ root.style.removeProperty(MH_CSS_MAP[k]); });
   ['--mh-grid-size-px','--mh-grid-thick-px','--mh-grid-persp-px','--mh-grid-depth-deg','--mh-grid-dur',
-   '--mh-grid-rot-deg','--mh-vp-x','--mh-vp-y','--mh-vp-amp','--mh-vp-dur',
+   '--mh-grid-rot-deg','--mh-grid-rot-min-deg','--mh-grid-rot-max-deg','--mh-grid-rot-dur',
+   '--mh-vp-x','--mh-vp-y','--mh-vp-amp','--mh-vp-dur',
    '--mh-scan-gap-px','--mh-scan-dur','--mh-stripe-thick-px','--mh-stripe-angle-deg','--mh-stripe-dur',
    '--mh-glitch-dur','--mh-rgb-px','--mh-city-pulse'].forEach(function(p){ root.style.removeProperty(p); });
 }
@@ -4331,6 +4356,9 @@ function normalizeMhRecipe(raw){
       r[k] = /^#[0-9a-fA-F]{6}$/.test(hx) ? hx.toLowerCase() : d[k];
     }
   });
+  if(r.gridRotMin > r.gridRotMax){
+    var swap = r.gridRotMin; r.gridRotMin = r.gridRotMax; r.gridRotMax = swap;
+  }
   return r;
 }
 function syncMhLayerFlags(host, recipe){
@@ -4351,6 +4379,7 @@ function syncMhLayerFlags(host, recipe){
     n.setAttribute('data-mh-vignette', r.vignetteOn?'1':'0');
     n.setAttribute('data-mh-chroma', r.chromaOn?'1':'0');
     n.setAttribute('data-vp-move', (r.vpMove && r.gridOn)?'1':'0');
+    n.setAttribute('data-grid-rot', (r.gridRotAnimate && r.gridOn)?'1':'0');
     n.setAttribute('data-grid-rand', (r.gridRand>0 && r.gridOn)?'1':'0');
     n.setAttribute('data-mh-all-off', anyOn?'0':'1');
   });
@@ -4369,6 +4398,9 @@ function applyMhVarsTo(el, recipe){
   el.style.setProperty('--mh-grid-depth-deg', r.gridDepth+'deg');
   el.style.setProperty('--mh-grid-dur', r.gridDur+'s');
   el.style.setProperty('--mh-grid-rot-deg', r.gridRot+'deg');
+  el.style.setProperty('--mh-grid-rot-min-deg', r.gridRotMin+'deg');
+  el.style.setProperty('--mh-grid-rot-max-deg', r.gridRotMax+'deg');
+  el.style.setProperty('--mh-grid-rot-dur', r.gridRotDur+'s');
   el.style.setProperty('--mh-vp-x', r.vpX+'%');
   el.style.setProperty('--mh-vp-y', r.vpY+'%');
   el.style.setProperty('--mh-vp-amp', r.vpAmp+'%');
@@ -4464,7 +4496,11 @@ var MH_LAYER_PILLS = [
     {key:'gridOpacity', label:'Opacity', type:'range', min:0, max:1, step:0.01},
     {key:'gridPersp', label:'Perspective', type:'range', min:200, max:900, step:10},
     {key:'gridDepth', label:'Depth angle', type:'range', min:40, max:80, step:1},
-    {key:'gridRot', label:'Plane rotation', type:'range', min:-45, max:45, step:1},
+    {key:'gridRot', label:'Plane rotation (fixed)', type:'range', min:-45, max:45, step:1},
+    {key:'gridRotAnimate', label:'Animate plane rotation', type:'toggle'},
+    {key:'gridRotMin', label:'Rotation lower limit', type:'range', min:-60, max:60, step:1},
+    {key:'gridRotMax', label:'Rotation upper limit', type:'range', min:-60, max:60, step:1},
+    {key:'gridRotDur', label:'Rotation period (s)', type:'range', min:2, max:20, step:0.5},
     {key:'gridDur', label:'Scroll period (s)', type:'range', min:0.8, max:8, step:0.1},
     {key:'horizonOn', label:'Horizon line', type:'toggle'},
     {key:'vpX', label:'Vanishing point X', type:'range', min:10, max:90, step:1},
@@ -4662,6 +4698,7 @@ function openMhEditor(editItem){
         }else{
           syncControl('horizonOn', false);
           syncControl('vpMove', false);
+          syncControl('gridRotAnimate', false);
         }
       }
     }
@@ -5078,7 +5115,8 @@ function interpretAiBgPrompt(prompt){
     name = 'Night highway';
     r.black='#05070c'; r.neon1='#00ffff'; r.neon2='#ff00c8'; r.accent='#ffe600';
     r.gridOn=true; r.horizonOn=true; r.stripeOn=true; r.scanOn=true; r.glitchOn=true;
-    r.gridRot=-6; r.vpX=50; r.vpY=42; r.vpMove=true; r.vpAmp=10; r.gridRand=2;
+    r.gridRot=-6; r.gridRotAnimate=true; r.gridRotMin=-14; r.gridRotMax=4; r.gridRotDur=7;
+    r.vpX=50; r.vpY=42; r.vpMove=true; r.vpAmp=10; r.gridRand=2;
   }else if(/calm|minimal|quiet|soft|empty|solid/.test(t)){
     name = 'Quiet CRT';
     r.washOn=true; r.gridOn=false; r.horizonOn=false; r.scanOn=false; r.stripeOn=false;
