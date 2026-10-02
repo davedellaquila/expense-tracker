@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Bills calendar header: the next-month › button now sits right after the month/year, with the monthly total alone on the far right.
 - New Info tab (far right): shows the app version and renders this change log live from the repo — room to add documentation sections later.
 - Pull-to-check-for-updates: dragging down from the very top of any screen runs the update check (same as the automatic one) — no sheet open, page scrolled to top.
 - Bills calendar header now shows the month's total on the right, balancing the month title on the left.
