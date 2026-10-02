@@ -565,11 +565,13 @@ textarea{resize:vertical; min-height:64px;}
 .repfilterstick .rf-sum{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 #rep-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
 #dash-filtercard{scroll-margin-top:calc(var(--headH, 64px) + 12px);}
-/* Largest expenses: fixed layout so Category/Amount stay visible; merchant wraps */
+/* Largest expenses: fixed layout so Category/Amount stay visible; merchant wraps.
+   Category truncates with an ellipsis inside its column (never overlaps Amount). */
 table.ptable.top-table{min-width:0; table-layout:fixed; width:100%;}
-table.ptable.top-table th:nth-child(1){width:20%;}
-table.ptable.top-table th:nth-child(3){width:24%;}
+table.ptable.top-table th:nth-child(1){width:18%;}
+table.ptable.top-table th:nth-child(3){width:27%;}
 table.ptable.top-table th:nth-child(4){width:22%;}
+table.ptable.top-table td:nth-child(3){overflow:hidden; text-overflow:ellipsis;}
 .top-cell{min-width:0;}
 .top-merch{font-weight:600; overflow-wrap:anywhere;}
 .top-desc{font-size:12px; color:var(--muted); overflow-wrap:anywhere;}
@@ -1414,7 +1416,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020243';
+var APP_VERSION = '202610020246';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
