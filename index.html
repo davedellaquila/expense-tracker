@@ -1336,7 +1336,7 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
         <h2 id="rep-title" style="margin-bottom:2px">Expense report</h2>
         <p class="muted" id="rep-sub" style="margin-top:0"></p>
         <p class="muted" style="font-size:12.5px; margin:6px 0 0">Tip: tap any chart to see the underlying transactions.</p>
-        <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
+        <div class="stat-grid" id="rep-stats"></div>
       </div>
       <div class="card" data-repchart="catmix"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div></div>
       <div class="card" data-repchart="catbars"><h2>Category Bars</h2><p class="chart-sub">Each month's spend by category, side by side — tap a bar to drill in</p><div id="rep-catbars"></div></div>
@@ -1495,7 +1495,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610021345';
+var APP_VERSION = '202610021352';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
