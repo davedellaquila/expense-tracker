@@ -15,8 +15,6 @@
   var t = localStorage.getItem('expenseTracker.theme') || 'system';
   var dark = t==='dark' || (t==='system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.setAttribute('data-theme', dark?'dark':'light');
-  /* Custom page bg (solid / gradient / pattern) is light-mode only. */
-  if(dark) return;
   var raw = localStorage.getItem('expenseTracker.bg');
   if(!raw) return;
   var cfg = null;
@@ -24,10 +22,109 @@
   else if(/^#[0-9a-fA-F]{6}$/.test(raw)) cfg = {type:'solid', value:raw, base:raw};
   if(!cfg || !cfg.value) return;
   var root = document.documentElement;
+  /* Max Headroom: paint only via #bg-dynamic — do NOT overwrite --bg.
+     Ghost buttons / chips use --bg as a surface fill; forcing CRT black there
+     made Create account / Continue with Google unreadable on white cards. */
+  if(cfg.type==='dynamic'){
+    root.setAttribute('data-bg-dynamic', cfg.id || cfg.value);
+    if((cfg.id||cfg.value)==='mh-custom' && cfg.recipe && cfg.recipe.kind==='mh'){
+      try{
+        var r = cfg.recipe;
+        var map = {
+          black:'--mh-black', neon1:'--mh-neon1', neon2:'--mh-neon2', accent:'--mh-accent',
+          intensity:'--mh-intensity', speed:'--mh-speed', vignette:'--mh-vignette', chroma:'--mh-chroma',
+          washOn:'--mh-wash-on', horizonOn:'--mh-horizon-on', vignetteOn:'--mh-vignette-on', chromaOn:'--mh-chroma-on',
+          gridOn:'--mh-grid-on', gridSize:'--mh-grid-size', gridThick:'--mh-grid-thick', gridOpacity:'--mh-grid-opacity',
+          gridPersp:'--mh-grid-persp', gridDepth:'--mh-grid-depth', gridDur:'--mh-grid-dur',
+          gridRot:'--mh-grid-rot', vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
+          vpAmp:'--mh-vp-amp-num', vpDur:'--mh-vp-dur-num', gridRand:'--mh-grid-rand',
+          scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
+          beam:'--mh-beam', flicker:'--mh-flicker',
+          stripeOn:'--mh-stripe-on', stripeThick:'--mh-stripe-thick', stripeAngle:'--mh-stripe-angle',
+          stripeOpacity:'--mh-stripe-opacity', stripeDur:'--mh-stripe-dur',
+          glitchOn:'--mh-glitch-on', tear:'--mh-tear', glitchDur:'--mh-glitch-dur', rgb:'--mh-rgb',
+          noise:'--mh-noise', stutter:'--mh-stutter',
+          cityOn:'--mh-city-on', cityOpacity:'--mh-city-opacity', cityPulse:'--mh-city-pulse',
+          shapeSize:'--mh-shape-size', shapeCount:'--mh-shape-count'
+        };
+        Object.keys(map).forEach(function(k){
+          if(r[k]==null) return;
+          var v = r[k];
+          if(typeof v==='boolean') v = v ? 1 : 0;
+          root.style.setProperty(map[k], String(v));
+        });
+        root.style.setProperty('--mh-grid-size-px', (r.gridSize||36)+'px');
+        root.style.setProperty('--mh-grid-thick-px', (r.gridThick||2)+'px');
+        root.style.setProperty('--mh-grid-persp-px', (r.gridPersp||480)+'px');
+        root.style.setProperty('--mh-grid-depth-deg', (r.gridDepth||64)+'deg');
+        root.style.setProperty('--mh-grid-dur', (r.gridDur||3.2)+'s');
+        root.style.setProperty('--mh-grid-rot-deg', (r.gridRot||0)+'deg');
+        root.style.setProperty('--mh-vp-x', (r.vpX!=null?r.vpX:50)+'%');
+        root.style.setProperty('--mh-vp-y', (r.vpY!=null?r.vpY:47)+'%');
+        root.style.setProperty('--mh-vp-amp', (r.vpAmp!=null?r.vpAmp:8)+'%');
+        root.style.setProperty('--mh-vp-dur', (r.vpDur!=null?r.vpDur:6)+'s');
+        root.style.setProperty('--mh-scan-gap-px', (r.scanGap||3)+'px');
+        root.style.setProperty('--mh-scan-dur', (r.scanDur||1.4)+'s');
+        root.style.setProperty('--mh-stripe-thick-px', (r.stripeThick||28)+'px');
+        root.style.setProperty('--mh-stripe-angle-deg', (r.stripeAngle||-32)+'deg');
+        root.style.setProperty('--mh-stripe-dur', (r.stripeDur||4)+'s');
+        root.style.setProperty('--mh-glitch-dur', (r.glitchDur||2.2)+'s');
+        root.style.setProperty('--mh-rgb-px', (r.rgb||6)+'px');
+        root.style.setProperty('--mh-city-pulse', (r.cityPulse||2.2)+'s');
+        if(r.freeze) root.setAttribute('data-mh-freeze','1');
+        try{
+          var st = document.querySelector('#bg-dynamic .mh-custom');
+          if(st){
+            st.setAttribute('data-mh-wash', r.washOn===false?'0':'1');
+            st.setAttribute('data-mh-grid', r.gridOn===false?'0':'1');
+            st.setAttribute('data-mh-horizon', r.horizonOn===false?'0':'1');
+            st.setAttribute('data-mh-scan', r.scanOn===false?'0':'1');
+            st.setAttribute('data-mh-stripe', r.stripeOn===false?'0':'1');
+            st.setAttribute('data-mh-glitch', r.glitchOn===false?'0':'1');
+            st.setAttribute('data-mh-city', r.cityOn===false?'0':'1');
+            st.setAttribute('data-mh-vignette', r.vignetteOn===false?'0':'1');
+            st.setAttribute('data-mh-chroma', r.chromaOn===false?'0':'1');
+            st.setAttribute('data-vp-move', (r.vpMove && r.gridOn!==false)?'1':'0');
+            st.setAttribute('data-grid-rand', ((r.gridRand||0)>0 && r.gridOn!==false)?'1':'0');
+          }
+        }catch(_e){}
+      }catch(e){}
+    }
+    return;
+  }
+  if(dark) return;
+  if(cfg.type==='image'){
+    var img = '';
+    try{ img = localStorage.getItem('expenseTracker.bgImage') || ''; }catch(e){}
+    if(!img) return;
+    var mode = cfg.mode === 'repeat' ? 'repeat' : 'cover';
+    /* Don't set --bg to a dark wallpaper base — ghost buttons use --bg as fill. */
+    root.style.setProperty('--bg-extra', 'url("'+img.replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'")');
+    root.style.setProperty('--bg-pos', 'center');
+    if(mode==='repeat'){
+      root.style.setProperty('--bg-size', cfg.size || 'auto');
+      root.style.setProperty('--bg-repeat', 'repeat');
+    }else{
+      root.style.setProperty('--bg-size', 'cover');
+      root.style.setProperty('--bg-repeat', 'no-repeat');
+    }
+    return;
+  }
+  if(cfg.type==='custom' && cfg.animate){
+    root.setAttribute('data-bg-anim', '1');
+  }
   if(cfg.type==='solid'){
-    root.style.setProperty('--bg', cfg.value);
+    root.style.setProperty('--page-bg', cfg.value);
+  }else if(cfg.type==='custom'){
+    root.style.setProperty('--page-bg', cfg.base || '#f3f5f7');
+    if(cfg.value && cfg.value!=='none'){
+      root.style.setProperty('--bg-extra', cfg.value);
+      if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
+      root.style.setProperty('--bg-repeat', 'repeat');
+      root.style.setProperty('--bg-pos', '0 0');
+    }
   }else{
-    root.style.setProperty('--bg', cfg.base || '#f3f5f7');
+    root.style.setProperty('--page-bg', cfg.base || '#f3f5f7');
     root.style.setProperty('--bg-extra', cfg.value);
     if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
   }
@@ -70,11 +167,13 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%; overflow-x:clip;}
 body{
-  margin:0; background-color:var(--bg); background-image:var(--bg-extra, none);
-  background-size:var(--bg-size, auto); background-attachment:fixed;
+  margin:0; background-color:var(--page-bg, var(--bg)); background-image:var(--bg-extra, none);
+  background-size:var(--bg-size, auto); background-repeat:var(--bg-repeat, repeat);
+  background-position:var(--bg-pos, 0 0); background-attachment:fixed;
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:18px; line-height:1.5; overflow-x:clip;
+  isolation:isolate; /* keep #bg-dynamic (z:-1) above body bg, behind UI */
 }
 [hidden]{display:none !important;}
 
@@ -153,9 +252,13 @@ body{
   }
 }
 .user-chip{
-  font-size:15px; color:var(--muted); background:var(--bg);
+  font-size:15px; color:var(--muted); background:var(--track);
   border:1px solid var(--border); border-radius:999px; padding:4px 12px;
+  font-family:inherit; cursor:pointer; line-height:1.3;
 }
+.user-chip:hover{ border-color:var(--accent); color:var(--text); }
+.user-chip:active{ opacity:.85; }
+.user-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 /* ---------- layout ---------- */
 main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)); max-width:760px; margin:0 auto;}
@@ -471,7 +574,9 @@ textarea{resize:vertical; min-height:64px;}
 }
 .btn:active{opacity:.85;}
 .btn:disabled{opacity:.75; cursor:default;}
-.btn.ghost{background:var(--bg); color:var(--text); border:1px solid var(--border);}
+.btn.ghost{
+  background:var(--track); color:var(--text); border:1px solid var(--border);
+}
 .btn.danger{background:var(--danger);}
 .btn.go{background:var(--accent);}
 .btn.small{width:auto; padding:8px 14px; font-size:16px;}
@@ -483,6 +588,8 @@ textarea{resize:vertical; min-height:64px;}
 }
 #screen-settings .set-actions .btn{width:auto; flex:none; margin:0;}
 #screen-settings .set-actions .linkbtn{font-size:14px; padding:6px 4px;}
+#screen-settings .set-auth-forgot{margin-top:4px;}
+#screen-settings .set-auth-forgot .linkbtn{font-size:14px; padding:4px 2px; font-weight:600;}
 #screen-settings .set-util{margin-top:12px;}
 #screen-settings .set-util .linkbtn{font-size:14px;}
 #screen-settings .set-fieldrow{
@@ -814,21 +921,36 @@ html.iphone .tabbar{ bottom:0; transition:none; }
   /* The iOS keyboard doesn't shrink dvh, but the overlay is lifted by --kb-h:
      without subtracting it, a tall sheet overflows the overlay's top and the
      first fields (e.g. merchant name) become unreachable by scrolling. */
-  max-height:calc(92dvh - var(--kb-h, 0px)); overflow-y:auto;
-  border-radius:20px 20px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom));
+  max-height:calc(92dvh - var(--kb-h, 0px));
+  border-radius:20px 20px 0 0;
+  display:flex; flex-direction:column; overflow:hidden;
+  padding:0;
 }
-/* ✕ in a circle, top-right of every sheet: closes without scrolling to Cancel.
-   Sticky (not absolute) so it stays reachable while the sheet scrolls. */
+/* Non-scrolling chrome: grab + title + close stay above sheet-body. */
+.sheet-head{
+  flex:none; position:relative; z-index:8;
+  min-height:56px;
+  padding:8px 56px 10px 18px; /* right pad clears absolute ✕ */
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  box-shadow:0 1px 0 rgba(20,30,40,.04);
+}
+.sheet-head-title{
+  margin:2px 0 0; padding:0;
+  font-size:17px; font-weight:700; line-height:1.25; color:var(--text);
+}
+.sheet-body{
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  padding:10px 18px calc(22px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;
+}
+/* ✕ pinned in the non-scrolling head — never over live preview. */
 .sheet-x{
-  position:sticky; top:-6px; z-index:5;
-  margin:-6px -6px -45px auto;
+  position:absolute; top:8px; right:12px; z-index:9;
   width:45px; height:45px; border-radius:50%; border:none; cursor:pointer; padding:0;
   background:rgba(127,127,127,.22); color:var(--text);
   font-size:22px; line-height:1; display:flex; align-items:center; justify-content:center;
 }
-/* top:-6px matches margin-top:-6px: the sticky offset is measured from the
-   sheet's scrollport (below its 18px padding), so top must equal the negative
-   margin for the stuck position to match the in-flow position exactly. */
 /* Round-button press: grow to 1.5× and fade to invisible in sync (150ms).
    Buttons that stay on screen (FAB, search clear) ease back on release;
    sheet ✕ / card ✕ use .press-out + a matching delay so the fade finishes as
@@ -853,8 +975,9 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* Drag handle at the top of every bottom sheet: a full-width hit area with
    the iOS-style thumb centered. Dragging it resizes the sheet; the sticky
    footer stays pinned at the bottom while content slides behind it. */
-.grab{width:100%; padding:20px 0; margin:0 auto; cursor:grab; touch-action:none;
+.grab{width:100%; padding:14px 0 8px; margin:0 auto; cursor:grab; touch-action:none;
   user-select:none; -webkit-user-select:none;}
+.sheet-head .grab{margin:0 auto 4px;}
 .grab::after{content:''; display:block; width:42px; height:5px; border-radius:99px;
   background:var(--border); margin:0 auto;}
 .grab.resizing{cursor:grabbing;}
@@ -996,28 +1119,1071 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 .dupbadge{display:inline-block;font-size:11px;font-weight:700;margin-left:6px;padding:1px 7px;border-radius:9px;white-space:nowrap;vertical-align:middle;background:#fdecea;color:#b3261e}
 .applyall{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0;}
 .applyall label{font-size:12px; color:var(--muted); font-weight:600;}
-/* Settings → Appearance: background presets (solid / gradient / pattern) */
-.bg-section{margin-top:14px;}
-.bg-section-label{font-size:13px; font-weight:700; color:var(--muted); margin:10px 0 6px; text-transform:uppercase; letter-spacing:.03em;}
-.bg-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;}
-.bg-row input[type=color]{width:42px; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:transparent; cursor:pointer;}
-.bg-presets{display:flex; gap:8px; flex-wrap:wrap;}
+/* Settings → Appearance: calm, professional background picker */
+.bg-section{margin-top:16px; padding-top:14px; border-top:1px solid var(--border);}
+.bg-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin:0 0 10px;}
+.bg-head .f{margin:0;}
+.bg-head .linkbtn{font-size:13px; padding:2px 0; font-weight:600;}
+.bg-panel{margin:0;}
+.bg-intensity{margin:0 0 12px;}
+.bg-intensity .seg{width:100%;}
+.bg-intensity .seg button{flex:1; font-size:14px;}
+.bg-type-row{display:grid; grid-template-columns:64px 1fr; gap:8px 10px; align-items:start; margin:0 0 10px;}
+.bg-type-row:last-child{margin-bottom:0;}
+.bg-type-lbl{
+  font-size:12px; font-weight:600; color:var(--muted); line-height:36px;
+  letter-spacing:.01em;
+}
+.bg-presets{display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-height:36px;}
 .bg-presets button{
-  width:34px; height:34px; border-radius:10px; border:2px solid var(--border);
-  padding:0; cursor:pointer; background-color:var(--bg); background-size:cover; flex:none;
+  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  padding:0; cursor:pointer; background-color:var(--track); background-size:cover;
+  background-position:center; flex:none; position:relative;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
+  transition: box-shadow .15s ease, border-color .15s ease, transform .12s ease;
 }
-.bg-presets button.solid{border-radius:50%;}
-.bg-presets button.on{outline:2px solid var(--accent); outline-offset:2px; border-color:var(--accent);}
-.bg-custom{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-.bg-custom input[type=color]{
-  width:42px; height:36px; padding:0; border:2px solid var(--border); border-radius:8px;
-  background:transparent; cursor:pointer;
+.bg-presets button:hover{transform:translateY(-1px);}
+.bg-presets button:active{transform:none;}
+.bg-presets button.on{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent);
 }
-.bg-custom input[type=color].on{outline:2px solid var(--accent); outline-offset:2px; border-color:var(--accent);}
-.bg-custom .bg-custom-lbl{font-size:14px; font-weight:600; color:var(--text);}
-.bg-hint{font-size:13px; margin:8px 0 0;}
-/* Page backgrounds are light-mode only — keep the picker visible but inert in dark. */
-[data-theme="dark"] .bg-section{opacity:.48; pointer-events:none;}
+.bg-presets button.on::after{
+  content:""; position:absolute; right:3px; bottom:3px; width:8px; height:8px;
+  border-radius:50%; background:var(--accent); border:1.5px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.12);
+}
+.bg-customize{margin-top:16px;}
+.bg-customize-label{
+  font-size:12px; font-weight:700; color:var(--muted); margin:0 0 8px;
+  letter-spacing:.02em; text-transform:uppercase;
+}
+.bg-cust-list{display:flex; flex-direction:column; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--card);}
+.bg-cust-row{
+  display:grid; grid-template-columns:88px 1fr; gap:10px 12px; align-items:center;
+  padding:12px; border-bottom:1px solid var(--border);
+}
+.bg-cust-row:last-child{border-bottom:0;}
+.bg-cust-kicker{font-size:13px; font-weight:700; color:var(--text); line-height:1.2;}
+.bg-cust-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;}
+.bg-cust-actions .btn.small{padding:7px 12px; font-size:14px;}
+.bg-cust-actions .linkbtn{font-size:13px; padding:4px 2px;}
+.bg-cust-row input[type=color]{
+  width:40px; height:32px; padding:0; border:1px solid var(--border); border-radius:8px;
+  background:transparent; cursor:pointer; flex:none;
+}
+.bg-cust-row input[type=color].on{
+  box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent); border-color:var(--accent);
+}
+.bg-cust-hex{font-size:12.5px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums;}
+.bg-pic-thumb{
+  width:44px; height:32px; border-radius:8px; border:1px solid var(--border);
+  background:#edf0f3 center/cover no-repeat; flex:none; overflow:hidden;
+}
+.bg-pic-thumb.on{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent);
+}
+.bg-pic-thumb.empty{background:
+  linear-gradient(45deg,#e2e7ec 25%,transparent 25%),
+  linear-gradient(-45deg,#e2e7ec 25%,transparent 25%),
+  linear-gradient(45deg,transparent 75%,#e2e7ec 75%),
+  linear-gradient(-45deg,transparent 75%,#e2e7ec 75%);
+  background-size:12px 12px; background-position:0 0,0 6px,6px -6px,-6px 0; background-color:#f3f5f7;
+}
+.bg-pic-modes{display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; margin-top:2px;}
+.bg-pic-modes .seg{flex:none;}
+.bg-pic-modes .seg button{font-size:13px; padding:6px 10px;}
+.bg-lib{margin-top:10px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--track);}
+[data-theme="dark"] .bg-lib{background:var(--seg-bg);}
+.bg-lib-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 8px; flex-wrap:wrap;}
+.bg-lib-head strong{font-size:13px; font-weight:700;}
+.bg-lib-actions{display:flex; gap:6px; flex-wrap:wrap; align-items:center;}
+.bg-lib-actions .btn.small{padding:6px 11px; font-size:13px;}
+.bg-lib-empty{font-size:12.5px; color:var(--muted); margin:0;}
+.bg-lib-list{display:flex; flex-direction:column; gap:6px;}
+.bg-lib-item{
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:10px; background:var(--card);
+}
+.bg-lib-item.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+.bg-lib-swatch{
+  width:36px; height:28px; border-radius:8px; border:1px solid var(--border);
+  flex:none; overflow:hidden; background:var(--track); position:relative;
+}
+.bg-lib-meta{flex:1; min-width:0;}
+.bg-lib-name{font-size:13.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.bg-lib-kind{font-size:11.5px; color:var(--muted); font-weight:600;}
+.bg-lib-btns{display:flex; gap:4px; flex-wrap:wrap; flex:none;}
+.bg-lib-btns .btn.small{padding:5px 9px; font-size:12.5px;}
+.bg-lib-btns .linkbtn{font-size:12.5px; padding:4px 2px;}
+.bg-customs-empty{font-size:12.5px; color:var(--muted); margin:0;}
+.bg-custom-swatch{
+  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  padding:0; cursor:pointer; position:relative; overflow:hidden; flex:none;
+  background-size:cover; background-position:center;
+}
+.bg-custom-swatch.on{border-color:var(--accent); box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent);}
+.bg-custom-swatch .bg-custom-x{
+  position:absolute; top:2px; right:2px; width:16px; height:16px; border:0; border-radius:50%;
+  background:rgba(23,32,42,.55); color:#fff; font-size:11px; line-height:16px; padding:0; cursor:pointer;
+}
+/* MH editor sheet */
+.mh-ed-card{
+  border:1px solid var(--border); border-radius:12px; margin:0 0 10px;
+  background:var(--card); padding:12px;
+}
+.mh-ed-card-title{
+  margin:0 0 10px; font-size:13.5px; font-weight:700; color:var(--text);
+}
+.mh-ed-card-body{display:grid; grid-template-columns:1fr 1fr; gap:8px 12px;}
+@media (max-width:420px){ .mh-ed-card-body{grid-template-columns:1fr;} }
+.mh-ed-field label{display:flex; justify-content:space-between; gap:8px; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 3px;}
+.mh-ed-field label .v{color:var(--text); font-variant-numeric:tabular-nums;}
+.mh-ed-field input[type=range]{width:100%;}
+.mh-ed-field input[type=color]{width:100%; height:34px; padding:0; border:1px solid var(--border); border-radius:8px; background:transparent;}
+.mh-ed-toggle{display:flex; align-items:center; gap:8px; font-size:13.5px; grid-column:1 / -1;}
+.mh-ed-toggle input{width:18px; height:18px;}
+.mh-ed-pills{
+  display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px;
+}
+.mh-ed-pills .catchip{font-size:14px; padding:7px 11px;}
+.mh-ed-layer-cards{display:flex; flex-direction:column; gap:0;}
+.mh-ed-actions{flex-wrap:wrap; gap:8px; margin-top:12px; z-index:2;}
+.mh-ed-actions .btn{flex:1 1 calc(50% - 8px); min-width:120px;}
+.mh-ed-hint{font-size:12.5px; color:var(--muted); margin:0 0 10px;}
+.mh-ed-lbl{font-size:12px; font-weight:700; color:var(--muted); margin:0 0 6px; text-transform:uppercase; letter-spacing:.03em;}
+/* Sticky preview pins under fixed .sheet-head (z below head so ✕ stays clear). */
+.mh-ed-preview-wrap{
+  position:sticky; top:0; z-index:3;
+  margin:0 0 14px; padding:0 0 10px;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  box-shadow:0 6px 10px -8px rgba(20,30,40,.18);
+}
+.mh-ed-preview-cap{
+  margin:0 0 6px; font-size:11px; font-weight:700; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--muted);
+}
+.mh-ed-preview{
+  position:relative; height:168px; border-radius:12px; border:1px solid var(--border);
+  overflow:hidden; background:#05070c;
+  box-shadow:0 1px 2px rgba(20,30,40,.06);
+}
+@media (min-width:520px){ .mh-ed-preview{height:190px;} }
+.mh-ed-preview .mh-custom{ position:absolute; inset:0; display:block; }
+.sheet.mh-ed-sheet .sheet-body{ padding-top:8px; }
+
+.bg-motion{margin-top:14px; border:1px solid var(--border); border-radius:12px; background:transparent;}
+.bg-motion > summary{
+  list-style:none; cursor:pointer; user-select:none;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:11px 12px; font-size:13.5px; font-weight:700; color:var(--text);
+}
+.bg-motion > summary::-webkit-details-marker{display:none;}
+.bg-motion > summary::after{
+  content:"▸"; color:var(--muted); font-size:12px; font-weight:700;
+  transition:transform .15s ease;
+}
+.bg-motion[open] > summary::after{transform:rotate(90deg);}
+.bg-motion-body{padding:0 12px 12px; display:flex; flex-direction:column; gap:12px;}
+.bg-motion-group{margin:0;}
+.bg-motion-label{
+  font-size:12px; font-weight:700; color:var(--muted); margin:0 0 6px;
+  letter-spacing:.02em; text-transform:uppercase;
+}
+.bg-presets-scene button,
+.bg-presets-dgrad button,
+.bg-presets-dynamic button,
+.bg-presets-journey button{
+  width:48px; height:34px; border-radius:10px; position:relative; overflow:hidden;
+}
+.bg-presets-scene button.on::after,
+.bg-presets-dgrad button.on::after,
+.bg-presets-dynamic button.on::after,
+.bg-presets-journey button.on::after{
+  right:2px; bottom:2px; width:7px; height:7px;
+}
+.bg-presets-dynamic button{
+  background-color:#05070c; border-color:#2a3544;
+  box-shadow:inset 0 0 10px rgba(0,255,255,.18);
+}
+.bg-presets-dynamic button.on{
+  box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent), inset 0 0 10px rgba(0,255,255,.18);
+}
+.bg-presets-dynamic button .mh-thumb,
+.bg-presets-journey button .mh-thumb,
+.bg-presets-dgrad button .mh-thumb{position:absolute; inset:0; pointer-events:none;}
+.bg-hint{font-size:12.5px; line-height:1.45; margin:12px 0 0; color:var(--muted);}
+.bg-hint b{font-weight:650; color:var(--text);}
+/* Solids / gradients / patterns / picture / customs stay light-mode only; dynamics work in any theme. */
+[data-theme="dark"] .bg-light-only{opacity:.5; pointer-events:none;}
+.bg-ed-preview{
+  width:100%; height:110px; border-radius:12px; border:1px solid var(--border);
+  background-color:#f3f5f7; background-size:auto; background-repeat:repeat;
+  margin:8px 0 12px;
+}
+.bg-ed-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 12px;}
+@media (max-width:420px){
+  .bg-ed-grid{grid-template-columns:1fr;}
+  .bg-type-row{grid-template-columns:56px 1fr;}
+}
+.bg-ed-field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin:0 0 4px;}
+.bg-ed-field input[type=color]{width:100%; height:36px; padding:0; border:1px solid var(--border); border-radius:8px; background:transparent; cursor:pointer;}
+.bg-ed-field input[type=range]{width:100%;}
+.bg-ed-field select, .bg-ed-field input[type=text]{
+  width:100%; font-size:15px; padding:8px 10px; border:1px solid var(--border);
+  border-radius:10px; background:var(--input-bg); color:var(--text); font-family:inherit;
+}
+.bg-ed-check{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14.5px;}
+.bg-ed-check input{width:18px; height:18px;}
+.bg-ed-hint{font-size:12.5px; color:var(--muted); margin:6px 0 0;}
+.bg-editor-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:4px;}
+
+/* ---------- Dynamic Max Headroom page backgrounds (CRT-dark layer only) ----------
+   Stage lives on #bg-dynamic. Theme tokens (--bg, --text, …) stay with the user's
+   Light/Dark choice so card chrome (.btn.ghost, chips, inputs) stays readable. */
+#bg-dynamic{
+  position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden;
+  display:none; background:#05070c;
+}
+html[data-bg-dynamic] #bg-dynamic{display:block;}
+/* Hide body page fill/image while a dynamic stage is up (tokens still light/dark). */
+html[data-bg-dynamic] body{
+  background-color:transparent !important;
+  background-image:none !important;
+}
+#bg-dynamic .mh-scene{position:absolute; inset:0; display:none;}
+html[data-bg-dynamic="mh-wireframe"] #bg-dynamic .mh-scene[data-mh="mh-wireframe"],
+html[data-bg-dynamic="mh-scanlines"] #bg-dynamic .mh-scene[data-mh="mh-scanlines"],
+html[data-bg-dynamic="mh-stripes"] #bg-dynamic .mh-scene[data-mh="mh-stripes"],
+html[data-bg-dynamic="mh-glitch"] #bg-dynamic .mh-scene[data-mh="mh-glitch"],
+html[data-bg-dynamic="mh-geometry"] #bg-dynamic .mh-scene[data-mh="mh-geometry"],
+html[data-bg-dynamic="j-space"] #bg-dynamic .mh-scene[data-mh="j-space"],
+html[data-bg-dynamic="j-mountains"] #bg-dynamic .mh-scene[data-mh="j-mountains"],
+html[data-bg-dynamic="j-ocean"] #bg-dynamic .mh-scene[data-mh="j-ocean"],
+html[data-bg-dynamic="j-road"] #bg-dynamic .mh-scene[data-mh="j-road"],
+html[data-bg-dynamic="dg-aurora"] #bg-dynamic .mh-scene[data-mh="dg-aurora"],
+html[data-bg-dynamic="dg-mesh"] #bg-dynamic .mh-scene[data-mh="dg-mesh"],
+html[data-bg-dynamic="dg-sunset"] #bg-dynamic .mh-scene[data-mh="dg-sunset"],
+html[data-bg-dynamic="dg-conic"] #bg-dynamic .mh-scene[data-mh="dg-conic"],
+html[data-bg-dynamic="dg-wave"] #bg-dynamic .mh-scene[data-mh="dg-wave"],
+html[data-bg-dynamic="dg-candy"] #bg-dynamic .mh-scene[data-mh="dg-candy"],
+html[data-bg-dynamic="mh-custom"] #bg-dynamic .mh-scene[data-mh="mh-custom"]{display:block;}
+/* Custom animated gradient (editor) — body keeps tokens; layer paints shift */
+html[data-bg-anim="1"] body{
+  background-size:200% 200% !important;
+  background-repeat:no-repeat !important;
+  animation:dg-shift 14s ease-in-out infinite;
+}
+@keyframes dg-shift{
+  0%,100%{ background-position:0% 40%; }
+  50%{ background-position:100% 60%; }
+}
+
+/* Hot neon wash on near-black CRT stage */
+.mh-wash{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 28%, rgba(0,255,255,.28), transparent 58%),
+    radial-gradient(ellipse 60% 50% at 82% 72%, rgba(255,0,200,.26), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 55% 48%, rgba(255,230,0,.12), transparent 50%),
+    linear-gradient(180deg, #05070c 0%, #0a0e18 45%, #05070c 100%);
+}
+
+/* 1) Perspective wireframe floor + ceiling — dense, fast, neon cyan */
+.mh-wire .mh-plane{
+  position:absolute; left:-50%; width:200%; height:58%;
+  background-image:
+    linear-gradient(rgba(0,255,255,.72) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(0,255,255,.72) 2px, transparent 2px),
+    linear-gradient(rgba(255,0,200,.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,230,0,.25) 1px, transparent 1px);
+  background-size:36px 36px, 36px 36px, 72px 72px, 72px 72px;
+  transform-origin:center top;
+  will-change:background-position;
+  filter:drop-shadow(0 0 6px rgba(0,255,255,.55));
+}
+.mh-wire .mh-floor{
+  bottom:-12%; top:auto;
+  transform:perspective(480px) rotateX(64deg);
+  animation:mh-grid-scroll 3.2s linear infinite;
+  mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
+  -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
+}
+.mh-wire .mh-ceil{
+  top:-12%;
+  transform:perspective(480px) rotateX(-64deg);
+  animation:mh-grid-scroll 3.8s linear infinite reverse;
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
+  -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
+}
+.mh-wire .mh-horizon{
+  position:absolute; left:0; right:0; top:47%; height:3px;
+  background:linear-gradient(90deg, transparent, #ff00c8, #00ffff, #ffe600, #ff00c8, transparent);
+  box-shadow:0 0 28px #00ffff, 0 0 48px #ff00c8;
+  animation:mh-horizon-pulse 1.6s ease-in-out infinite;
+}
+@keyframes mh-grid-scroll{
+  to{ background-position:0 36px, 36px 0, 0 72px, 72px 0; }
+}
+@keyframes mh-horizon-pulse{
+  0%,100%{ opacity:.75; filter:brightness(1); }
+  50%{ opacity:1; filter:brightness(1.4); }
+}
+
+/* 2) CRT scanlines — hard flicker + racing beam */
+.mh-crt .mh-scan{
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,.55) 0 1px,
+    transparent 1px 3px,
+    rgba(0,255,255,.12) 3px 4px
+  );
+  background-size:100% 5px;
+  animation:mh-scan-drift 1.4s linear infinite;
+}
+.mh-crt .mh-beam{
+  position:absolute; left:0; right:0; height:18%;
+  background:linear-gradient(180deg, transparent, rgba(0,255,255,.35), rgba(255,0,200,.2), transparent);
+  animation:mh-beam 1.8s linear infinite;
+  box-shadow:0 0 40px rgba(0,255,255,.35);
+}
+.mh-crt .mh-flicker{
+  position:absolute; inset:0;
+  background:rgba(255,255,255,.08);
+  animation:mh-flicker 0.9s steps(3, end) infinite;
+  mix-blend-mode:soft-light;
+}
+.mh-crt .mh-static{
+  position:absolute; inset:0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 2px, rgba(255,0,200,.06) 2px 3px),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,255,255,.05) 3px 4px);
+  animation:mh-static-jitter 0.35s steps(2) infinite;
+  opacity:.7;
+}
+@keyframes mh-scan-drift{ to{ background-position:0 5px; } }
+@keyframes mh-beam{
+  0%{ top:-20%; opacity:.4; }
+  100%{ top:110%; opacity:.95; }
+}
+@keyframes mh-flicker{
+  0%,100%{ opacity:.05; }
+  25%{ opacity:.35; }
+  50%{ opacity:.1; }
+  75%{ opacity:.45; }
+}
+@keyframes mh-static-jitter{
+  0%{ transform:translate(0,0); }
+  50%{ transform:translate(-2px,1px); }
+  100%{ transform:translate(1px,-1px); }
+}
+
+/* 3) Neon diagonal stripe march — thick cyan/magenta/yellow */
+.mh-stripes .mh-band{
+  position:absolute; inset:-50%;
+  background:repeating-linear-gradient(
+    -38deg,
+    transparent 0 10px,
+    #00ffff 10px 16px,
+    transparent 16px 22px,
+    #ff00c8 22px 28px,
+    transparent 28px 34px,
+    #ffe600 34px 38px
+  );
+  opacity:.55;
+  animation:mh-stripe-march 4s linear infinite;
+  mix-blend-mode:screen;
+}
+.mh-stripes .mh-band2{
+  opacity:.4;
+  background:repeating-linear-gradient(
+    42deg,
+    transparent 0 12px,
+    rgba(0,255,255,.85) 12px 14px,
+    transparent 14px 26px,
+    rgba(255,0,200,.8) 26px 28px
+  );
+  animation:mh-stripe-march 2.8s linear infinite reverse;
+}
+.mh-stripes .mh-band3{
+  opacity:.3;
+  background:repeating-linear-gradient(
+    -12deg,
+    transparent 0 18px,
+    rgba(255,230,0,.9) 18px 20px
+  );
+  animation:mh-stripe-march 5.5s linear infinite;
+}
+@keyframes mh-stripe-march{ to{ transform:translate3d(120px, 80px, 0); } }
+
+/* 4) Hard glitch / horizontal tear stutter */
+.mh-glitch .mh-slice{
+  position:absolute; left:-4%; right:-4%; height:12%;
+  background:
+    linear-gradient(90deg,
+      transparent 0%,
+      #00ffff 18%,
+      #ff00c8 42%,
+      #ffe600 58%,
+      #00ffff 78%,
+      transparent 100%);
+  mix-blend-mode:screen;
+  opacity:0;
+  filter:saturate(1.6);
+}
+.mh-glitch .mh-s1{ top:12%; animation:mh-tear 2.4s steps(1) infinite; }
+.mh-glitch .mh-s2{ top:34%; height:7%; animation:mh-tear 1.9s steps(1) .4s infinite; }
+.mh-glitch .mh-s3{ top:55%; height:10%; animation:mh-tear 2.8s steps(1) .9s infinite; }
+.mh-glitch .mh-s4{ top:78%; height:8%; animation:mh-tear 2.1s steps(1) 1.3s infinite; }
+.mh-glitch .mh-noise{
+  position:absolute; inset:0;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 2px, rgba(0,255,255,.08) 2px 3px),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,0,200,.06) 2px 3px);
+  animation:mh-noise-shift 0.45s steps(4) infinite;
+  opacity:.85;
+  mix-blend-mode:screen;
+}
+.mh-glitch .mh-rgb{
+  position:absolute; inset:0;
+  background:
+    linear-gradient(90deg, rgba(255,0,0,.08), transparent 40%, transparent 60%, rgba(0,255,255,.1));
+  animation:mh-rgb-shift 1.1s steps(3) infinite;
+  mix-blend-mode:screen;
+}
+@keyframes mh-tear{
+  0%,70%,100%{ opacity:0; transform:translateX(0) skewX(0); clip-path:inset(0 0 0 0); }
+  72%{ opacity:1; transform:translateX(-28px) skewX(-8deg); }
+  76%{ opacity:.95; transform:translateX(36px) skewX(6deg); }
+  80%{ opacity:1; transform:translateX(-14px) skewX(-4deg); }
+  84%{ opacity:.7; transform:translateX(10px); }
+  88%{ opacity:0; transform:translateX(0); }
+}
+@keyframes mh-noise-shift{ to{ background-position:12px 0, 0 8px; } }
+@keyframes mh-rgb-shift{
+  0%,100%{ transform:translateX(0); opacity:.4; }
+  33%{ transform:translateX(-5px); opacity:.7; }
+  66%{ transform:translateX(6px); opacity:.55; }
+}
+
+/* 5) Floating wireframe geometry / city-grid pulse — loud neon */
+.mh-geo .mh-city{
+  position:absolute; left:0; right:0; bottom:0; height:48%;
+  background-image:
+    linear-gradient(90deg, rgba(0,255,255,.65) 1.5px, transparent 1.5px),
+    linear-gradient(rgba(255,0,200,.45) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255,230,0,.25) 1px, transparent 1px);
+  background-size:22px 22px, 22px 22px, 44px 44px;
+  mask-image:linear-gradient(to top, rgba(0,0,0,.9), transparent);
+  -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,.9), transparent);
+  animation:mh-city-pulse 2.2s ease-in-out infinite;
+  filter:drop-shadow(0 0 10px rgba(0,255,255,.5));
+}
+.mh-geo .mh-poly{
+  position:absolute; width:130px; height:130px;
+  border:2.5px solid #00ffff;
+  background:rgba(0,255,255,.06);
+  box-shadow:0 0 18px #00ffff, 0 0 0 2px rgba(255,0,200,.35) inset;
+  transform:rotate(12deg);
+  animation:mh-float 4.5s ease-in-out infinite;
+}
+.mh-geo .mh-p1{ top:10%; left:6%; border-radius:2px; }
+.mh-geo .mh-p2{
+  top:16%; right:8%; width:100px; height:100px;
+  border:0; background:rgba(255,0,200,.12);
+  box-shadow:0 0 0 2.5px #ff00c8, 0 0 22px #ff00c8;
+  clip-path:polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  animation-duration:3.6s; animation-delay:-1s;
+}
+.mh-geo .mh-p3{
+  bottom:42%; left:38%; width:80px; height:80px;
+  border-color:#ffe600; border-radius:50%;
+  box-shadow:0 0 20px #ffe600, 0 0 0 2px rgba(0,255,255,.3) inset;
+  background:rgba(255,230,0,.08);
+  animation-duration:3s; animation-delay:-.5s;
+}
+.mh-geo .mh-p4{
+  top:42%; left:18%; width:55px; height:55px;
+  border-color:#ff00c8; border-radius:4px;
+  box-shadow:0 0 14px #ff00c8;
+  animation-duration:2.8s; animation-delay:-1.8s;
+}
+@keyframes mh-city-pulse{
+  0%,100%{ opacity:.7; background-size:22px 22px, 22px 22px, 44px 44px; filter:brightness(1); }
+  50%{ opacity:1; background-size:26px 26px, 26px 26px, 52px 52px; filter:brightness(1.35); }
+}
+@keyframes mh-float{
+  0%,100%{ transform:translateY(0) rotate(12deg) scale(1); opacity:.75; }
+  50%{ transform:translateY(-28px) rotate(28deg) scale(1.08); opacity:1; }
+}
+
+
+/* ---------- Custom Max Headroom engine (CSS-variable driven) ---------- */
+#bg-dynamic.mh-engine,
+html[data-bg-dynamic="mh-custom"] #bg-dynamic{
+  --mh-black:#05070c; --mh-neon1:#00ffff; --mh-neon2:#ff00c8; --mh-accent:#ffe600;
+  --mh-intensity:1; --mh-speed:1; --mh-vignette:.5; --mh-chroma:0;
+  --mh-grid-on:1; --mh-grid-size:36; --mh-grid-thick:2; --mh-grid-opacity:.72;
+  --mh-grid-persp:480; --mh-grid-depth:64; --mh-grid-dur:3.2;
+  --mh-grid-rot:0; --mh-grid-rot-deg:0deg; --mh-vp-x:50%; --mh-vp-y:47%; --mh-vp-amp:8%; --mh-vp-dur:6s; --mh-grid-rand:0;
+  --mh-wash-on:1; --mh-horizon-on:1; --mh-vignette-on:1; --mh-chroma-on:0;
+  --mh-scan-on:1; --mh-scan-gap:3; --mh-scan-opacity:.55; --mh-scan-dur:1.4;
+  --mh-beam:0.55; --mh-flicker:0.35;
+  --mh-stripe-on:1; --mh-stripe-thick:28; --mh-stripe-angle:-32; --mh-stripe-opacity:.55; --mh-stripe-dur:4;
+  --mh-glitch-on:1; --mh-tear:1; --mh-glitch-dur:2.2; --mh-rgb:6; --mh-noise:.2; --mh-stutter:1;
+  --mh-city-on:1; --mh-city-opacity:.85; --mh-city-pulse:2.2; --mh-shape-size:1; --mh-shape-count:1;
+}
+
+.mh-custom{ --_spd: var(--mh-speed, 1); }
+.mh-custom .mhc-stage{ position:absolute; inset:0; background:var(--mh-black,#05070c); }
+/* Ambient neon wash — gated; off = solid base only */
+.mh-custom .mhc-wash{
+  position:absolute; inset:0; opacity:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 28%, color-mix(in srgb, var(--mh-neon1) 40%, transparent), transparent 58%),
+    radial-gradient(ellipse 60% 50% at 82% 72%, color-mix(in srgb, var(--mh-neon2) 38%, transparent), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 55% 48%, color-mix(in srgb, var(--mh-accent) 22%, transparent), transparent 50%);
+}
+.mh-custom[data-mh-wash="1"] .mhc-wash{
+  opacity:calc(var(--mh-wash-on,1) * var(--mh-intensity,1) * .9);
+}
+.mh-custom .mhc-layer{ position:absolute; inset:0; pointer-events:none; }
+.mh-custom .mhc-grid{
+  opacity:calc(var(--mh-grid-on,1) * var(--mh-grid-opacity,.72) * var(--mh-intensity,1));
+  perspective:var(--mh-grid-persp-px,480px);
+  perspective-origin:var(--mh-vp-x,50%) var(--mh-vp-y,47%);
+  transform:rotateZ(var(--mh-grid-rot-deg,0deg));
+  transform-style:preserve-3d;
+}
+.mh-custom[data-mh-grid="1"][data-vp-move="1"] .mhc-grid{
+  animation:mhc-vp-drift calc(var(--mh-vp-dur,6s) / var(--_spd)) ease-in-out infinite;
+}
+.mh-custom .mhc-plane{
+  position:absolute; left:-50%; width:200%; height:58%;
+  background-image:
+    linear-gradient(var(--mh-neon1) var(--mh-grid-thick-px,2px), transparent var(--mh-grid-thick-px,2px)),
+    linear-gradient(90deg, var(--mh-neon1) var(--mh-grid-thick-px,2px), transparent var(--mh-grid-thick-px,2px)),
+    linear-gradient(color-mix(in srgb, var(--mh-neon2) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--mh-accent) 40%, transparent) 1px, transparent 1px);
+  background-size: var(--mh-grid-size-px,36px) var(--mh-grid-size-px,36px), var(--mh-grid-size-px,36px) var(--mh-grid-size-px,36px),
+    calc(var(--mh-grid-size-px,36px)*2) calc(var(--mh-grid-size-px,36px)*2), calc(var(--mh-grid-size-px,36px)*2) calc(var(--mh-grid-size-px,36px)*2);
+  transform-origin:center top; will-change:auto;
+  filter:drop-shadow(0 0 6px color-mix(in srgb, var(--mh-neon1) 55%, transparent));
+  animation:none;
+}
+.mh-custom[data-mh-grid="1"] .mhc-plane{
+  will-change:background-position, transform;
+  animation:mhc-grid-scroll calc(var(--mh-grid-dur,3.2s) / var(--_spd)) linear infinite;
+}
+.mh-custom[data-mh-grid="1"][data-grid-rand="1"] .mhc-plane{
+  animation:
+    mhc-grid-scroll calc(var(--mh-grid-dur,3.2s) / var(--_spd)) linear infinite,
+    mhc-grid-jitter calc(0.55s / var(--_spd)) steps(2,end) infinite;
+}
+.mh-custom .mhc-floor{
+  bottom:-12%; top:auto;
+  transform:rotateX(var(--mh-grid-depth-deg,64deg));
+  mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
+  -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
+}
+.mh-custom .mhc-ceil{
+  top:-12%;
+  transform:rotateX(calc(var(--mh-grid-depth-deg,64deg) * -1));
+  animation-direction:reverse;
+  mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
+  -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
+}
+.mh-custom .mhc-horizon{
+  position:absolute; left:0; right:0; height:3px;
+  top:var(--mh-vp-y,47%);
+  background:linear-gradient(90deg, transparent, var(--mh-neon2), var(--mh-neon1), var(--mh-accent), var(--mh-neon2), transparent);
+  box-shadow:0 0 28px var(--mh-neon1), 0 0 48px var(--mh-neon2);
+  opacity:0;
+  transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35));
+  animation:none;
+}
+.mh-custom[data-mh-horizon="1"] .mhc-horizon{
+  opacity:calc(var(--mh-horizon-on,1) * var(--mh-intensity,1));
+  animation:mhc-horizon-pulse calc(1.6s / var(--_spd)) ease-in-out infinite;
+}
+.mh-custom[data-mh-horizon="1"][data-vp-move="1"] .mhc-horizon{
+  animation:
+    mhc-horizon-pulse calc(1.6s / var(--_spd)) ease-in-out infinite,
+    mhc-horizon-wander calc(var(--mh-vp-dur,6s) / var(--_spd)) ease-in-out infinite;
+}
+@keyframes mhc-grid-scroll{ to{ background-position:0 var(--mh-grid-size-px,36px), var(--mh-grid-size-px,36px) 0, 0 calc(var(--mh-grid-size-px,36px)*2), calc(var(--mh-grid-size-px,36px)*2) 0; } }
+/* brightness only — never override opacity (that broke layer gates) */
+@keyframes mhc-horizon-pulse{ 0%,100%{ filter:brightness(.85); } 50%{ filter:brightness(1.4); } }
+@keyframes mhc-vp-drift{
+  0%,100%{ perspective-origin:var(--mh-vp-x,50%) var(--mh-vp-y,47%); }
+  25%{ perspective-origin:calc(var(--mh-vp-x,50%) + var(--mh-vp-amp,8%)) calc(var(--mh-vp-y,47%) - var(--mh-vp-amp,8%) * .55); }
+  50%{ perspective-origin:calc(var(--mh-vp-x,50%) - var(--mh-vp-amp,8%) * .35) calc(var(--mh-vp-y,47%) + var(--mh-vp-amp,8%) * .4); }
+  75%{ perspective-origin:calc(var(--mh-vp-x,50%) + var(--mh-vp-amp,8%) * .5) calc(var(--mh-vp-y,47%) + var(--mh-vp-amp,8%) * .25); }
+}
+@keyframes mhc-horizon-wander{
+  0%,100%{ transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35)); }
+  25%{ transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35 + var(--mh-vp-amp,8%) * .8)); }
+  50%{ transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35 - var(--mh-vp-amp,8%) * .55)); }
+  75%{ transform:translateX(calc((var(--mh-vp-x,50%) - 50%) * 0.35 + var(--mh-vp-amp,8%) * .35)); }
+}
+@keyframes mhc-grid-jitter{
+  0%,100%{ translate:0 0; }
+  50%{ translate:calc(var(--mh-grid-rand,0) * 2px) calc(var(--mh-grid-rand,0) * -1.5px); }
+}
+
+.mh-custom .mhc-scan{ opacity:calc(var(--mh-scan-on,1) * var(--mh-intensity,1)); }
+.mh-custom .mhc-scanlines{
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(0deg,
+    rgba(0,0,0,var(--mh-scan-opacity,.55)) 0 1px,
+    transparent 1px var(--mh-scan-gap-px,3px),
+    color-mix(in srgb, var(--mh-neon1) 18%, transparent) var(--mh-scan-gap-px,3px) calc(var(--mh-scan-gap-px,3px) + 1px));
+  animation:none;
+}
+.mh-custom[data-mh-scan="1"] .mhc-scanlines{
+  animation:mhc-scan-drift calc(var(--mh-scan-dur,1.4s) / var(--_spd)) linear infinite;
+}
+.mh-custom .mhc-beam{
+  position:absolute; left:0; right:0; height:18%;
+  background:linear-gradient(180deg, transparent, color-mix(in srgb, var(--mh-neon1) 35%, transparent), transparent);
+  opacity:calc(var(--mh-beam,.55) * var(--mh-scan-on,1));
+  animation:none;
+}
+.mh-custom[data-mh-scan="1"] .mhc-beam{
+  animation:mhc-beam calc(1.8s / var(--_spd)) linear infinite;
+}
+.mh-custom .mhc-flicker{
+  position:absolute; inset:0; background:rgba(255,255,255,.04);
+  opacity:0;
+  animation:none;
+}
+.mh-custom[data-mh-scan="1"] .mhc-flicker{
+  opacity:calc(var(--mh-flicker,.35) * var(--mh-scan-on,1));
+  animation:mhc-flicker calc(0.9s / var(--_spd)) steps(3,end) infinite;
+}
+@keyframes mhc-scan-drift{ to{ background-position:0 5px; } }
+@keyframes mhc-beam{ 0%{ top:-20%; } 100%{ top:110%; } }
+@keyframes mhc-flicker{ 0%,100%{ opacity:0; } 30%{ opacity:calc(var(--mh-flicker,.35)*.8); } 60%{ opacity:0; } 85%{ opacity:calc(var(--mh-flicker,.35)); } }
+
+.mh-custom .mhc-stripes{ opacity:calc(var(--mh-stripe-on,1) * var(--mh-stripe-opacity,.55) * var(--mh-intensity,1)); }
+.mh-custom .mhc-band{
+  position:absolute; inset:-40%;
+  background:repeating-linear-gradient(var(--mh-stripe-angle-deg,-32deg),
+    var(--mh-neon2) 0 var(--mh-stripe-thick-px,28px),
+    var(--mh-accent) var(--mh-stripe-thick-px,28px) calc(var(--mh-stripe-thick-px,28px)*2),
+    var(--mh-neon1) calc(var(--mh-stripe-thick-px,28px)*2) calc(var(--mh-stripe-thick-px,28px)*3));
+  mix-blend-mode:screen;
+  animation:none;
+}
+.mh-custom[data-mh-stripe="1"] .mhc-band{
+  animation:mhc-stripe-march calc(var(--mh-stripe-dur,4s) / var(--_spd)) linear infinite;
+}
+.mh-custom[data-mh-stripe="1"] .mhc-b2{ opacity:.65; animation-direction:reverse; animation-duration:calc(var(--mh-stripe-dur,4s) * .7 / var(--_spd)); filter:hue-rotate(40deg); }
+@keyframes mhc-stripe-march{ to{ transform:translate3d(120px, 80px, 0); } }
+
+.mh-custom .mhc-glitch{ opacity:calc(var(--mh-glitch-on,1) * var(--mh-intensity,1)); }
+.mh-custom .mhc-slice{
+  position:absolute; left:-5%; right:-5%; height:8%;
+  background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--mh-neon1) 55%, transparent), color-mix(in srgb, var(--mh-neon2) 55%, transparent), transparent);
+  mix-blend-mode:screen; opacity:calc(var(--mh-tear,1) * .85);
+  animation:none;
+}
+.mh-custom[data-mh-glitch="1"] .mhc-slice{
+  animation:mhc-tear calc(var(--mh-glitch-dur,2.2s) / var(--_spd) / max(var(--mh-stutter,1),.2)) steps(1) infinite;
+}
+.mh-custom .mhc-s1{ top:12%; }
+.mh-custom .mhc-s2{ top:34%; height:7%; animation-delay:.4s; }
+.mh-custom .mhc-s3{ top:55%; height:10%; animation-delay:.9s; opacity:calc(var(--mh-tear,1) * var(--mh-shape-count,1) * .7); }
+.mh-custom .mhc-s4{ top:78%; height:8%; animation-delay:1.3s; opacity:calc(var(--mh-tear,1) * var(--mh-shape-count,1) * .6); }
+.mh-custom .mhc-noise{
+  position:absolute; inset:0; opacity:0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 1px, transparent 1px 2px);
+  animation:none;
+}
+.mh-custom[data-mh-glitch="1"] .mhc-noise{
+  opacity:var(--mh-noise,.2);
+  animation:mhc-noise calc(.45s / var(--_spd)) steps(4) infinite;
+}
+.mh-custom .mhc-rgb{
+  position:absolute; inset:0;
+  box-shadow: inset calc(var(--mh-rgb-px,6px) * -1) 0 0 color-mix(in srgb, var(--mh-neon2) 35%, transparent),
+              inset var(--mh-rgb-px,6px) 0 0 color-mix(in srgb, var(--mh-neon1) 35%, transparent);
+  opacity:0;
+  animation:none;
+}
+.mh-custom[data-mh-glitch="1"] .mhc-rgb{
+  opacity:calc(var(--mh-glitch-on,1) * .85);
+  animation:mhc-rgb calc(1.1s / var(--_spd)) steps(3) infinite;
+}
+@keyframes mhc-tear{
+  0%,40%,100%{ transform:translateX(0); opacity:0; }
+  42%{ transform:translateX(calc(var(--mh-rgb-px,6px) * 2)); opacity:.9; }
+  48%{ transform:translateX(calc(var(--mh-rgb-px,6px) * -1.5)); opacity:.7; }
+  55%{ transform:translateX(0); opacity:0; }
+}
+@keyframes mhc-noise{ to{ background-position:12px 0, 0 8px; } }
+@keyframes mhc-rgb{
+  0%,100%{ transform:translateX(0); }
+  33%{ transform:translateX(calc(var(--mh-rgb-px,6px) * .4)); }
+  66%{ transform:translateX(calc(var(--mh-rgb-px,6px) * -.4)); }
+}
+
+.mh-custom .mhc-city{ opacity:calc(var(--mh-city-on,1) * var(--mh-city-opacity,.85) * var(--mh-intensity,1)); }
+.mh-custom .mhc-skyline{
+  position:absolute; left:0; right:0; bottom:0; height:42%;
+  background-image:
+    linear-gradient(var(--mh-neon1) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mh-neon1) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--mh-neon2) 50%, transparent) 1px, transparent 1px);
+  background-size:22px 22px, 22px 22px, 44px 44px;
+  mask-image:linear-gradient(to top, #000 20%, transparent);
+  -webkit-mask-image:linear-gradient(to top, #000 20%, transparent);
+  animation:none;
+}
+.mh-custom[data-mh-city="1"] .mhc-skyline{
+  animation:mhc-city-pulse calc(var(--mh-city-pulse,2.2s) / var(--_spd)) ease-in-out infinite;
+}
+.mh-custom .mhc-poly{
+  position:absolute; border:2px solid var(--mh-neon1);
+  box-shadow:0 0 14px var(--mh-neon1); background:color-mix(in srgb, var(--mh-neon1) 10%, transparent);
+  width:calc(48px * var(--mh-shape-size,1)); height:calc(48px * var(--mh-shape-size,1));
+  animation:none;
+  opacity:0;
+}
+.mh-custom[data-mh-city="1"] .mhc-poly{
+  animation:mhc-float calc(4.5s / var(--_spd)) ease-in-out infinite;
+  opacity:calc(var(--mh-city-on,1) * var(--mh-shape-count,1));
+}
+.mh-custom .mhc-p1{ top:12%; left:10%; border-color:var(--mh-neon1); }
+.mh-custom .mhc-p2{ top:18%; right:14%; border-color:var(--mh-neon2); border-radius:50%; animation-delay:-1s; }
+.mh-custom[data-mh-city="1"] .mhc-p3{ bottom:48%; left:40%; border-color:var(--mh-accent); border-radius:4px; animation-delay:-.5s; opacity:calc(var(--mh-city-on,1) * min(1, var(--mh-shape-count,1))); }
+.mh-custom[data-mh-city="1"] .mhc-p4{ top:40%; left:22%; border-color:var(--mh-neon2); animation-delay:-1.8s; opacity:calc(var(--mh-city-on,1) * max(0, var(--mh-shape-count,1) - .35)); }
+@keyframes mhc-city-pulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.35); } }
+@keyframes mhc-float{ 0%,100%{ transform:translateY(0) rotate(12deg) scale(1);} 50%{ transform:translateY(-24px) rotate(28deg) scale(1.08);} }
+
+.mh-custom .mhc-vignette{
+  position:absolute; inset:0; pointer-events:none; opacity:0;
+  background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,var(--mh-vignette,.5)) 100%);
+}
+.mh-custom[data-mh-vignette="1"] .mhc-vignette{
+  opacity:calc(var(--mh-vignette-on,1));
+}
+.mh-custom .mhc-chroma{
+  position:absolute; inset:0; pointer-events:none; opacity:0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--mh-neon2) 25%, transparent), transparent 40%, transparent 60%, color-mix(in srgb, var(--mh-neon1) 25%, transparent));
+  mix-blend-mode:screen;
+}
+.mh-custom[data-mh-chroma="1"] .mhc-chroma{
+  opacity:calc(var(--mh-chroma-on,1) * var(--mh-chroma,0));
+}
+html[data-mh-freeze="1"] .mh-custom *,
+html.bg-paused .mh-custom *{ animation-play-state:paused !important; }
+.mh-custom[data-mh-all-off="1"] *{ animation:none !important; }
+
+/* ---------- Motion · Journeys ---------- */
+/* Space fly-through */
+.j-space .j-sky{
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at center,#1a1040 0%,#050714 55%,#020208 100%);
+}
+.j-space .j-stars{
+  position:absolute; left:50%; top:50%; width:220%; height:220%;
+  margin-left:-110%; margin-top:-110%;
+  background-repeat:repeat;
+  transform-origin:center center;
+  animation:j-warp-fly 4s linear infinite;
+}
+.j-space .j-stars-far{
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 30% 60%, #cde, transparent),
+    radial-gradient(1.5px 1.5px at 70% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 90% 80%, #aaf, transparent),
+    radial-gradient(1px 1px at 50% 50%, #fff, transparent);
+  background-size:180px 180px, 220px 220px, 160px 160px, 200px 200px, 240px 240px;
+  opacity:.55; animation-duration:7s;
+}
+.j-space .j-stars-mid{
+  background-image:
+    radial-gradient(1.5px 1.5px at 15% 40%, #fff, transparent),
+    radial-gradient(2px 2px at 55% 15%, #eef, transparent),
+    radial-gradient(1.5px 1.5px at 80% 70%, #fff, transparent),
+    radial-gradient(2px 2px at 35% 85%, #ccf, transparent);
+  background-size:140px 140px, 170px 170px, 150px 150px, 190px 190px;
+  opacity:.75; animation-duration:4.5s;
+}
+.j-space .j-stars-near{
+  background-image:
+    radial-gradient(2.5px 2.5px at 25% 25%, #fff, transparent),
+    radial-gradient(2px 8px at 60% 50%, rgba(180,220,255,.9), transparent),
+    radial-gradient(2.5px 2.5px at 75% 80%, #fff, transparent),
+    radial-gradient(2px 10px at 40% 60%, rgba(255,255,255,.85), transparent);
+  background-size:100px 100px, 120px 120px, 90px 90px, 110px 110px;
+  opacity:.95; animation-duration:2.4s;
+}
+.j-space .j-nebula{
+  position:absolute; inset:0;
+  background:
+    radial-gradient(ellipse 50% 40% at 30% 40%, rgba(120,60,200,.25), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 70% 60%, rgba(40,100,200,.2), transparent 55%);
+  animation:j-nebula-pulse 8s ease-in-out infinite;
+}
+@keyframes j-warp-fly{
+  0%{ transform:scale(.35); opacity:.2; }
+  70%{ opacity:1; }
+  100%{ transform:scale(2.4); opacity:0; }
+}
+@keyframes j-nebula-pulse{
+  0%,100%{ opacity:.7; transform:scale(1); }
+  50%{ opacity:1; transform:scale(1.08); }
+}
+
+/* Aerial mountains */
+.j-mountains .j-m-sky{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg,#7dd3fc 0%,#bae6fd 35%,#fef3c7 70%,#86efac 100%);
+}
+.j-mountains .j-m-layer{
+  position:absolute; left:-20%; width:140%; height:55%; bottom:0;
+  background-repeat:repeat-x;
+  animation:j-terrain-scroll 18s linear infinite;
+}
+.j-mountains .j-m-far{
+  height:48%; bottom:18%;
+  background:
+    linear-gradient(175deg, transparent 40%, #64748b 40.5%, #64748b 55%, transparent 55.5%),
+    linear-gradient(155deg, transparent 30%, #78879a 30.5%, #78879a 48%, transparent 48.5%),
+    linear-gradient(190deg, transparent 35%, #556070 35.5%, #556070 52%, transparent 52.5%);
+  background-size:220px 100%, 180px 100%, 260px 100%;
+  opacity:.7; animation-duration:28s; filter:blur(.4px);
+}
+.j-mountains .j-m-mid{
+  height:42%; bottom:8%;
+  background:
+    linear-gradient(165deg, transparent 38%, #4d7c5a 38.5%, #3f6b4c 62%, transparent 62.5%),
+    linear-gradient(145deg, transparent 28%, #5a8f68 28.5%, #4a7a56 58%, transparent 58.5%),
+    linear-gradient(185deg, transparent 42%, #3d6b4a 42.5%, #335a3e 65%, transparent 65.5%);
+  background-size:200px 100%, 160px 100%, 240px 100%;
+  animation-duration:16s;
+}
+.j-mountains .j-m-near{
+  height:28%;
+  background:
+    linear-gradient(170deg, transparent 30%, #2f5d3a 30.5%, #244a2e 70%, #1a3520 100%),
+    linear-gradient(150deg, transparent 20%, #366844 20.5%, #2a5335 75%, #1a3520 100%);
+  background-size:160px 100%, 120px 100%;
+  animation-duration:9s;
+}
+.j-mountains .j-m-cloud{
+  position:absolute; top:12%; left:-30%; width:160%; height:30%;
+  background:
+    radial-gradient(ellipse 80px 28px at 20% 50%, rgba(255,255,255,.55), transparent),
+    radial-gradient(ellipse 100px 32px at 50% 40%, rgba(255,255,255,.45), transparent),
+    radial-gradient(ellipse 70px 24px at 75% 55%, rgba(255,255,255,.5), transparent);
+  animation:j-cloud-drift 22s linear infinite;
+  opacity:.85;
+}
+@keyframes j-terrain-scroll{ to{ background-position:400px 0, -360px 0, 480px 0; } }
+@keyframes j-cloud-drift{ to{ transform:translateX(18%); } }
+
+/* Aerial ocean */
+.j-ocean .j-o-sky{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg,#38bdf8 0%,#0ea5e9 28%,#0284c7 55%,#0369a1 100%);
+}
+.j-ocean .j-o-water{
+  position:absolute; left:-10%; width:120%; top:35%; bottom:0;
+  background:
+    repeating-linear-gradient(95deg,
+      transparent 0 18px,
+      rgba(255,255,255,.12) 18px 20px,
+      transparent 20px 40px,
+      rgba(14,165,233,.35) 40px 42px),
+    repeating-linear-gradient(0deg,
+      rgba(7,89,133,.4) 0 12px,
+      rgba(14,165,233,.25) 12px 24px),
+    linear-gradient(180deg,#0ea5e9 0%,#0369a1 60%,#0c4a6e 100%);
+  background-size:120px 100%, 100% 48px, auto;
+  animation:j-ocean-fly 6s linear infinite;
+  transform:perspective(600px) rotateX(52deg);
+  transform-origin:center top;
+}
+.j-ocean .j-o-foam{
+  position:absolute; left:0; right:0; top:38%; height:8%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  animation:j-foam-shim 3.5s ease-in-out infinite;
+}
+.j-ocean .j-o-glint{
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse 40% 20% at 60% 45%, rgba(255,255,255,.25), transparent 70%);
+  animation:j-glint 5s ease-in-out infinite;
+}
+@keyframes j-ocean-fly{ to{ background-position:120px 80px, 0 48px, 0 0; } }
+@keyframes j-foam-shim{ 0%,100%{ opacity:.4; transform:translateX(-4%); } 50%{ opacity:.9; transform:translateX(6%); } }
+@keyframes j-glint{ 0%,100%{ opacity:.3; } 50%{ opacity:.7; } }
+
+/* Mountain road drive */
+.j-road .j-r-sky{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg,#93c5fd 0%,#bfdbfe 40%,#dbeafe 55%,#86efac 55%,#4ade80 100%);
+}
+.j-road .j-r-peaks{
+  position:absolute; left:-15%; width:130%; height:40%; top:22%;
+  background:
+    linear-gradient(160deg, transparent 45%, #64748b 45.5%, #475569 70%, transparent 70.5%),
+    linear-gradient(200deg, transparent 40%, #788497 40.5%, #5a6878 68%, transparent 68.5%),
+    linear-gradient(145deg, transparent 50%, #556070 50.5%, #3f4a57 72%, transparent 72.5%);
+  background-size:180px 100%, 220px 100%, 150px 100%;
+  animation:j-peaks-scroll 14s linear infinite;
+  opacity:.85;
+}
+.j-road .j-r-ground{
+  position:absolute; left:0; right:0; bottom:0; height:48%;
+  background:linear-gradient(180deg,#4ade80 0%,#22c55e 40%,#15803d 100%);
+}
+.j-road .j-r-road{
+  position:absolute; left:50%; bottom:0; width:140%; height:52%;
+  margin-left:-70%;
+  background:
+    linear-gradient(90deg, transparent 42%, #374151 42%, #374151 58%, transparent 58%),
+    linear-gradient(180deg, transparent 0%, #1f2937 8%);
+  clip-path:polygon(46% 0%, 54% 0%, 95% 100%, 5% 100%);
+  transform-origin:center top;
+}
+.j-road .j-r-lanes{
+  position:absolute; left:50%; bottom:0; width:8%; height:52%;
+  margin-left:-4%;
+  background:repeating-linear-gradient(180deg,
+    #fde047 0 18px,
+    transparent 18px 40px);
+  clip-path:polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%);
+  animation:j-lane-rush 0.55s linear infinite;
+  opacity:.95;
+}
+.j-road .j-r-shoulder{
+  position:absolute; left:50%; bottom:0; width:140%; height:52%;
+  margin-left:-70%;
+  background:linear-gradient(90deg,
+    transparent 40%, rgba(255,255,255,.15) 41%, transparent 42%,
+    transparent 58%, rgba(255,255,255,.15) 59%, transparent 60%);
+  clip-path:polygon(46% 0%, 54% 0%, 95% 100%, 5% 100%);
+}
+@keyframes j-peaks-scroll{ to{ background-position:180px 0, -220px 0, 150px 0; } }
+@keyframes j-lane-rush{ to{ background-position:0 40px; } }
+
+/* ---------- Dynamic gradients ---------- */
+.dg-aurora .dg-blob{
+  position:absolute; width:70%; height:70%; border-radius:50%; filter:blur(48px);
+  opacity:.7; mix-blend-mode:screen;
+}
+.dg-aurora .dg-a1{ top:-15%; left:-10%; background:#a78bfa; animation:dg-blob-drift 11s ease-in-out infinite; }
+.dg-aurora .dg-a2{ top:20%; right:-20%; background:#38bdf8; animation:dg-blob-drift 14s ease-in-out infinite reverse; }
+.dg-aurora .dg-a3{ bottom:-20%; left:20%; background:#f472b6; animation:dg-blob-drift 12s ease-in-out -3s infinite; }
+.dg-aurora .dg-base{ position:absolute; inset:0; background:linear-gradient(160deg,#0f172a,#1e1b4b 50%,#312e81); }
+@keyframes dg-blob-drift{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  33%{ transform:translate(12%,8%) scale(1.12); }
+  66%{ transform:translate(-8%,-6%) scale(.92); }
+}
+
+.dg-mesh .dg-m{
+  position:absolute; inset:-20%;
+  background:
+    radial-gradient(at 20% 30%, #fb7185 0, transparent 45%),
+    radial-gradient(at 80% 20%, #38bdf8 0, transparent 40%),
+    radial-gradient(at 50% 80%, #a3e635 0, transparent 42%),
+    radial-gradient(at 10% 80%, #c084fc 0, transparent 38%),
+    #fef3c7;
+  background-size:140% 140%;
+  animation:dg-mesh-move 16s ease-in-out infinite;
+}
+@keyframes dg-mesh-move{
+  0%,100%{ background-position:0% 0%, 100% 0%, 50% 100%, 0% 100%, 0 0; }
+  50%{ background-position:40% 20%, 60% 40%, 30% 60%, 20% 50%, 0 0; }
+}
+
+.dg-sunset .dg-s{
+  position:absolute; inset:0;
+  background:linear-gradient(120deg,#ffe600,#ff6b35,#ff2d95,#7c3aed,#00e5ff,#ffe600);
+  background-size:300% 300%;
+  animation:dg-flow 10s linear infinite;
+}
+@keyframes dg-flow{ to{ background-position:100% 50%; } }
+
+.dg-conic .dg-c{
+  position:absolute; left:50%; top:50%; width:160vmax; height:160vmax;
+  margin:-80vmax 0 0 -80vmax;
+  background:conic-gradient(from 0deg,#ff2d95,#ffe600,#00e5ff,#a3e635,#c026ff,#ff2d95);
+  animation:dg-spin 18s linear infinite;
+}
+.dg-conic .dg-cveil{
+  position:absolute; inset:0;
+  background:radial-gradient(circle at center, transparent 30%, rgba(255,255,255,.35) 100%);
+}
+@keyframes dg-spin{ to{ transform:rotate(360deg); } }
+
+.dg-wave .dg-w{
+  position:absolute; inset:-30% -10%;
+  background:
+    linear-gradient(190deg, rgba(56,189,248,.55), transparent 50%),
+    linear-gradient(10deg, rgba(167,139,250,.5), transparent 55%),
+    linear-gradient(180deg,#e0f2fe,#ddd6fe 50%,#fce7f3);
+  background-size:100% 200%, 100% 200%, auto;
+  animation:dg-wave-flow 9s ease-in-out infinite;
+}
+@keyframes dg-wave-flow{
+  0%,100%{ background-position:0 0, 0 100%, 0 0; transform:translateY(0); }
+  50%{ background-position:0 40%, 0 40%, 0 0; transform:translateY(-3%); }
+}
+
+.dg-candy .dg-band{
+  position:absolute; inset:-40%;
+  background:repeating-linear-gradient(
+    -32deg,
+    #ff2d95 0 28px,
+    #ffe600 28px 56px,
+    #00e5ff 56px 84px,
+    #a3e635 84px 112px,
+    #c026ff 112px 140px
+  );
+  animation:dg-candy-march 8s linear infinite;
+  opacity:.85;
+}
+.dg-candy .dg-wash{
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 30%, rgba(255,255,255,.35), transparent 60%);
+}
+@keyframes dg-candy-march{ to{ transform:translate3d(70px, 50px, 0); } }
+
+/* Pause CSS animations when tab hidden or reduced-motion */
+html.bg-paused #bg-dynamic *,
+html.bg-paused .bg-presets-dynamic .mh-thumb *,
+html.bg-paused .bg-presets-journey .mh-thumb *,
+html.bg-paused .bg-presets-dgrad .mh-thumb *,
+html.bg-paused body{
+  animation-play-state:paused !important;
+}
+@media (prefers-reduced-motion: reduce){
+  #bg-dynamic *,
+  .bg-presets-dynamic .mh-thumb *,
+  .bg-presets-journey .mh-thumb *,
+  .bg-presets-dgrad .mh-thumb *,
+  html[data-bg-anim="1"] body{
+    animation:none !important;
+  }
+  .mh-glitch .mh-slice{ opacity:.45; }
+  .mh-crt .mh-flicker{ opacity:.2; }
+  .mh-crt .mh-static{ opacity:.4; }
+  .j-space .j-stars-near{ opacity:.7; transform:scale(1.1); }
+  .j-ocean .j-o-water{ opacity:.95; }
+  .dg-conic .dg-c{ transform:rotate(40deg); }
+}
 
 /* ---------- setup ---------- */
 .setupwrap{max-width:560px; margin:0 auto; padding:26px 18px 40px;}
@@ -1057,6 +2223,132 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 </style>
 </head>
 <body>
+
+<!-- Animated Max Headroom-style page backgrounds (CRT-dark). Behind UI via z-index:-1. -->
+<div id="bg-dynamic" aria-hidden="true">
+  <div class="mh-scene mh-wire" data-mh="mh-wireframe">
+    <div class="mh-wash"></div>
+    <div class="mh-plane mh-ceil"></div>
+    <div class="mh-plane mh-floor"></div>
+    <div class="mh-horizon"></div>
+  </div>
+  <div class="mh-scene mh-crt" data-mh="mh-scanlines">
+    <div class="mh-wash"></div>
+    <div class="mh-static"></div>
+    <div class="mh-scan"></div>
+    <div class="mh-beam"></div>
+    <div class="mh-flicker"></div>
+  </div>
+  <div class="mh-scene mh-stripes" data-mh="mh-stripes">
+    <div class="mh-wash"></div>
+    <div class="mh-band"></div>
+    <div class="mh-band mh-band2"></div>
+    <div class="mh-band mh-band3"></div>
+  </div>
+  <div class="mh-scene mh-glitch" data-mh="mh-glitch">
+    <div class="mh-wash"></div>
+    <div class="mh-rgb"></div>
+    <div class="mh-noise"></div>
+    <div class="mh-slice mh-s1"></div>
+    <div class="mh-slice mh-s2"></div>
+    <div class="mh-slice mh-s3"></div>
+    <div class="mh-slice mh-s4"></div>
+  </div>
+  <div class="mh-scene mh-geo" data-mh="mh-geometry">
+    <div class="mh-wash"></div>
+    <div class="mh-poly mh-p1"></div>
+    <div class="mh-poly mh-p2"></div>
+    <div class="mh-poly mh-p3"></div>
+    <div class="mh-poly mh-p4"></div>
+    <div class="mh-city"></div>
+  </div>
+  <div class="mh-scene mh-custom" data-mh="mh-custom">
+    <div class="mhc-stage"></div>
+    <div class="mhc-wash"></div>
+    <div class="mhc-layer mhc-grid">
+      <div class="mhc-plane mhc-ceil"></div>
+      <div class="mhc-plane mhc-floor"></div>
+      <div class="mhc-horizon"></div>
+    </div>
+    <div class="mhc-layer mhc-scan">
+      <div class="mhc-scanlines"></div>
+      <div class="mhc-beam"></div>
+      <div class="mhc-flicker"></div>
+    </div>
+    <div class="mhc-layer mhc-stripes">
+      <div class="mhc-band mhc-b1"></div>
+      <div class="mhc-band mhc-b2"></div>
+    </div>
+    <div class="mhc-layer mhc-glitch">
+      <div class="mhc-rgb"></div>
+      <div class="mhc-noise"></div>
+      <div class="mhc-slice mhc-s1"></div>
+      <div class="mhc-slice mhc-s2"></div>
+      <div class="mhc-slice mhc-s3"></div>
+      <div class="mhc-slice mhc-s4"></div>
+    </div>
+    <div class="mhc-layer mhc-city">
+      <div class="mhc-skyline"></div>
+      <div class="mhc-poly mhc-p1"></div>
+      <div class="mhc-poly mhc-p2"></div>
+      <div class="mhc-poly mhc-p3"></div>
+      <div class="mhc-poly mhc-p4"></div>
+    </div>
+    <div class="mhc-vignette"></div>
+    <div class="mhc-chroma"></div>
+  </div>
+  <div class="mh-scene j-space" data-mh="j-space">
+    <div class="j-sky"></div>
+    <div class="j-nebula"></div>
+    <div class="j-stars j-stars-far"></div>
+    <div class="j-stars j-stars-mid"></div>
+    <div class="j-stars j-stars-near"></div>
+  </div>
+  <div class="mh-scene j-mountains" data-mh="j-mountains">
+    <div class="j-m-sky"></div>
+    <div class="j-m-cloud"></div>
+    <div class="j-m-layer j-m-far"></div>
+    <div class="j-m-layer j-m-mid"></div>
+    <div class="j-m-layer j-m-near"></div>
+  </div>
+  <div class="mh-scene j-ocean" data-mh="j-ocean">
+    <div class="j-o-sky"></div>
+    <div class="j-o-water"></div>
+    <div class="j-o-foam"></div>
+    <div class="j-o-glint"></div>
+  </div>
+  <div class="mh-scene j-road" data-mh="j-road">
+    <div class="j-r-sky"></div>
+    <div class="j-r-peaks"></div>
+    <div class="j-r-ground"></div>
+    <div class="j-r-road"></div>
+    <div class="j-r-shoulder"></div>
+    <div class="j-r-lanes"></div>
+  </div>
+  <div class="mh-scene dg-aurora" data-mh="dg-aurora">
+    <div class="dg-base"></div>
+    <div class="dg-blob dg-a1"></div>
+    <div class="dg-blob dg-a2"></div>
+    <div class="dg-blob dg-a3"></div>
+  </div>
+  <div class="mh-scene dg-mesh" data-mh="dg-mesh">
+    <div class="dg-m"></div>
+  </div>
+  <div class="mh-scene dg-sunset" data-mh="dg-sunset">
+    <div class="dg-s"></div>
+  </div>
+  <div class="mh-scene dg-conic" data-mh="dg-conic">
+    <div class="dg-c"></div>
+    <div class="dg-cveil"></div>
+  </div>
+  <div class="mh-scene dg-wave" data-mh="dg-wave">
+    <div class="dg-w"></div>
+  </div>
+  <div class="mh-scene dg-candy" data-mh="dg-candy">
+    <div class="dg-band"></div>
+    <div class="dg-wash"></div>
+  </div>
+</div>
 
 <!-- in-app update banner: shown when version.json reports a newer build -->
 <div id="updBar" role="status">
@@ -1132,7 +2424,7 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
     <div class="brand"><img class="brand-icon" src="icons/apple-touch-icon.png" alt=""><h1>Expense Tracker</h1></div>
     <div class="header-actions">
       <button type="button" class="hdr-news" id="hdr-whats-new" title="See recent changes">What’s new</button>
-      <span class="user-chip" id="user-chip"></span>
+      <button type="button" class="user-chip" id="user-chip" title="Change who's entering" aria-label="Change who's entering"></button>
     </div>
   </header>
   <div id="refresh-pill" aria-live="polite"><span class="spin"></span>Updating&hellip;</div>
@@ -1613,10 +2905,12 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
               <input type="email" id="set-auth-email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com">
               <label class="f" for="set-auth-pass">Password</label>
               <input type="password" id="set-auth-pass" autocomplete="current-password" placeholder="6+ characters">
-              <div class="set-actions">
+              <div class="set-actions set-auth-actions">
                 <button class="btn small" id="set-auth-signin" type="button">Sign in</button>
                 <button class="btn small ghost" id="set-auth-signup" type="button">Create account</button>
                 <button class="btn small ghost" id="set-auth-google" type="button">Continue with Google</button>
+              </div>
+              <div class="set-auth-forgot">
                 <button class="linkbtn" id="set-auth-forgot" type="button">Forgot password?</button>
               </div>
             </div>
@@ -1658,20 +2952,137 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
           <button data-theme-opt="system">🌓 System</button>
         </div>
         <div class="bg-section">
-          <label class="f" style="margin-top:4px">Page background</label>
-          <div class="bg-section-label">Solids</div>
-          <div class="bg-presets" id="bg-presets-solid"></div>
-          <div class="bg-section-label">Gradients</div>
-          <div class="bg-presets" id="bg-presets-gradient"></div>
-          <div class="bg-section-label">Patterns</div>
-          <div class="bg-presets" id="bg-presets-pattern"></div>
-          <div class="bg-section-label">Custom</div>
-          <div class="bg-custom">
-            <input type="color" id="set-bg" value="#f3f5f7" title="Pick any color" aria-label="Custom background color">
-            <span class="bg-custom-lbl">Pick any color</span>
-            <button type="button" class="btn small ghost" id="set-bg-reset">Reset to default</button>
+          <div class="bg-head">
+            <label class="f">Page background</label>
+            <button type="button" class="linkbtn" id="set-bg-reset">Reset</button>
           </div>
-          <p class="muted bg-hint">Fun backgrounds for Light mode (and System when your device is light). Cards stay white so text stays readable. Dark mode keeps its own look. Saved on this device.</p>
+
+          <div class="bg-light-only">
+            <div class="bg-intensity" id="bg-intensity">
+              <div class="seg" id="bg-intensity-seg" role="tablist" aria-label="Preset intensity">
+                <button type="button" data-bg-intensity="subtle" class="on" role="tab" aria-selected="true">Subtle</button>
+                <button type="button" data-bg-intensity="medium" role="tab" aria-selected="false">Medium</button>
+                <button type="button" data-bg-intensity="bold" role="tab" aria-selected="false">Bold</button>
+              </div>
+            </div>
+
+            <div class="bg-panel bg-bold-block" data-bg-panel="subtle" id="bg-panel-subtle">
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Solids</div>
+                <div class="bg-presets" id="bg-presets-subtle-solid"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Gradients</div>
+                <div class="bg-presets" id="bg-presets-subtle-gradient"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Patterns</div>
+                <div class="bg-presets" id="bg-presets-subtle-pattern"></div>
+              </div>
+            </div>
+            <div class="bg-panel bg-bold-block" data-bg-panel="medium" id="bg-panel-medium" hidden>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Solids</div>
+                <div class="bg-presets" id="bg-presets-medium-solid"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Gradients</div>
+                <div class="bg-presets" id="bg-presets-medium-gradient"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Patterns</div>
+                <div class="bg-presets" id="bg-presets-medium-pattern"></div>
+              </div>
+            </div>
+            <div class="bg-panel bg-bold-block" data-bg-panel="bold" id="bg-panel-bold" hidden>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Solids</div>
+                <div class="bg-presets" id="bg-presets-bold-solid"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Gradients</div>
+                <div class="bg-presets" id="bg-presets-bold-gradient"></div>
+              </div>
+              <div class="bg-type-row">
+                <div class="bg-type-lbl">Patterns</div>
+                <div class="bg-presets" id="bg-presets-bold-pattern"></div>
+              </div>
+            </div>
+
+            <div class="bg-customize">
+              <div class="bg-customize-label">Customize</div>
+              <div class="bg-cust-list">
+                <div class="bg-cust-row">
+                  <div class="bg-cust-kicker">Color</div>
+                  <div class="bg-cust-actions">
+                    <input type="color" id="set-bg" value="#f3f5f7" title="Pick any color" aria-label="Custom background color">
+                    <span class="bg-cust-hex" id="set-bg-hex">#f3f5f7</span>
+                  </div>
+                </div>
+                <div class="bg-cust-row" style="align-items:start">
+                  <div class="bg-cust-kicker" style="padding-top:6px">Picture</div>
+                  <div class="bg-cust-actions" style="flex-direction:column;align-items:stretch">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <div class="bg-pic-thumb empty" id="bg-pic-thumb" title="Uploaded picture" aria-hidden="true"></div>
+                      <input type="file" id="set-bg-pic" accept="image/*" class="filepick" aria-label="Upload background picture">
+                      <button type="button" class="btn small" id="set-bg-pic-pick">Upload…</button>
+                      <button type="button" class="btn small ghost" id="set-bg-pic-clear" hidden>Clear</button>
+                    </div>
+                    <div class="bg-pic-modes" id="bg-pic-modes" hidden>
+                      <div class="seg" id="bg-pic-mode-seg">
+                        <button type="button" data-pic-mode="cover" class="on">Size to fit</button>
+                        <button type="button" data-pic-mode="repeat">Repeating</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bg-cust-row">
+                  <div class="bg-cust-kicker">Editor</div>
+                  <div class="bg-cust-actions">
+                    <button type="button" class="btn small" id="bg-editor-open">Open editor</button>
+                    <span class="muted" style="font-size:12.5px">Solid, gradient &amp; pattern</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-lib" id="bg-lib">
+                <div class="bg-lib-head">
+                  <strong>My backgrounds</strong>
+                  <div class="bg-lib-actions">
+                    <button type="button" class="btn small ghost" id="bg-import-open">Import…</button>
+                    <input type="file" id="bg-import-file" accept=".json,.expensebg.json,application/json" class="filepick" aria-label="Import background file">
+                  </div>
+                </div>
+                <div class="bg-lib-list" id="bg-lib-list"></div>
+                <p class="bg-lib-empty" id="bg-lib-empty">No saved backgrounds yet — use Open editor or MH editor, then Save.</p>
+              </div>
+            </div>
+          </div>
+
+          <details class="bg-motion" id="bg-motion">
+            <summary>Motion &amp; effects <span class="muted" style="font-weight:500;font-size:12.5px">Optional · any theme</span></summary>
+            <div class="bg-motion-body">
+              <div class="bg-motion-group">
+                <div class="bg-motion-label">Dynamic gradients</div>
+                <div class="bg-presets bg-presets-dgrad bg-presets-scene" id="bg-presets-dgrad"></div>
+              </div>
+              <div class="bg-motion-group">
+                <div class="bg-motion-label">Max Headroom</div>
+                <div class="bg-cust-actions" style="margin:0 0 8px;flex-wrap:wrap">
+                  <button type="button" class="btn small" id="mh-editor-open">MH editor…</button>
+                  <button type="button" class="btn small ghost" id="ai-bg-open">AI background…</button>
+                  <span class="muted" style="font-size:12.5px">Dial layers or describe a scene</span>
+                </div>
+                <div class="bg-presets bg-presets-dynamic bg-presets-scene" id="bg-presets-dynamic"></div>
+              </div>
+              <div class="bg-motion-group">
+                <div class="bg-motion-label">Journeys</div>
+                <div class="bg-presets bg-presets-journey bg-presets-scene" id="bg-presets-journey"></div>
+              </div>
+            </div>
+          </details>
+
+          <p class="bg-hint">Presets, color, picture, and the editor are for <b>Light</b> mode. Motion effects work in any theme and pause with reduced-motion. Saved on this device.</p>
         </div>
       </div>
       <div class="card" id="set-steps-card">
@@ -1721,46 +3132,148 @@ var LS_API = 'expenseTracker.apiUrl';
 var LS_USER = 'expenseTracker.userName';
 var LS_THEME = 'expenseTracker.theme';
 var LS_BG = 'expenseTracker.bg';
+var LS_BG_IMAGE = 'expenseTracker.bgImage'; /* data URL kept separate so config JSON stays small */
+var LS_BG_CUSTOMS = 'expenseTracker.bgCustoms'; /* saved editor backgrounds library */
+var LS_MH_EDITOR = 'expenseTracker.mhEditor'; /* last MH recipe draft */
+var EXPENSEBG_FORMAT = 'expensebg';
+var EXPENSEBG_VERSION = 1;
 var DEFAULT_BG = '#f3f5f7';
-/* Light-mode page backgrounds: solids, gradients, and subtle patterns.
-   Stored as JSON {type, id?, value, base?, size?}. Legacy bare "#rrggbb" still loads. */
+var BG_IMAGE_MAX_PX = 1920;
+var BG_IMAGE_JPEG_Q = 0.72;
+/* Light-mode page backgrounds organized by boldness (subtle → medium → bold),
+   plus custom color, picture (cover/tile), and Max Headroom dynamics.
+   Stored as JSON {type, id?, value, base?, size?, boldness?, mode?}.
+   Image bytes live in LS_BG_IMAGE; cfg.value is "image" sentinel.
+   Legacy bare "#rrggbb" still loads. */
 var BG_PRESETS = [
-  {id:'default', type:'solid', label:'Default gray', value:'#f3f5f7', base:'#f3f5f7'},
-  {id:'sage', type:'solid', label:'Sage', value:'#eef6f1', base:'#eef6f1'},
-  {id:'sky', type:'solid', label:'Sky mist', value:'#eef2f8', base:'#eef2f8'},
-  {id:'parchment', type:'solid', label:'Warm parchment', value:'#f7f1ea', base:'#f7f1ea'},
-  {id:'lilac', type:'solid', label:'Soft lilac', value:'#f4eef6', base:'#f4eef6'},
-  {id:'mint', type:'solid', label:'Soft mint', value:'#e8f5f0', base:'#e8f5f0'},
-  {id:'blush', type:'solid', label:'Soft blush', value:'#f8eef0', base:'#f8eef0'},
-  {id:'slate', type:'solid', label:'Cool slate', value:'#e8ecf0', base:'#e8ecf0'},
-  {id:'cream', type:'solid', label:'Cream', value:'#faf6f0', base:'#faf6f0'},
-  {id:'g-sage', type:'gradient', label:'Sage wash',
+  /* —— Subtle —— */
+  {id:'default', type:'solid', boldness:'subtle', label:'Default gray', value:'#f3f5f7', base:'#f3f5f7'},
+  {id:'sage', type:'solid', boldness:'subtle', label:'Sage', value:'#eef6f1', base:'#eef6f1'},
+  {id:'sky', type:'solid', boldness:'subtle', label:'Sky mist', value:'#eef2f8', base:'#eef2f8'},
+  {id:'parchment', type:'solid', boldness:'subtle', label:'Warm parchment', value:'#f7f1ea', base:'#f7f1ea'},
+  {id:'lilac', type:'solid', boldness:'subtle', label:'Soft lilac', value:'#f4eef6', base:'#f4eef6'},
+  {id:'mint', type:'solid', boldness:'subtle', label:'Soft mint', value:'#e8f5f0', base:'#e8f5f0'},
+  {id:'blush', type:'solid', boldness:'subtle', label:'Soft blush', value:'#f8eef0', base:'#f8eef0'},
+  {id:'slate', type:'solid', boldness:'subtle', label:'Cool slate', value:'#e8ecf0', base:'#e8ecf0'},
+  {id:'cream', type:'solid', boldness:'subtle', label:'Cream', value:'#faf6f0', base:'#faf6f0'},
+  {id:'g-sage', type:'gradient', boldness:'subtle', label:'Sage wash',
     value:'linear-gradient(160deg,#e4f0e9 0%,#eef6f1 48%,#f4f7f5 100%)', base:'#eef6f1'},
-  {id:'g-sky', type:'gradient', label:'Sky mist',
+  {id:'g-sky', type:'gradient', boldness:'subtle', label:'Sky mist',
     value:'linear-gradient(165deg,#e4eef9 0%,#eef2f8 50%,#f5f7fa 100%)', base:'#eef2f8'},
-  {id:'g-parchment', type:'gradient', label:'Warm parchment',
+  {id:'g-parchment', type:'gradient', boldness:'subtle', label:'Warm parchment',
     value:'linear-gradient(158deg,#f5eadc 0%,#f7f1ea 46%,#f8f5f0 100%)', base:'#f7f1ea'},
-  {id:'g-slate', type:'gradient', label:'Cool slate mist',
+  {id:'g-slate', type:'gradient', boldness:'subtle', label:'Cool slate mist',
     value:'linear-gradient(170deg,#dde3ea 0%,#e8ecf0 52%,#f2f4f6 100%)', base:'#e8ecf0'},
-  {id:'g-mint', type:'gradient', label:'Mint breeze',
+  {id:'g-mint', type:'gradient', boldness:'subtle', label:'Mint breeze',
     value:'linear-gradient(155deg,#dcefe7 0%,#e8f5f0 50%,#f2f8f5 100%)', base:'#e8f5f0'},
-  {id:'g-dawn', type:'gradient', label:'Soft dawn',
+  {id:'g-dawn', type:'gradient', boldness:'subtle', label:'Soft dawn',
     value:'linear-gradient(135deg,#f3ebe3 0%,#eef2f6 100%)', base:'#f0eeea'},
-  {id:'p-dots', type:'pattern', label:'Mint dots',
+  {id:'p-dots', type:'pattern', boldness:'subtle', label:'Mint dots',
     value:'radial-gradient(rgba(23,122,82,.16) 1.15px, transparent 1.2px)',
     base:'#eef6f1', size:'15px 15px'},
-  {id:'p-grid', type:'pattern', label:'Soft grid',
+  {id:'p-grid', type:'pattern', boldness:'subtle', label:'Soft grid',
     value:'linear-gradient(rgba(23,32,42,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(23,32,42,.05) 1px, transparent 1px)',
     base:'#f3f5f7', size:'18px 18px, 18px 18px'},
-  {id:'p-paper', type:'pattern', label:'Paper lines',
+  {id:'p-paper', type:'pattern', boldness:'subtle', label:'Paper lines',
     value:'repeating-linear-gradient(0deg, transparent, transparent 11px, rgba(120,90,50,.07) 11px, rgba(120,90,50,.07) 12px)',
     base:'#faf6f0', size:'auto'},
-  {id:'p-diag', type:'pattern', label:'Sky diagonals',
+  {id:'p-diag', type:'pattern', boldness:'subtle', label:'Sky diagonals',
     value:'repeating-linear-gradient(-32deg, transparent, transparent 9px, rgba(37,99,235,.07) 9px, rgba(37,99,235,.07) 10px)',
     base:'#eef2f8', size:'auto'},
-  {id:'p-mesh', type:'pattern', label:'Soft mesh',
+  {id:'p-mesh', type:'pattern', boldness:'subtle', label:'Soft mesh',
     value:'radial-gradient(at 20% 20%, rgba(23,122,82,.10) 0, transparent 45%), radial-gradient(at 80% 10%, rgba(37,99,235,.10) 0, transparent 42%), radial-gradient(at 50% 80%, rgba(154,107,26,.08) 0, transparent 48%)',
-    base:'#f3f5f7', size:'auto'}
+    base:'#f3f5f7', size:'auto'},
+  /* —— Medium —— */
+  {id:'m-coral', type:'solid', boldness:'medium', label:'Coral', value:'#ff8a7a', base:'#ff8a7a'},
+  {id:'m-azure', type:'solid', boldness:'medium', label:'Azure', value:'#5b9cff', base:'#5b9cff'},
+  {id:'m-emerald', type:'solid', boldness:'medium', label:'Emerald', value:'#34d399', base:'#34d399'},
+  {id:'m-amber', type:'solid', boldness:'medium', label:'Amber', value:'#fbbf24', base:'#fbbf24'},
+  {id:'m-violet', type:'solid', boldness:'medium', label:'Violet', value:'#a78bfa', base:'#a78bfa'},
+  {id:'m-rose', type:'solid', boldness:'medium', label:'Rose', value:'#fb7185', base:'#fb7185'},
+  {id:'m-teal', type:'solid', boldness:'medium', label:'Teal', value:'#2dd4bf', base:'#2dd4bf'},
+  {id:'mg-sunset', type:'gradient', boldness:'medium', label:'Sunset wash',
+    value:'linear-gradient(135deg,#fb923c 0%,#f472b6 50%,#818cf8 100%)', base:'#f472b6'},
+  {id:'mg-ocean', type:'gradient', boldness:'medium', label:'Ocean',
+    value:'linear-gradient(160deg,#22d3ee 0%,#3b82f6 55%,#6366f1 100%)', base:'#3b82f6'},
+  {id:'mg-forest', type:'gradient', boldness:'medium', label:'Forest',
+    value:'linear-gradient(150deg,#4ade80 0%,#14b8a6 50%,#0ea5e9 100%)', base:'#14b8a6'},
+  {id:'mg-candy', type:'gradient', boldness:'medium', label:'Candy',
+    value:'linear-gradient(120deg,#f9a8d4 0%,#c4b5fd 50%,#93c5fd 100%)', base:'#c4b5fd'},
+  {id:'mg-citrus', type:'gradient', boldness:'medium', label:'Citrus',
+    value:'linear-gradient(145deg,#facc15 0%,#fb923c 55%,#f87171 100%)', base:'#fb923c'},
+  {id:'mp-stripes', type:'pattern', boldness:'medium', label:'Bold diagonals',
+    value:'repeating-linear-gradient(-36deg,#3b82f6 0 8px,#fbbf24 8px 16px,#f472b6 16px 24px,#fff 24px 32px)',
+    base:'#eff6ff', size:'auto'},
+  {id:'mp-polka', type:'pattern', boldness:'medium', label:'Polka punch',
+    value:'radial-gradient(circle,#ef4444 2.5px, transparent 2.6px)',
+    base:'#fef3c7', size:'18px 18px'},
+  {id:'mp-checks', type:'pattern', boldness:'medium', label:'Soft checks',
+    value:'linear-gradient(45deg,#93c5fd 25%,transparent 25%),linear-gradient(-45deg,#93c5fd 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#93c5fd 75%),linear-gradient(-45deg,transparent 75%,#93c5fd 75%)',
+    base:'#eff6ff', size:'22px 22px'},
+  {id:'mp-zig', type:'pattern', boldness:'medium', label:'Chevron',
+    value:'repeating-linear-gradient(90deg,#a78bfa 0 10px,transparent 10px 20px),repeating-linear-gradient(0deg,#f9a8d4 0 10px,transparent 10px 20px)',
+    base:'#faf5ff', size:'20px 20px'},
+  /* —— Bold —— */
+  {id:'b-hotpink', type:'solid', boldness:'bold', label:'Hot pink', value:'#ff2d95', base:'#ff2d95'},
+  {id:'b-electric', type:'solid', boldness:'bold', label:'Electric blue', value:'#0066ff', base:'#0066ff'},
+  {id:'b-lime', type:'solid', boldness:'bold', label:'Lime', value:'#a3e635', base:'#a3e635'},
+  {id:'b-orange', type:'solid', boldness:'bold', label:'Blaze orange', value:'#ff4500', base:'#ff4500'},
+  {id:'b-purple', type:'solid', boldness:'bold', label:'Vivid purple', value:'#c026ff', base:'#c026ff'},
+  {id:'b-yellow', type:'solid', boldness:'bold', label:'Electric yellow', value:'#ffe600', base:'#ffe600'},
+  {id:'b-cyan', type:'solid', boldness:'bold', label:'Hot cyan', value:'#00e5ff', base:'#00e5ff'},
+  {id:'bg-vapor', type:'gradient', boldness:'bold', label:'Vaporwave',
+    value:'linear-gradient(160deg,#ff00c8 0%,#7c3aed 40%,#00e5ff 100%)', base:'#7c3aed'},
+  {id:'bg-fire', type:'gradient', boldness:'bold', label:'Fireball',
+    value:'linear-gradient(135deg,#ffe600 0%,#ff4500 45%,#ff0077 100%)', base:'#ff4500'},
+  {id:'bg-laser', type:'gradient', boldness:'bold', label:'Laser grid',
+    value:'linear-gradient(180deg,#00e5ff 0%,#0066ff 50%,#c026ff 100%)', base:'#0066ff'},
+  {id:'bg-meme', type:'gradient', boldness:'bold', label:'Memphis splash',
+    value:'linear-gradient(45deg,#ffe600 0%,#ff2d95 33%,#00e5ff 66%,#a3e635 100%)', base:'#ff2d95'},
+  {id:'bp-zebra', type:'pattern', boldness:'bold', label:'Zebra blaze',
+    value:'repeating-linear-gradient(-45deg,#0a0a0a 0 12px,#ffe600 12px 24px,#ff2d95 24px 36px)',
+    base:'#0a0a0a', size:'auto'},
+  {id:'bp-checker', type:'pattern', boldness:'bold', label:'Neon checker',
+    value:'linear-gradient(45deg,#00e5ff 25%,transparent 25%),linear-gradient(-45deg,#00e5ff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#00e5ff 75%),linear-gradient(-45deg,transparent 75%,#00e5ff 75%)',
+    base:'#ff2d95', size:'28px 28px'},
+  {id:'bp-confetti', type:'pattern', boldness:'bold', label:'Confetti dots',
+    value:'radial-gradient(circle at 20% 30%,#ffe600 0 4px,transparent 5px),radial-gradient(circle at 70% 20%,#00e5ff 0 5px,transparent 6px),radial-gradient(circle at 40% 70%,#ff2d95 0 4px,transparent 5px),radial-gradient(circle at 85% 65%,#a3e635 0 5px,transparent 6px),radial-gradient(circle at 10% 80%,#c026ff 0 3px,transparent 4px)',
+    base:'#1e1b4b', size:'64px 64px'},
+  {id:'bp-bars', type:'pattern', boldness:'bold', label:'Signal bars',
+    value:'repeating-linear-gradient(90deg,#ff2d95 0 14px,#00e5ff 14px 28px,#ffe600 28px 42px,#0066ff 42px 56px)',
+    base:'#ff2d95', size:'auto'},
+  /* Max Headroom dynamics (CSS only, CRT-dark neon). */
+  {id:'mh-wireframe', type:'dynamic', group:'maxheadroom', label:'Wireframe grid — racing cyan floor & ceiling',
+    value:'mh-wireframe', base:'#05070c'},
+  {id:'mh-scanlines', type:'dynamic', group:'maxheadroom', label:'CRT scanlines — hard flicker & racing beam',
+    value:'mh-scanlines', base:'#05070c'},
+  {id:'mh-stripes', type:'dynamic', group:'maxheadroom', label:'Neon stripes — cyan/magenta/yellow march',
+    value:'mh-stripes', base:'#05070c'},
+  {id:'mh-glitch', type:'dynamic', group:'maxheadroom', label:'Hard glitch — stutter tears & RGB split',
+    value:'mh-glitch', base:'#05070c'},
+  {id:'mh-geometry', type:'dynamic', group:'maxheadroom', label:'City pulse — loud neon wireframe shapes',
+    value:'mh-geometry', base:'#05070c'},
+  /* Motion · Journeys */
+  {id:'j-space', type:'dynamic', group:'journey', label:'Space fly-through — stars rushing past',
+    value:'j-space', base:'#050714'},
+  {id:'j-mountains', type:'dynamic', group:'journey', label:'Aerial mountains — flying over peaks',
+    value:'j-mountains', base:'#7dd3fc'},
+  {id:'j-ocean', type:'dynamic', group:'journey', label:'Aerial ocean — flying over open water',
+    value:'j-ocean', base:'#0284c7'},
+  {id:'j-road', type:'dynamic', group:'journey', label:'Mountain road — driving toward the horizon',
+    value:'j-road', base:'#93c5fd'},
+  /* Dynamic gradients */
+  {id:'dg-aurora', type:'dynamic', group:'dgrad', label:'Aurora blobs — soft morphing color wash',
+    value:'dg-aurora', base:'#1e1b4b'},
+  {id:'dg-mesh', type:'dynamic', group:'dgrad', label:'Mesh shift — multi-point color drift',
+    value:'dg-mesh', base:'#fef3c7'},
+  {id:'dg-sunset', type:'dynamic', group:'dgrad', label:'Sunset flow — linear rainbow drift',
+    value:'dg-sunset', base:'#ff6b35'},
+  {id:'dg-conic', type:'dynamic', group:'dgrad', label:'Conic spin — revolving color wheel',
+    value:'dg-conic', base:'#ffe600'},
+  {id:'dg-wave', type:'dynamic', group:'dgrad', label:'Wave wash — flowing soft bands',
+    value:'dg-wave', base:'#e0f2fe'},
+  {id:'dg-candy', type:'dynamic', group:'dgrad', label:'Candy march — bold striped gradient',
+    value:'dg-candy', base:'#ff2d95'}
 ];
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
@@ -1772,7 +3285,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022104';
+var APP_VERSION = '202610022340';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -2129,39 +3642,238 @@ function bgPref(){
 }
 function clearBgCss(){
   var root = document.documentElement;
-  root.style.removeProperty('--bg');
+  root.style.removeProperty('--page-bg');
   root.style.removeProperty('--bg-extra');
   root.style.removeProperty('--bg-size');
+  root.style.removeProperty('--bg-repeat');
+  root.style.removeProperty('--bg-pos');
+  root.removeAttribute('data-bg-dynamic');
+  root.removeAttribute('data-bg-anim');
+  root.removeAttribute('data-mh-freeze');
+  root.classList.remove('bg-paused');
+  clearMhCssVars();
+}
+function syncDynamicBgMotion(){
+  var root = document.documentElement;
+  if(!root.getAttribute('data-bg-dynamic') && root.getAttribute('data-bg-anim')!=='1'){
+    root.classList.remove('bg-paused');
+    return;
+  }
+  var reduce = false;
+  try{ reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){}
+  var hidden = !!(document.hidden);
+  root.classList.toggle('bg-paused', reduce || hidden);
+}
+function applyDynamicBg(cfg){
+  var root = document.documentElement;
+  if(!cfg || cfg.type!=='dynamic'){
+    root.removeAttribute('data-bg-dynamic');
+    root.removeAttribute('data-mh-freeze');
+    root.classList.remove('bg-paused');
+    clearMhCssVars();
+    return;
+  }
+  var id = cfg.id || cfg.value;
+  root.setAttribute('data-bg-dynamic', id);
+  if(id==='mh-custom'){
+    var recipe = (cfg.recipe && cfg.recipe.kind==='mh') ? cfg.recipe : (loadMhEditorDraft() || mhDefaultRecipe());
+    applyMhRecipe(recipe, {live:true});
+  }else{
+    clearMhCssVars();
+    root.removeAttribute('data-mh-freeze');
+  }
+  syncDynamicBgMotion();
+}
+function bgImageData(){
+  try{ return localStorage.getItem(LS_BG_IMAGE) || ''; }catch(e){ return ''; }
+}
+function setBgImageData(dataUrl){
+  try{
+    if(!dataUrl) localStorage.removeItem(LS_BG_IMAGE);
+    else localStorage.setItem(LS_BG_IMAGE, dataUrl);
+    return true;
+  }catch(e){
+    toast('Picture too large for this device storage. Try a smaller image.', true);
+    return false;
+  }
+}
+function loadBgCustoms(){
+  try{
+    var raw = localStorage.getItem(LS_BG_CUSTOMS);
+    if(!raw) return [];
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+function saveBgCustoms(list){
+  try{ localStorage.setItem(LS_BG_CUSTOMS, JSON.stringify(list||[])); return true; }
+  catch(e){ toast('Could not save customs on this device.', true); return false; }
+}
+function hexToRgba(hex, a){
+  hex = String(hex||'#000000').replace('#','');
+  if(hex.length===3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  var n = parseInt(hex, 16);
+  if(!isFinite(n)) n = 0;
+  var r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  return 'rgba('+r+','+g+','+b+','+(a==null?1:a)+')';
+}
+function buildCustomBgLayers(recipe){
+  recipe = recipe || {};
+  var base = recipe.mode==='gradient' ? 'gradient' : 'solid';
+  var solid = recipe.solid || DEFAULT_BG;
+  var angle = Number(recipe.angle);
+  if(!isFinite(angle)) angle = 135;
+  var g1 = recipe.g1 || '#38bdf8';
+  var g2 = recipe.g2 || '#a78bfa';
+  var g3 = recipe.g3 || '';
+  var layers = [];
+  var sizes = [];
+  var pat = recipe.pattern || 'none';
+  var pcol = recipe.patternColor || '#17202a';
+  var scale = Math.max(6, Math.min(64, Number(recipe.patternScale)||16));
+  var opac = Math.max(0, Math.min(1, Number(recipe.patternOpacity)));
+  if(!isFinite(opac)) opac = 0.18;
+  var rgba = hexToRgba(pcol, opac);
+  if(pat==='dots'){
+    layers.push('radial-gradient('+rgba+' 1.2px, transparent 1.3px)');
+    sizes.push(scale+'px '+scale+'px');
+  }else if(pat==='grid'){
+    layers.push('linear-gradient('+rgba+' 1px, transparent 1px), linear-gradient(90deg, '+rgba+' 1px, transparent 1px)');
+    sizes.push(scale+'px '+scale+'px, '+scale+'px '+scale+'px');
+  }else if(pat==='stripes'){
+    layers.push('repeating-linear-gradient(0deg, transparent, transparent '+(scale-2)+'px, '+rgba+' '+(scale-2)+'px, '+rgba+' '+scale+'px)');
+    sizes.push('auto');
+  }else if(pat==='diag'){
+    layers.push('repeating-linear-gradient(-32deg, transparent, transparent '+(scale-2)+'px, '+rgba+' '+(scale-2)+'px, '+rgba+' '+scale+'px)');
+    sizes.push('auto');
+  }else if(pat==='chevrons'){
+    layers.push('repeating-linear-gradient(90deg, '+rgba+' 0 '+(scale/2)+'px, transparent '+(scale/2)+'px '+scale+'px)');
+    sizes.push('auto');
+  }
+  if(base==='gradient'){
+    var stops = g3 ? (g1+' 0%, '+g2+' 50%, '+g3+' 100%') : (g1+' 0%, '+g2+' 100%');
+    layers.push('linear-gradient('+angle+'deg, '+stops+')');
+    sizes.push(recipe.animate ? '200% 200%' : 'auto');
+  }
+  var value = layers.length ? layers.join(', ') : 'none';
+  var size = sizes.length ? sizes.join(', ') : 'auto';
+  var pageBase = base==='solid' ? solid : (g2 || solid || DEFAULT_BG);
+  return {
+    type:'custom',
+    base: pageBase,
+    value: base==='solid' && pat==='none' ? 'none' : value,
+    size: size,
+    animate: !!(recipe.animate && base==='gradient'),
+    recipe: {
+      mode: base,
+      solid: solid,
+      g1: g1, g2: g2, g3: g3,
+      angle: angle,
+      pattern: pat,
+      patternColor: pcol,
+      patternScale: scale,
+      patternOpacity: opac,
+      animate: !!(recipe.animate && base==='gradient')
+    }
+  };
+}
+function applyCustomBg(cfg){
+  var root = document.documentElement;
+  var surface = (cfg && cfg.base) || DEFAULT_BG;
+  if(cfg && cfg.recipe && cfg.recipe.mode==='solid' && cfg.recipe.solid) surface = cfg.recipe.solid;
+  root.style.setProperty('--page-bg', surface);
+  if(!cfg || !cfg.value || cfg.value==='none') return;
+  root.style.setProperty('--bg-extra', cfg.value);
+  if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
+  root.style.setProperty('--bg-repeat', 'repeat');
+  root.style.setProperty('--bg-pos', '0 0');
+  if(cfg.animate){
+    root.setAttribute('data-bg-anim', '1');
+    syncDynamicBgMotion();
+  }
+}
+function applyImageBg(cfg){
+  var root = document.documentElement;
+  var img = bgImageData();
+  if(!img) return;
+  var mode = (cfg && cfg.mode==='repeat') ? 'repeat' : 'cover';
+  root.style.setProperty('--page-bg', DEFAULT_BG);
+  root.style.setProperty('--bg-extra', 'url("'+String(img).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'")');
+  root.style.setProperty('--bg-pos', 'center');
+  if(mode==='repeat'){
+    root.style.setProperty('--bg-size', (cfg && cfg.size) || 'auto');
+    root.style.setProperty('--bg-repeat', 'repeat');
+  }else{
+    root.style.setProperty('--bg-size', 'cover');
+    root.style.setProperty('--bg-repeat', 'no-repeat');
+  }
 }
 function applyBgCss(cfg){
   var root = document.documentElement;
   clearBgCss();
   if(!cfg || !cfg.value) return;
   if(cfg.type==='solid'){
-    root.style.setProperty('--bg', cfg.value);
+    root.style.setProperty('--page-bg', cfg.value);
     return;
   }
-  root.style.setProperty('--bg', cfg.base || DEFAULT_BG);
+  if(cfg.type==='dynamic'){
+    applyDynamicBg(cfg);
+    return;
+  }
+  if(cfg.type==='image'){
+    applyImageBg(cfg);
+    return;
+  }
+  if(cfg.type==='custom'){
+    applyCustomBg(cfg);
+    return;
+  }
+  root.style.setProperty('--page-bg', cfg.base || DEFAULT_BG);
   root.style.setProperty('--bg-extra', cfg.value);
   if(cfg.size) root.style.setProperty('--bg-size', cfg.size);
+  root.style.setProperty('--bg-repeat', 'repeat');
 }
 function bgConfigsEqual(a, b){
   if(!a && !b) return true;
   if(!a || !b) return false;
   if(a.id && b.id) return a.id===b.id;
-  return a.type===b.type && a.value===b.value;
+  return a.type===b.type && a.value===b.value && (a.mode||'')===(b.mode||'');
+}
+function mhThumbHtml(id){
+  if(id==='mh-wireframe') return '<span class="mh-thumb mh-wire"><span class="mh-wash"></span><span class="mh-plane mh-floor" style="height:80%;bottom:-25%"></span><span class="mh-horizon" style="top:40%"></span></span>';
+  if(id==='mh-scanlines') return '<span class="mh-thumb mh-crt"><span class="mh-wash"></span><span class="mh-scan"></span><span class="mh-beam"></span></span>';
+  if(id==='mh-stripes') return '<span class="mh-thumb mh-stripes"><span class="mh-wash"></span><span class="mh-band"></span><span class="mh-band mh-band2"></span></span>';
+  if(id==='mh-glitch') return '<span class="mh-thumb mh-glitch"><span class="mh-wash"></span><span class="mh-slice mh-s1" style="opacity:.9;top:25%"></span><span class="mh-noise"></span></span>';
+  if(id==='mh-geometry') return '<span class="mh-thumb mh-geo"><span class="mh-wash"></span><span class="mh-city" style="height:60%"></span><span class="mh-poly mh-p1" style="width:26px;height:26px;top:15%;left:15%"></span><span class="mh-poly mh-p2" style="width:22px;height:22px;top:20%;right:12%"></span></span>';
+  if(id==='j-space') return '<span class="mh-thumb j-space"><span class="j-sky"></span><span class="j-stars j-stars-near" style="animation:none;transform:scale(1);opacity:.9"></span></span>';
+  if(id==='j-mountains') return '<span class="mh-thumb j-mountains"><span class="j-m-sky"></span><span class="j-m-layer j-m-mid" style="animation:none;height:55%;bottom:0"></span></span>';
+  if(id==='j-ocean') return '<span class="mh-thumb j-ocean"><span class="j-o-sky"></span><span class="j-o-water" style="animation:none;top:40%;transform:none"></span></span>';
+  if(id==='j-road') return '<span class="mh-thumb j-road"><span class="j-r-sky"></span><span class="j-r-ground"></span><span class="j-r-road"></span><span class="j-r-lanes" style="animation:none"></span></span>';
+  if(id==='dg-aurora') return '<span class="mh-thumb dg-aurora"><span class="dg-base"></span><span class="dg-blob dg-a1" style="animation:none;width:60%;height:60%"></span><span class="dg-blob dg-a2" style="animation:none;width:50%;height:50%"></span></span>';
+  if(id==='dg-mesh') return '<span class="mh-thumb dg-mesh"><span class="dg-m" style="animation:none;inset:0"></span></span>';
+  if(id==='dg-sunset') return '<span class="mh-thumb dg-sunset"><span class="dg-s" style="animation:none"></span></span>';
+  if(id==='dg-conic') return '<span class="mh-thumb dg-conic"><span class="dg-c" style="animation:none;width:120px;height:120px;margin:-60px 0 0 -60px;left:50%;top:50%"></span></span>';
+  if(id==='dg-wave') return '<span class="mh-thumb dg-wave"><span class="dg-w" style="animation:none;inset:0"></span></span>';
+  if(id==='dg-candy') return '<span class="mh-thumb dg-candy"><span class="dg-band" style="animation:none;inset:0"></span></span>';
+  if(id==='mh-custom') return '<span class="mh-thumb" style="background:linear-gradient(135deg,#00ffff,#ff00c8,#05070c)"></span>';
+  return '';
 }
 function paintBgPresetButtons(){
-  ['solid','gradient','pattern'].forEach(function(type){
-    var host = $('bg-presets-'+type);
+  var hosts = [
+    ['subtle','solid'],['subtle','gradient'],['subtle','pattern'],
+    ['medium','solid'],['medium','gradient'],['medium','pattern'],
+    ['bold','solid'],['bold','gradient'],['bold','pattern']
+  ];
+  hosts.forEach(function(pair){
+    var boldness = pair[0], type = pair[1];
+    var host = $('bg-presets-'+boldness+'-'+type);
     if(!host || host.getAttribute('data-wired')==='1') return;
     host.setAttribute('data-wired','1');
-    BG_PRESETS.filter(function(p){ return p.type===type; }).forEach(function(p){
+    BG_PRESETS.filter(function(p){
+      return p.type===type && (p.boldness||'subtle')===boldness;
+    }).forEach(function(p){
       var b = el('button',{
-        type:'button',
-        title:p.label,
-        'aria-label':p.label,
-        'data-bg-id':p.id,
+        type:'button', title:p.label, 'aria-label':p.label, 'data-bg-id':p.id,
         class: type==='solid' ? 'solid' : ''
       });
       if(type==='solid'){
@@ -2178,14 +3890,107 @@ function paintBgPresetButtons(){
       host.appendChild(b);
     });
   });
+  [['dynamic','maxheadroom'],['journey','journey'],['dgrad','dgrad']].forEach(function(pair){
+    var hostId = pair[0], group = pair[1];
+    var host = $('bg-presets-'+hostId);
+    if(!host || host.getAttribute('data-wired')==='1') return;
+    host.setAttribute('data-wired','1');
+    BG_PRESETS.filter(function(p){
+      return p.type==='dynamic' && (p.group||'maxheadroom')===group;
+    }).forEach(function(p){
+      var b = el('button',{
+        type:'button', title:p.label, 'aria-label':p.label, 'data-bg-id':p.id
+      });
+      b.style.backgroundColor = p.base || '#05070c';
+      b.innerHTML = mhThumbHtml(p.id);
+      b.addEventListener('click', function(){
+        setBgConfig(Object.assign({}, p));
+        toast('Background updated.');
+      });
+      host.appendChild(b);
+    });
+  });
+}
+function syncBgPicControls(){
+  var cfg = bgPref();
+  var thumb = $('bg-pic-thumb');
+  var clearBtn = $('set-bg-pic-clear');
+  var modes = $('bg-pic-modes');
+  var img = bgImageData();
+  var isPic = !!(cfg && cfg.type==='image' && img);
+  if(thumb){
+    thumb.classList.toggle('empty', !img);
+    thumb.classList.toggle('on', isPic);
+    if(img){
+      thumb.style.backgroundImage = 'url("'+String(img).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'")';
+      thumb.style.backgroundSize = (cfg && cfg.mode==='repeat') ? '28px auto' : 'cover';
+      thumb.style.backgroundRepeat = (cfg && cfg.mode==='repeat') ? 'repeat' : 'no-repeat';
+    }else{
+      thumb.style.backgroundImage = '';
+    }
+  }
+  if(clearBtn) clearBtn.hidden = !img;
+  if(modes) modes.hidden = !img;
+  var mode = (cfg && cfg.type==='image' && cfg.mode==='repeat') ? 'repeat' : 'cover';
+  document.querySelectorAll('#bg-pic-mode-seg button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-pic-mode')===mode);
+  });
+}
+function setBgIntensity(level, opts){
+  level = (level==='medium' || level==='bold') ? level : 'subtle';
+  document.querySelectorAll('#bg-intensity-seg button').forEach(function(b){
+    var on = b.getAttribute('data-bg-intensity')===level;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.bg-panel[data-bg-panel]').forEach(function(panel){
+    panel.hidden = panel.getAttribute('data-bg-panel')!==level;
+  });
+  if(opts && opts.persist){
+    try{ localStorage.setItem('expenseTracker.bgIntensity', level); }catch(e){}
+  }
+}
+function syncBgIntensityFromCfg(cfg){
+  var level = null;
+  if(cfg && (cfg.type==='solid' || cfg.type==='gradient' || cfg.type==='pattern')){
+    if(cfg.boldness) level = cfg.boldness;
+    else{
+      var preset = BG_PRESETS.find(function(p){ return p.id===cfg.id; });
+      if(preset && preset.boldness) level = preset.boldness;
+    }
+  }
+  if(!level){
+    try{ level = localStorage.getItem('expenseTracker.bgIntensity') || 'subtle'; }catch(e){ level = 'subtle'; }
+  }
+  setBgIntensity(level);
+}
+function syncBgMotionDetails(cfg){
+  var motion = $('bg-motion');
+  if(!motion) return;
+  if(cfg && cfg.type==='dynamic') motion.open = true;
+}
+function wireBgIntensityControls(){
+  var seg = $('bg-intensity-seg');
+  if(!seg || seg.getAttribute('data-wired')==='1') return;
+  seg.setAttribute('data-wired','1');
+  seg.querySelectorAll('button[data-bg-intensity]').forEach(function(b){
+    b.addEventListener('click', function(){
+      setBgIntensity(b.getAttribute('data-bg-intensity'), {persist:true});
+    });
+  });
 }
 function syncBgControls(){
   var cfg = bgPref();
   paintBgPresetButtons();
+  paintBgCustoms();
+  syncBgIntensityFromCfg(cfg);
+  syncBgMotionDetails(cfg);
   var picker = $('set-bg');
   if(picker){
     if(cfg && cfg.type==='solid') picker.value = cfg.value;
     else if(!cfg) picker.value = DEFAULT_BG;
+    var hx = $('set-bg-hex');
+    if(hx) hx.textContent = (picker.value||'').toLowerCase();
   }
   document.querySelectorAll('.bg-presets button[data-bg-id]').forEach(function(b){
     var id = b.getAttribute('data-bg-id');
@@ -2193,10 +3998,9 @@ function syncBgControls(){
     var on = false;
     if(!cfg && id==='default') on = true;
     else if(cfg && preset) on = bgConfigsEqual(cfg, preset);
-    else if(cfg && cfg.type==='solid' && cfg.id==='custom' && id==='default') on = false;
+    else if(cfg && cfg.id===id) on = true;
     b.classList.toggle('on', on);
   });
-  // Custom picker selected when user picked via color input (id=custom), or a solid hex that isn't a named swatch
   var customOn = !!(cfg && cfg.type==='solid' && (
     cfg.id==='custom' ||
     !BG_PRESETS.some(function(p){
@@ -2204,10 +4008,14 @@ function syncBgControls(){
     })
   ));
   if(picker) picker.classList.toggle('on', customOn);
+  syncBgPicControls();
 }
 function applyBg(){
   var cfg = bgPref();
-  if(cfg && !effectiveDark()) applyBgCss(cfg);
+  /* Dynamics (Max Headroom + Journeys + Dynamic gradients): any theme.
+     Other page bgs: light only. Theme --bg chrome stays intact. */
+  if(cfg && cfg.type==='dynamic') applyBgCss(cfg);
+  else if(cfg && !effectiveDark()) applyBgCss(cfg);
   else clearBgCss();
   syncBgControls();
 }
@@ -2219,6 +4027,13 @@ function setBgConfig(cfg){
       var out = {type:cfg.type, value:cfg.value, base:cfg.base||cfg.value};
       if(cfg.id) out.id = cfg.id;
       if(cfg.size) out.size = cfg.size;
+      if(cfg.mode) out.mode = cfg.mode;
+      if(cfg.group) out.group = cfg.group;
+      if(cfg.boldness) out.boldness = cfg.boldness;
+      if(cfg.animate) out.animate = true;
+      if(cfg.recipe) out.recipe = cfg.recipe;
+      if(cfg.name) out.name = cfg.name;
+      if(cfg.libraryId) out.libraryId = cfg.libraryId;
       localStorage.setItem(LS_BG, JSON.stringify(out));
     }
   }catch(e){}
@@ -2230,6 +4045,1171 @@ function setBg(hex){
   if(!hex){ setBgConfig(null); return; }
   setBgConfig({type:'solid', id:'custom', value:hex, base:hex});
 }
+function setBgPictureMode(mode){
+  mode = mode==='repeat' ? 'repeat' : 'cover';
+  var img = bgImageData();
+  if(!img){ toast('Upload a picture first.', true); return; }
+  setBgConfig({type:'image', id:'custom-image', value:'image', base:'#1a1a1a', mode:mode});
+  toast(mode==='repeat' ? 'Picture set to repeating.' : 'Picture sized to fit.');
+}
+function clearBgPicture(){
+  setBgImageData('');
+  var cfg = bgPref();
+  if(cfg && cfg.type==='image') setBgConfig(null);
+  else syncBgPicControls();
+  toast('Picture cleared.');
+}
+function compressBgImageFile(file, done){
+  if(!file || !/^image\//.test(file.type||'')){
+    toast('Choose an image file.', true);
+    return;
+  }
+  var reader = new FileReader();
+  reader.onerror = function(){ toast('Could not read that image.', true); };
+  reader.onload = function(){
+    var raw = String(reader.result||'');
+    var img = new Image();
+    img.onload = function(){
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      if(!w || !h){ toast('Could not read that image.', true); return; }
+      var scale = Math.min(1, BG_IMAGE_MAX_PX / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      if(!ctx){ done(raw); return; }
+      ctx.drawImage(img, 0, 0, cw, ch);
+      var out = raw;
+      try{
+        out = canvas.toDataURL('image/jpeg', BG_IMAGE_JPEG_Q);
+      }catch(e){ out = raw; }
+      if(out.length > 4.5e6){
+        try{ out = canvas.toDataURL('image/jpeg', 0.55); }catch(e2){}
+      }
+      if(out.length > 4.8e6){
+        toast('Image is still large after compress — tiling may fail. Try a smaller file.', true);
+      }
+      done(out);
+    };
+    img.onerror = function(){ toast('Could not decode that image.', true); };
+    img.src = raw;
+  };
+  reader.readAsDataURL(file);
+}
+function wireBgPictureControls(){
+  var pick = $('set-bg-pic-pick');
+  var file = $('set-bg-pic');
+  var clear = $('set-bg-pic-clear');
+  if(pick && file){
+    pick.addEventListener('click', function(){ file.click(); });
+    file.addEventListener('change', function(){
+      var f = file.files && file.files[0];
+      file.value = '';
+      if(!f) return;
+      compressBgImageFile(f, function(dataUrl){
+        if(!setBgImageData(dataUrl)) return;
+        var mode = 'cover';
+        var prev = bgPref();
+        if(prev && prev.type==='image' && prev.mode==='repeat') mode = 'repeat';
+        setBgConfig({type:'image', id:'custom-image', value:'image', base:'#1a1a1a', mode:mode});
+        toast('Picture background updated.');
+      });
+    });
+  }
+  if(clear) clear.addEventListener('click', clearBgPicture);
+  document.querySelectorAll('#bg-pic-mode-seg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      setBgPictureMode(b.getAttribute('data-pic-mode'));
+    });
+  });
+}
+function openBgEditor(editItem){
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',{}, editItem ? 'Edit background' : 'Background editor'));
+    sh.appendChild(el('p',{class:'muted', style:'margin:0 0 8px;font-size:13.5px'},
+      'Compose a solid or gradient, optionally with a pattern. Light mode only.'));
+    var preview = el('div',{class:'bg-ed-preview', id:'bg-ed-preview'});
+    sh.appendChild(preview);
+    var recipe = (editItem && editItem.recipe) ? Object.assign({}, editItem.recipe) : {
+      mode:'gradient', solid:DEFAULT_BG, g1:'#38bdf8', g2:'#a78bfa', g3:'',
+      angle:135, pattern:'none', patternColor:'#17202a', patternScale:16,
+      patternOpacity:0.18, animate:false
+    };
+    var nameVal = (editItem && editItem.name) || '';
+
+    function field(label, node){
+      var wrap = el('div',{class:'bg-ed-field'});
+      wrap.appendChild(el('label',{}, label));
+      wrap.appendChild(node);
+      return wrap;
+    }
+    var modeSel = el('select',{id:'bg-ed-mode'});
+    [['solid','Solid color'],['gradient','Gradient']].forEach(function(opt){
+      var o = el('option',{value:opt[0]}, opt[1]);
+      if(recipe.mode===opt[0]) o.selected = true;
+      modeSel.appendChild(o);
+    });
+    var solidIn = el('input',{type:'color', id:'bg-ed-solid', value:recipe.solid||DEFAULT_BG});
+    var g1 = el('input',{type:'color', id:'bg-ed-g1', value:recipe.g1||'#38bdf8'});
+    var g2 = el('input',{type:'color', id:'bg-ed-g2', value:recipe.g2||'#a78bfa'});
+    var g3 = el('input',{type:'color', id:'bg-ed-g3', value:recipe.g3||'#f472b6'});
+    var g3Wrap = el('div',{class:'bg-ed-field'});
+    var g3Check = el('label',{class:'bg-ed-check'});
+    var g3On = el('input',{type:'checkbox', id:'bg-ed-g3on'});
+    g3On.checked = !!(recipe.g3);
+    g3Check.appendChild(g3On);
+    g3Check.appendChild(document.createTextNode(' Third color'));
+    g3Wrap.appendChild(g3Check);
+    g3Wrap.appendChild(g3);
+    var angle = el('input',{type:'range', id:'bg-ed-angle', min:'0', max:'360', step:'1', value:String(recipe.angle||135)});
+    var angleLbl = el('div',{class:'bg-ed-hint', id:'bg-ed-angle-lbl'}, 'Angle: '+(recipe.angle||135)+'°');
+    var patSel = el('select',{id:'bg-ed-pat'});
+    [['none','No pattern'],['dots','Dots'],['grid','Grid'],['stripes','Stripes'],['diag','Diagonal'],['chevrons','Chevrons']].forEach(function(opt){
+      var o = el('option',{value:opt[0]}, opt[1]);
+      if((recipe.pattern||'none')===opt[0]) o.selected = true;
+      patSel.appendChild(o);
+    });
+    var pcol = el('input',{type:'color', id:'bg-ed-pcol', value:recipe.patternColor||'#17202a'});
+    var pscale = el('input',{type:'range', id:'bg-ed-pscale', min:'6', max:'48', step:'1', value:String(recipe.patternScale||16)});
+    var popac = el('input',{type:'range', id:'bg-ed-popac', min:'0.05', max:'0.55', step:'0.01', value:String(recipe.patternOpacity!=null?recipe.patternOpacity:0.18)});
+    var animLab = el('label',{class:'bg-ed-check', id:'bg-ed-anim-wrap'});
+    var anim = el('input',{type:'checkbox', id:'bg-ed-anim'});
+    anim.checked = !!recipe.animate;
+    animLab.appendChild(anim);
+    animLab.appendChild(document.createTextNode(' Animate gradient'));
+    var animHint = el('p',{class:'bg-ed-hint'}, 'Soft color shift for gradients. Respects reduced-motion.');
+    var nameIn = el('input',{type:'text', id:'bg-ed-name', placeholder:'My background', maxlength:'40', value:nameVal});
+
+    var grid = el('div',{class:'bg-ed-grid'});
+    grid.appendChild(field('Base', modeSel));
+    var solidField = field('Color', solidIn);
+    var g1Field = field('Color 1', g1);
+    var g2Field = field('Color 2', g2);
+    grid.appendChild(solidField);
+    grid.appendChild(g1Field);
+    grid.appendChild(g2Field);
+    sh.appendChild(grid);
+    sh.appendChild(g3Wrap);
+    sh.appendChild(field('Angle', angle));
+    sh.appendChild(angleLbl);
+    sh.appendChild(field('Pattern', patSel));
+    var pgrid = el('div',{class:'bg-ed-grid'});
+    pgrid.appendChild(field('Pattern color', pcol));
+    pgrid.appendChild(field('Scale', pscale));
+    pgrid.appendChild(field('Opacity', popac));
+    sh.appendChild(pgrid);
+    sh.appendChild(animLab);
+    sh.appendChild(animHint);
+    sh.appendChild(field('Name (for Saved customs)', nameIn));
+
+    function readRecipe(){
+      return {
+        mode: modeSel.value,
+        solid: solidIn.value,
+        g1: g1.value, g2: g2.value,
+        g3: g3On.checked ? g3.value : '',
+        angle: Number(angle.value)||135,
+        pattern: patSel.value,
+        patternColor: pcol.value,
+        patternScale: Number(pscale.value)||16,
+        patternOpacity: Number(popac.value),
+        animate: !!(anim.checked && modeSel.value==='gradient')
+      };
+    }
+    function syncModeUi(){
+      var isG = modeSel.value==='gradient';
+      solidField.style.display = isG ? 'none' : '';
+      g1Field.style.display = isG ? '' : 'none';
+      g2Field.style.display = isG ? '' : 'none';
+      g3Wrap.style.display = isG ? '' : 'none';
+      angle.style.display = isG ? '' : 'none';
+      angleLbl.style.display = isG ? '' : 'none';
+      animLab.style.display = isG ? '' : 'none';
+      animHint.style.display = isG ? '' : 'none';
+      if(!isG) anim.checked = false;
+    }
+    function paintPreview(){
+      var built = buildCustomBgLayers(readRecipe());
+      preview.style.backgroundColor = built.base || DEFAULT_BG;
+      preview.style.backgroundImage = (built.value && built.value!=='none') ? built.value : 'none';
+      preview.style.backgroundSize = built.size || 'auto';
+      preview.style.backgroundRepeat = 'repeat';
+      preview.style.animation = built.animate ? 'dg-shift 14s ease-in-out infinite' : 'none';
+      if(built.animate) preview.style.backgroundSize = '200% 200%';
+      angleLbl.textContent = 'Angle: '+angle.value+'°';
+    }
+    [modeSel, solidIn, g1, g2, g3, g3On, angle, patSel, pcol, pscale, popac, anim].forEach(function(n){
+      n.addEventListener('input', function(){ syncModeUi(); paintPreview(); });
+      n.addEventListener('change', function(){ syncModeUi(); paintPreview(); });
+    });
+    syncModeUi();
+    paintPreview();
+
+    var actions = el('div',{class:'bg-editor-actions', style:'margin-top:14px'});
+    var applyBtn = el('button',{type:'button', class:'btn small'}, 'Apply');
+    var saveBtn = el('button',{type:'button', class:'btn small ghost'}, editItem ? 'Save changes' : 'Save & apply');
+    var cancelBtn = el('button',{type:'button', class:'btn small ghost'}, 'Cancel');
+    applyBtn.addEventListener('click', function(){
+      var built = buildCustomBgLayers(readRecipe());
+      built.id = 'custom-live';
+      setBgConfig(built);
+      toast('Background updated.');
+      close();
+    });
+    saveBtn.addEventListener('click', function(){
+      var built = buildCustomBgLayers(readRecipe());
+      var nm = (nameIn.value||'').trim() || 'Custom';
+      var id = (editItem && editItem.id) || ('c'+Date.now().toString(36));
+      built.id = id; built.name = nm;
+      upsertBgLibraryItem({id:id, name:nm, kind:'custom', cfg:built});
+      built.libraryId = id;
+      setBgConfig(built);
+      toast('Saved to My backgrounds.');
+      close();
+    });
+    cancelBtn.addEventListener('click', function(){ close(); });
+    actions.appendChild(applyBtn);
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+    sh.appendChild(actions);
+  });
+}
+/* ===== Max Headroom custom engine + background library / share ===== */
+function mhDefaultRecipe(){
+  return {
+    kind:'mh',
+    black:'#05070c', neon1:'#00ffff', neon2:'#ff00c8', accent:'#ffe600',
+    intensity:1, speed:1, vignette:0.5, chroma:0, freeze:false,
+    washOn:true, horizonOn:true, vignetteOn:true, chromaOn:false,
+    gridOn:true, gridSize:36, gridThick:2, gridOpacity:0.72, gridPersp:480, gridDepth:64, gridDur:3.2,
+    gridRot:0, vpX:50, vpY:47, vpMove:false, vpAmp:8, vpDur:6, gridRand:0,
+    scanOn:true, scanGap:3, scanOpacity:0.55, scanDur:1.4, beam:0.55, flicker:0.35,
+    stripeOn:true, stripeThick:28, stripeAngle:-32, stripeOpacity:0.55, stripeDur:4,
+    glitchOn:true, tear:1, glitchDur:2.2, rgb:6, noise:0.2, stutter:1,
+    cityOn:true, cityOpacity:0.85, cityPulse:2.2, shapeSize:1, shapeCount:1
+  };
+}
+var MH_CSS_MAP = {
+  black:'--mh-black', neon1:'--mh-neon1', neon2:'--mh-neon2', accent:'--mh-accent',
+  intensity:'--mh-intensity', speed:'--mh-speed', vignette:'--mh-vignette', chroma:'--mh-chroma',
+  washOn:'--mh-wash-on', horizonOn:'--mh-horizon-on', vignetteOn:'--mh-vignette-on', chromaOn:'--mh-chroma-on',
+  gridOn:'--mh-grid-on', gridSize:'--mh-grid-size', gridThick:'--mh-grid-thick', gridOpacity:'--mh-grid-opacity',
+  gridPersp:'--mh-grid-persp', gridDepth:'--mh-grid-depth', gridDur:'--mh-grid-dur',
+  gridRot:'--mh-grid-rot', vpX:'--mh-vp-x-num', vpY:'--mh-vp-y-num', vpMove:'--mh-vp-move',
+  vpAmp:'--mh-vp-amp-num', vpDur:'--mh-vp-dur-num', gridRand:'--mh-grid-rand',
+  scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
+  beam:'--mh-beam', flicker:'--mh-flicker',
+  stripeOn:'--mh-stripe-on', stripeThick:'--mh-stripe-thick', stripeAngle:'--mh-stripe-angle',
+  stripeOpacity:'--mh-stripe-opacity', stripeDur:'--mh-stripe-dur',
+  glitchOn:'--mh-glitch-on', tear:'--mh-tear', glitchDur:'--mh-glitch-dur', rgb:'--mh-rgb',
+  noise:'--mh-noise', stutter:'--mh-stutter',
+  cityOn:'--mh-city-on', cityOpacity:'--mh-city-opacity', cityPulse:'--mh-city-pulse',
+  shapeSize:'--mh-shape-size', shapeCount:'--mh-shape-count'
+};
+function clearMhCssVars(){
+  var root = document.documentElement;
+  Object.keys(MH_CSS_MAP).forEach(function(k){ root.style.removeProperty(MH_CSS_MAP[k]); });
+  ['--mh-grid-size-px','--mh-grid-thick-px','--mh-grid-persp-px','--mh-grid-depth-deg','--mh-grid-dur',
+   '--mh-grid-rot-deg','--mh-vp-x','--mh-vp-y','--mh-vp-amp','--mh-vp-dur',
+   '--mh-scan-gap-px','--mh-scan-dur','--mh-stripe-thick-px','--mh-stripe-angle-deg','--mh-stripe-dur',
+   '--mh-glitch-dur','--mh-rgb-px','--mh-city-pulse'].forEach(function(p){ root.style.removeProperty(p); });
+}
+function normalizeMhRecipe(raw){
+  var d = mhDefaultRecipe();
+  var r = Object.assign({}, d, raw||{});
+  r.kind = 'mh';
+  Object.keys(d).forEach(function(k){
+    if(k==='kind') return;
+    if(typeof d[k]==='boolean') r[k] = !!r[k];
+    else if(typeof d[k]==='number'){
+      var n = Number(r[k]);
+      r[k] = isFinite(n) ? n : d[k];
+    }else if(k==='black'||k==='neon1'||k==='neon2'||k==='accent'){
+      var hx = String(r[k]||'');
+      r[k] = /^#[0-9a-fA-F]{6}$/.test(hx) ? hx.toLowerCase() : d[k];
+    }
+  });
+  return r;
+}
+function syncMhLayerFlags(host, recipe){
+  var r = normalizeMhRecipe(recipe);
+  var nodes = [];
+  if(host && host.classList && host.classList.contains('mh-custom')) nodes.push(host);
+  var page = document.querySelector('#bg-dynamic .mh-custom');
+  if(page && nodes.indexOf(page)<0) nodes.push(page);
+  var anyOn = !!(r.washOn||r.gridOn||r.horizonOn||r.scanOn||r.stripeOn||r.glitchOn||r.cityOn||r.vignetteOn||r.chromaOn);
+  nodes.forEach(function(n){
+    n.setAttribute('data-mh-wash', r.washOn?'1':'0');
+    n.setAttribute('data-mh-grid', r.gridOn?'1':'0');
+    n.setAttribute('data-mh-horizon', r.horizonOn?'1':'0');
+    n.setAttribute('data-mh-scan', r.scanOn?'1':'0');
+    n.setAttribute('data-mh-stripe', r.stripeOn?'1':'0');
+    n.setAttribute('data-mh-glitch', r.glitchOn?'1':'0');
+    n.setAttribute('data-mh-city', r.cityOn?'1':'0');
+    n.setAttribute('data-mh-vignette', r.vignetteOn?'1':'0');
+    n.setAttribute('data-mh-chroma', r.chromaOn?'1':'0');
+    n.setAttribute('data-vp-move', (r.vpMove && r.gridOn)?'1':'0');
+    n.setAttribute('data-grid-rand', (r.gridRand>0 && r.gridOn)?'1':'0');
+    n.setAttribute('data-mh-all-off', anyOn?'0':'1');
+  });
+}
+function applyMhVarsTo(el, recipe){
+  if(!el) return;
+  var r = normalizeMhRecipe(recipe);
+  Object.keys(MH_CSS_MAP).forEach(function(k){
+    var v = r[k];
+    if(typeof v==='boolean') v = v ? 1 : 0;
+    el.style.setProperty(MH_CSS_MAP[k], String(v));
+  });
+  el.style.setProperty('--mh-grid-size-px', r.gridSize+'px');
+  el.style.setProperty('--mh-grid-thick-px', r.gridThick+'px');
+  el.style.setProperty('--mh-grid-persp-px', r.gridPersp+'px');
+  el.style.setProperty('--mh-grid-depth-deg', r.gridDepth+'deg');
+  el.style.setProperty('--mh-grid-dur', r.gridDur+'s');
+  el.style.setProperty('--mh-grid-rot-deg', r.gridRot+'deg');
+  el.style.setProperty('--mh-vp-x', r.vpX+'%');
+  el.style.setProperty('--mh-vp-y', r.vpY+'%');
+  el.style.setProperty('--mh-vp-amp', r.vpAmp+'%');
+  el.style.setProperty('--mh-vp-dur', r.vpDur+'s');
+  el.style.setProperty('--mh-scan-gap-px', r.scanGap+'px');
+  el.style.setProperty('--mh-scan-dur', r.scanDur+'s');
+  el.style.setProperty('--mh-stripe-thick-px', r.stripeThick+'px');
+  el.style.setProperty('--mh-stripe-angle-deg', r.stripeAngle+'deg');
+  el.style.setProperty('--mh-stripe-dur', r.stripeDur+'s');
+  el.style.setProperty('--mh-glitch-dur', r.glitchDur+'s');
+  el.style.setProperty('--mh-rgb-px', r.rgb+'px');
+  el.style.setProperty('--mh-city-pulse', r.cityPulse+'s');
+  syncMhLayerFlags(el, r);
+  return r;
+}
+function applyMhRecipe(recipe, opts){
+  opts = opts || {};
+  var r = normalizeMhRecipe(recipe);
+  var root = document.documentElement;
+  applyMhVarsTo(root, r);
+  if(opts.target) applyMhVarsTo(opts.target, r);
+  syncMhLayerFlags(document.documentElement, r);
+  if(opts.target) syncMhLayerFlags(opts.target, r);
+  if(r.freeze) root.setAttribute('data-mh-freeze','1');
+  else root.removeAttribute('data-mh-freeze');
+  if(opts.live){
+    root.setAttribute('data-bg-dynamic', 'mh-custom');
+    syncDynamicBgMotion();
+  }
+  return r;
+}
+function mhCustomLayersHtml(){
+  return ''+
+    '<div class="mhc-stage"></div>'+
+    '<div class="mhc-wash"></div>'+
+    '<div class="mhc-layer mhc-grid">'+
+      '<div class="mhc-plane mhc-ceil"></div>'+
+      '<div class="mhc-plane mhc-floor"></div>'+
+      '<div class="mhc-horizon"></div>'+
+    '</div>'+
+    '<div class="mhc-layer mhc-scan">'+
+      '<div class="mhc-scanlines"></div>'+
+      '<div class="mhc-beam"></div>'+
+      '<div class="mhc-flicker"></div>'+
+    '</div>'+
+    '<div class="mhc-layer mhc-stripes">'+
+      '<div class="mhc-band mhc-b1"></div>'+
+      '<div class="mhc-band mhc-b2"></div>'+
+    '</div>'+
+    '<div class="mhc-layer mhc-glitch">'+
+      '<div class="mhc-rgb"></div>'+
+      '<div class="mhc-noise"></div>'+
+      '<div class="mhc-slice mhc-s1"></div>'+
+      '<div class="mhc-slice mhc-s2"></div>'+
+      '<div class="mhc-slice mhc-s3"></div>'+
+      '<div class="mhc-slice mhc-s4"></div>'+
+    '</div>'+
+    '<div class="mhc-layer mhc-city">'+
+      '<div class="mhc-skyline"></div>'+
+      '<div class="mhc-poly mhc-p1"></div>'+
+      '<div class="mhc-poly mhc-p2"></div>'+
+      '<div class="mhc-poly mhc-p3"></div>'+
+      '<div class="mhc-poly mhc-p4"></div>'+
+    '</div>'+
+    '<div class="mhc-vignette"></div>'+
+    '<div class="mhc-chroma"></div>';
+}
+function loadMhEditorDraft(){
+  try{
+    var raw = localStorage.getItem(LS_MH_EDITOR);
+    if(!raw) return null;
+    var o = JSON.parse(raw);
+    return (o && o.kind==='mh') ? normalizeMhRecipe(o) : null;
+  }catch(e){ return null; }
+}
+function saveMhEditorDraft(recipe){
+  try{ localStorage.setItem(LS_MH_EDITOR, JSON.stringify(normalizeMhRecipe(recipe))); }catch(e){}
+}
+function mhCfgFromRecipe(recipe, name){
+  var r = normalizeMhRecipe(recipe);
+  return {
+    type:'dynamic', id:'mh-custom', value:'mh-custom', base:r.black||'#05070c',
+    group:'maxheadroom', recipe:r, name:name||''
+  };
+}
+
+/* Progressive-disclosure editor: always-on Colors + Motion, then layer pills
+   that toggle recipe flags and show/hide per-layer settings cards. */
+var MH_LAYER_PILLS = [
+  {id:'grid', label:'Grid', onKey:'gridOn', fields:[
+    {key:'gridSize', label:'Density', type:'range', min:16, max:80, step:1},
+    {key:'gridThick', label:'Thickness', type:'range', min:1, max:6, step:1},
+    {key:'gridOpacity', label:'Opacity', type:'range', min:0, max:1, step:0.01},
+    {key:'gridPersp', label:'Perspective', type:'range', min:200, max:900, step:10},
+    {key:'gridDepth', label:'Depth angle', type:'range', min:40, max:80, step:1},
+    {key:'gridRot', label:'Plane rotation', type:'range', min:-45, max:45, step:1},
+    {key:'gridDur', label:'Scroll period (s)', type:'range', min:0.8, max:8, step:0.1},
+    {key:'horizonOn', label:'Horizon line', type:'toggle'},
+    {key:'vpX', label:'Vanishing point X', type:'range', min:10, max:90, step:1},
+    {key:'vpY', label:'Vanishing point Y', type:'range', min:15, max:85, step:1},
+    {key:'vpMove', label:'Move vanishing point', type:'toggle'},
+    {key:'vpAmp', label:'VP motion amplitude', type:'range', min:0, max:30, step:1},
+    {key:'vpDur', label:'VP motion period (s)', type:'range', min:2, max:16, step:0.5},
+    {key:'gridRand', label:'Grid randomness', type:'range', min:0, max:8, step:0.5}
+  ]},
+  {id:'scan', label:'Scanlines', onKey:'scanOn', fields:[
+    {key:'scanGap', label:'Density / gap', type:'range', min:2, max:10, step:1},
+    {key:'scanOpacity', label:'Opacity', type:'range', min:0, max:1, step:0.01},
+    {key:'scanDur', label:'Drift period (s)', type:'range', min:0.4, max:4, step:0.1},
+    {key:'beam', label:'Beam intensity', type:'range', min:0, max:1, step:0.01},
+    {key:'flicker', label:'Flicker', type:'range', min:0, max:1, step:0.01}
+  ]},
+  {id:'stripe', label:'Stripes', onKey:'stripeOn', fields:[
+    {key:'stripeThick', label:'Thickness', type:'range', min:10, max:60, step:1},
+    {key:'stripeAngle', label:'Angle', type:'range', min:-60, max:60, step:1},
+    {key:'stripeOpacity', label:'Blend strength', type:'range', min:0, max:1, step:0.01},
+    {key:'stripeDur', label:'March period (s)', type:'range', min:1, max:10, step:0.1}
+  ]},
+  {id:'glitch', label:'Glitch', onKey:'glitchOn', fields:[
+    {key:'tear', label:'Tear amount', type:'range', min:0, max:1.5, step:0.05},
+    {key:'glitchDur', label:'Frequency (s)', type:'range', min:0.6, max:5, step:0.1},
+    {key:'rgb', label:'RGB split (px)', type:'range', min:0, max:16, step:1},
+    {key:'noise', label:'Noise', type:'range', min:0, max:0.6, step:0.01},
+    {key:'stutter', label:'Stutter', type:'range', min:0.2, max:2, step:0.05}
+  ]},
+  {id:'city', label:'City / shapes', onKey:'cityOn', fields:[
+    {key:'cityOpacity', label:'Opacity', type:'range', min:0, max:1, step:0.01},
+    {key:'cityPulse', label:'Pulse period (s)', type:'range', min:0.8, max:5, step:0.1},
+    {key:'shapeSize', label:'Shape size', type:'range', min:0.4, max:2, step:0.05},
+    {key:'shapeCount', label:'Shape presence', type:'range', min:0, max:1, step:0.05}
+  ]},
+  {id:'ambient', label:'Ambient', onKey:'washOn', fields:[
+    {key:'washOn', label:'Ambient glow', type:'toggle'},
+    {key:'vignetteOn', label:'Vignette', type:'toggle'},
+    {key:'vignette', label:'Vignette strength', type:'range', min:0, max:0.9, step:0.01},
+    {key:'chromaOn', label:'Chromatic edges', type:'toggle'},
+    {key:'chroma', label:'Chromatic feel', type:'range', min:0, max:0.8, step:0.01}
+  ]}
+];
+var MH_COLORS_FIELDS = [
+  {key:'black', label:'Black level', type:'color'},
+  {key:'neon1', label:'Primary neon', type:'color'},
+  {key:'neon2', label:'Secondary neon', type:'color'},
+  {key:'accent', label:'Accent / yellow', type:'color'}
+];
+var MH_MOTION_FIELDS = [
+  {key:'intensity', label:'Overall intensity', type:'range', min:0.2, max:1.5, step:0.05},
+  {key:'speed', label:'Speed multiplier', type:'range', min:0.25, max:2.5, step:0.05},
+  {key:'freeze', label:'Freeze animation', type:'toggle'}
+];
+/* Keep legacy name for any callers that still reference the accordion schema. */
+var MH_EDITOR_SCHEMA = [];
+
+function openMhEditor(editItem){
+  var prevCfg = bgPref();
+  var start = (editItem && editItem.recipe && editItem.recipe.kind==='mh')
+    ? normalizeMhRecipe(editItem.recipe)
+    : ((editItem && editItem.cfg && editItem.cfg.recipe && editItem.cfg.recipe.kind==='mh')
+      ? normalizeMhRecipe(editItem.cfg.recipe)
+      : (loadMhEditorDraft() || mhDefaultRecipe()));
+  var state = Object.assign({}, start);
+  var cancelled = true;
+  var sheetClose = null;
+  function restorePrevBg(){
+    if(!cancelled) return;
+    if(prevCfg) applyBgCss(prevCfg);
+    else clearBgCss();
+    syncBgControls();
+  }
+  openSheet(function(sh, close){
+    sheetClose = close;
+    var sheetEl = sh.closest('.sheet') || sh.parentNode;
+    if(sheetEl && sheetEl.classList) sheetEl.classList.add('mh-ed-sheet');
+    var head = sheetEl && sheetEl.querySelector ? sheetEl.querySelector('.sheet-head') : null;
+    if(head){
+      head.appendChild(el('div',{class:'sheet-head-title'}, editItem ? 'Edit Max Headroom' : 'Max Headroom editor'));
+    }else{
+      sh.appendChild(el('h2',{}, editItem ? 'Edit Max Headroom' : 'Max Headroom editor'));
+    }
+    var previewWrap = el('div',{class:'mh-ed-preview-wrap'});
+    previewWrap.appendChild(el('div',{class:'mh-ed-preview-cap'}, 'Live preview'));
+    var previewBox = el('div',{class:'mh-ed-preview', id:'mh-ed-preview', 'aria-label':'Live Max Headroom preview'});
+    var previewStage = el('div',{class:'mh-custom', id:'mh-ed-preview-stage'});
+    previewStage.innerHTML = mhCustomLayersHtml();
+    previewBox.appendChild(previewStage);
+    previewWrap.appendChild(previewBox);
+    sh.appendChild(previewWrap);
+    sh.appendChild(el('p',{class:'mh-ed-hint'},
+      'Tap layer pills to enable effects — settings appear for each active layer.'));
+
+    var nameIn = el('input',{type:'text', id:'mh-ed-name', placeholder:'Neon highway', maxlength:'40',
+      value:(editItem && editItem.name) || ''});
+    var nameField = el('div',{class:'bg-ed-field'});
+    nameField.appendChild(el('label',{}, 'Name (for My backgrounds)'));
+    nameField.appendChild(nameIn);
+    sh.appendChild(nameField);
+
+    var controls = {};
+    function appendField(body, f){
+      if(f.type==='toggle'){
+        var lab = el('label',{class:'mh-ed-toggle'});
+        var inp = el('input',{type:'checkbox'});
+        inp.checked = !!state[f.key];
+        lab.appendChild(inp);
+        lab.appendChild(document.createTextNode(' '+f.label));
+        body.appendChild(lab);
+        controls[f.key] = {el:inp, meta:f};
+        return;
+      }
+      var wrap = el('div',{class:'mh-ed-field'});
+      var lab2 = el('label',{});
+      lab2.appendChild(document.createTextNode(f.label));
+      var valSpan = el('span',{class:'v'}, '');
+      lab2.appendChild(valSpan);
+      wrap.appendChild(lab2);
+      var inp2;
+      if(f.type==='color'){
+        inp2 = el('input',{type:'color', value:state[f.key]||'#000000'});
+      }else{
+        inp2 = el('input',{type:'range', min:String(f.min), max:String(f.max), step:String(f.step), value:String(state[f.key])});
+      }
+      wrap.appendChild(inp2);
+      body.appendChild(wrap);
+      controls[f.key] = {el:inp2, meta:f, val:valSpan};
+    }
+    function makeCard(title, fields){
+      var card = el('div',{class:'mh-ed-card'});
+      card.appendChild(el('div',{class:'mh-ed-card-title'}, title));
+      var body = el('div',{class:'mh-ed-card-body'});
+      fields.forEach(function(f){ appendField(body, f); });
+      card.appendChild(body);
+      return card;
+    }
+
+    /* Always-visible globals */
+    sh.appendChild(makeCard('Colors', MH_COLORS_FIELDS));
+    sh.appendChild(makeCard('Motion', MH_MOTION_FIELDS));
+
+    /* Layer pills */
+    sh.appendChild(el('div',{class:'mh-ed-lbl'}, 'Layers'));
+    var pillRow = el('div',{class:'mh-ed-pills', id:'mh-ed-pills'});
+    var allPill = el('button',{type:'button', class:'catchip', id:'mh-pill-all'}, 'All');
+    var nonePill = el('button',{type:'button', class:'catchip', id:'mh-pill-none'}, 'None');
+    pillRow.appendChild(allPill);
+    pillRow.appendChild(nonePill);
+    var pillBtns = {};
+    MH_LAYER_PILLS.forEach(function(layer){
+      var b = el('button',{type:'button', class:'catchip', 'data-mh-layer':layer.id}, layer.label);
+      pillBtns[layer.id] = b;
+      pillRow.appendChild(b);
+    });
+    sh.appendChild(pillRow);
+
+    var cardsWrap = el('div',{class:'mh-ed-layer-cards'});
+    var layerCards = {};
+    MH_LAYER_PILLS.forEach(function(layer){
+      var card = makeCard(layer.label, layer.fields);
+      card.setAttribute('data-mh-layer-card', layer.id);
+      layerCards[layer.id] = card;
+      cardsWrap.appendChild(card);
+    });
+    sh.appendChild(cardsWrap);
+
+    function syncControl(key, val){
+      state[key] = val;
+      if(!controls[key]) return;
+      if(controls[key].meta.type==='toggle') controls[key].el.checked = !!val;
+      else controls[key].el.value = String(val);
+    }
+    function layerIsOn(layer){
+      if(layer.id==='ambient') return !!(state.washOn || state.vignetteOn || state.chromaOn);
+      return !!state[layer.onKey];
+    }
+    function setLayerOn(layer, on){
+      on = !!on;
+      if(layer.id==='ambient'){
+        if(on){
+          syncControl('washOn', true);
+          if(!state.vignetteOn && !state.chromaOn) syncControl('vignetteOn', true);
+        }else{
+          syncControl('washOn', false);
+          syncControl('vignetteOn', false);
+          syncControl('chromaOn', false);
+        }
+        return;
+      }
+      syncControl(layer.onKey, on);
+      if(layer.id==='grid'){
+        if(on){
+          if(!state.horizonOn) syncControl('horizonOn', true);
+        }else{
+          syncControl('horizonOn', false);
+          syncControl('vpMove', false);
+        }
+      }
+    }
+    function syncPillUi(){
+      var anyOff = false, anyOn = false;
+      MH_LAYER_PILLS.forEach(function(layer){
+        var on = layerIsOn(layer);
+        if(on) anyOn = true; else anyOff = true;
+        pillBtns[layer.id].classList.toggle('on', on);
+        layerCards[layer.id].hidden = !on;
+      });
+      allPill.classList.toggle('on', anyOn && !anyOff);
+      nonePill.classList.toggle('on', !anyOn);
+    }
+    function readState(){
+      Object.keys(controls).forEach(function(k){
+        var c = controls[k], f = c.meta;
+        if(f.type==='toggle') state[k] = !!c.el.checked;
+        else if(f.type==='color') state[k] = c.el.value;
+        else state[k] = Number(c.el.value);
+        if(c.val){
+          var v = state[k];
+          c.val.textContent = (typeof v==='number' && String(v).indexOf('.')>=0) ? Number(v).toFixed(2) : String(v);
+        }
+      });
+      return normalizeMhRecipe(state);
+    }
+    function live(){
+      var r = readState();
+      applyMhRecipe(r, {live:true, target:previewStage});
+      saveMhEditorDraft(r);
+      syncPillUi();
+    }
+
+    MH_LAYER_PILLS.forEach(function(layer){
+      pillBtns[layer.id].addEventListener('click', function(){
+        setLayerOn(layer, !layerIsOn(layer));
+        live();
+      });
+    });
+    allPill.addEventListener('click', function(){
+      MH_LAYER_PILLS.forEach(function(layer){ setLayerOn(layer, true); });
+      live();
+    });
+    nonePill.addEventListener('click', function(){
+      MH_LAYER_PILLS.forEach(function(layer){ setLayerOn(layer, false); });
+      live();
+    });
+
+    Object.keys(controls).forEach(function(k){
+      controls[k].el.addEventListener('input', live);
+      controls[k].el.addEventListener('change', live);
+    });
+    live();
+
+    var actions = el('div',{class:'btnrow stickybar mh-ed-actions'});
+    var applyBtn = el('button',{type:'button', class:'btn small'}, 'Apply');
+    var saveBtn = el('button',{type:'button', class:'btn small ghost'}, editItem ? 'Save changes' : 'Save & apply');
+    var resetBtn = el('button',{type:'button', class:'btn small ghost'}, 'Reset defaults');
+    var cancelBtn = el('button',{type:'button', class:'btn small ghost'}, 'Cancel');
+    applyBtn.addEventListener('click', function(){
+      cancelled = false;
+      var r = readState();
+      setBgConfig(mhCfgFromRecipe(r, (nameIn.value||'').trim()));
+      toast('Max Headroom background applied.');
+      close();
+    });
+    saveBtn.addEventListener('click', function(){
+      cancelled = false;
+      var r = readState();
+      var nm = (nameIn.value||'').trim() || 'Max Headroom';
+      var cfg = mhCfgFromRecipe(r, nm);
+      var id = (editItem && editItem.id) || ('mh'+Date.now().toString(36));
+      upsertBgLibraryItem({id:id, name:nm, kind:'mh', cfg:cfg});
+      cfg.libraryId = id;
+      setBgConfig(cfg);
+      toast('Saved to My backgrounds.');
+      close();
+    });
+    resetBtn.addEventListener('click', function(){
+      state = mhDefaultRecipe();
+      Object.keys(controls).forEach(function(k){
+        var c = controls[k], f = c.meta;
+        if(f.type==='toggle') c.el.checked = !!state[k];
+        else c.el.value = String(state[k]);
+      });
+      live();
+    });
+    cancelBtn.addEventListener('click', function(){
+      var ov = sheetEl && sheetEl.closest ? sheetEl.closest('.overlay') : null;
+      if(ov && ov._dismiss) ov._dismiss();
+      else { restorePrevBg(); close(); }
+    });
+    actions.appendChild(applyBtn);
+    actions.appendChild(saveBtn);
+    actions.appendChild(resetBtn);
+    actions.appendChild(cancelBtn);
+    sh.appendChild(actions);
+  }, function(){
+    restorePrevBg();
+    if(sheetClose) sheetClose();
+  });
+}
+function libraryKindLabel(item){
+  if(!item) return 'Custom';
+  if(item.kind==='mh' || (item.cfg && item.cfg.recipe && item.cfg.recipe.kind==='mh')) return 'Max Headroom';
+  if(item.cfg && item.cfg.type==='custom') return 'Gradient / pattern';
+  if(item.cfg && item.cfg.type==='solid') return 'Solid';
+  if(item.cfg && item.cfg.type==='image') return 'Picture';
+  if(item.cfg && item.cfg.type==='dynamic') return 'Dynamic';
+  return 'Custom';
+}
+function upsertBgLibraryItem(item){
+  var list = loadBgCustoms();
+  var idx = list.findIndex(function(c){ return c.id===item.id; });
+  var entry = {
+    id: item.id,
+    name: item.name || 'Background',
+    kind: item.kind || (item.cfg && item.cfg.recipe && item.cfg.recipe.kind==='mh' ? 'mh' : 'custom'),
+    cfg: item.cfg,
+    savedAt: new Date().toISOString()
+  };
+  if(idx>=0) list[idx] = entry; else list.unshift(entry);
+  if(list.length>40) list = list.slice(0,40);
+  saveBgCustoms(list);
+  paintBgLibrary();
+  return entry;
+}
+function deleteBgLibraryItem(id){
+  saveBgCustoms(loadBgCustoms().filter(function(c){ return c.id!==id; }));
+  paintBgLibrary();
+}
+function buildExpenseBgPayload(item, opts){
+  opts = opts || {};
+  var cfg = item.cfg ? Object.assign({}, item.cfg) : null;
+  if(!cfg) throw new Error('Missing background config');
+  var payload = {
+    format: EXPENSEBG_FORMAT,
+    version: EXPENSEBG_VERSION,
+    name: item.name || cfg.name || 'Shared background',
+    created: item.savedAt || new Date().toISOString(),
+    background: {
+      type: cfg.type,
+      id: cfg.id,
+      value: cfg.value,
+      base: cfg.base,
+      size: cfg.size,
+      mode: cfg.mode,
+      animate: !!cfg.animate,
+      group: cfg.group,
+      boldness: cfg.boldness,
+      recipe: cfg.recipe || null
+    }
+  };
+  if(opts.includeImage && cfg.type==='image'){
+    var img = bgImageData();
+    if(img) payload.imageData = img;
+  }
+  return payload;
+}
+function validateExpenseBgPayload(raw){
+  if(!raw || typeof raw!=='object') throw new Error('Not a JSON object');
+  if(raw.format!==EXPENSEBG_FORMAT) throw new Error('Unknown format (expected expensebg)');
+  if(Number(raw.version)!==1) throw new Error('Unsupported expensebg version');
+  var bg = raw.background;
+  if(!bg || typeof bg!=='object') throw new Error('Missing background');
+  var allowed = {solid:1, gradient:1, pattern:1, custom:1, dynamic:1, image:1};
+  if(!allowed[bg.type]) throw new Error('Unsupported background type');
+  if(bg.type==='dynamic' && bg.recipe && bg.recipe.kind && bg.recipe.kind!=='mh')
+    throw new Error('Unsupported dynamic recipe');
+  if(bg.recipe && bg.recipe.kind==='mh') bg.recipe = normalizeMhRecipe(bg.recipe);
+  if(raw.imageData!=null){
+    if(typeof raw.imageData!=='string' || raw.imageData.indexOf('data:image/')!==0)
+      throw new Error('Invalid imageData');
+    if(raw.imageData.length > 5e6) throw new Error('imageData too large');
+  }
+  return raw;
+}
+function importExpenseBgPayload(payload, opts){
+  opts = opts || {};
+  var p = validateExpenseBgPayload(payload);
+  var bg = p.background;
+  var cfg = {
+    type: bg.type,
+    id: bg.id || (bg.type==='dynamic' && bg.recipe && bg.recipe.kind==='mh' ? 'mh-custom' : ('imp'+Date.now().toString(36))),
+    value: bg.value,
+    base: bg.base || bg.value || DEFAULT_BG
+  };
+  if(bg.size) cfg.size = bg.size;
+  if(bg.mode) cfg.mode = bg.mode;
+  if(bg.animate) cfg.animate = true;
+  if(bg.group) cfg.group = bg.group;
+  if(bg.boldness) cfg.boldness = bg.boldness;
+  if(bg.recipe) cfg.recipe = bg.recipe;
+  if(bg.type==='custom' && bg.recipe){
+    var built = buildCustomBgLayers(bg.recipe);
+    cfg = Object.assign(built, {id: cfg.id, name: p.name});
+  }
+  if(bg.type==='dynamic' && bg.recipe && bg.recipe.kind==='mh'){
+    cfg = mhCfgFromRecipe(bg.recipe, p.name);
+  }
+  if(p.imageData && cfg.type==='image'){
+    if(!setBgImageData(p.imageData)) throw new Error('Could not store image');
+  }
+  var id = 'lib'+Date.now().toString(36);
+  var kind = (cfg.recipe && cfg.recipe.kind==='mh') ? 'mh' : (cfg.type==='custom' ? 'custom' : cfg.type);
+  upsertBgLibraryItem({id:id, name:p.name||'Imported', kind:kind, cfg:cfg});
+  if(opts.apply!==false){
+    cfg.libraryId = id;
+    setBgConfig(cfg);
+  }else{
+    paintBgLibrary();
+  }
+  return id;
+}
+function downloadExpenseBg(item, opts){
+  var payload = buildExpenseBgPayload(item, opts);
+  var json = JSON.stringify(payload, null, 2);
+  var blob = new Blob([json], {type:'application/json'});
+  var a = document.createElement('a');
+  var safe = String(item.name||'background').replace(/[^\w\-]+/g,'_').slice(0,40);
+  a.href = URL.createObjectURL(blob);
+  a.download = safe + '.expensebg.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function copyShareCode(item){
+  var payload = buildExpenseBgPayload(item, {includeImage:false});
+  var compact = JSON.stringify(payload);
+  var code = btoa(unescape(encodeURIComponent(compact)));
+  function ok(){ toast('Share code copied.'); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(ok).catch(function(){
+      window.prompt('Copy share code:', code);
+    });
+  }else window.prompt('Copy share code:', code);
+}
+function openBgImportSheet(){
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',{}, 'Import background'));
+    sh.appendChild(el('p',{class:'muted', style:'font-size:13.5px;margin:0 0 10px'},
+      'Paste a share code or import a .expensebg.json file. Recipes only by default — images are optional in files.'));
+    var ta = el('textarea',{id:'bg-import-code', rows:'5', placeholder:'Paste share code or JSON…',
+      style:'width:100%;font-size:13px;padding:10px;border:1px solid var(--border);border-radius:10px;font-family:ui-monospace,monospace;background:var(--input-bg);color:var(--text)'});
+    sh.appendChild(ta);
+    var applyChkLab = el('label',{class:'bg-ed-check'});
+    var applyChk = el('input',{type:'checkbox'});
+    applyChk.checked = true;
+    applyChkLab.appendChild(applyChk);
+    applyChkLab.appendChild(document.createTextNode(' Apply after import'));
+    sh.appendChild(applyChkLab);
+    var row = el('div',{class:'bg-editor-actions', style:'margin-top:12px'});
+    var go = el('button',{type:'button', class:'btn small'}, 'Import');
+    var fileBtn = el('button',{type:'button', class:'btn small ghost'}, 'Choose file…');
+    var cancel = el('button',{type:'button', class:'linkbtn'}, 'Cancel');
+    go.addEventListener('click', function(){
+      try{
+        var raw = (ta.value||'').trim();
+        if(!raw){ toast('Paste a code or JSON first.', true); return; }
+        var obj;
+        if(raw.charAt(0)==='{') obj = JSON.parse(raw);
+        else{
+          try{ obj = JSON.parse(decodeURIComponent(escape(atob(raw)))); }
+          catch(e1){ obj = JSON.parse(atob(raw)); }
+        }
+        importExpenseBgPayload(obj, {apply:!!applyChk.checked});
+        toast('Background imported.');
+        close();
+      }catch(e){ toast('Import failed: '+(e.message||e), true); }
+    });
+    fileBtn.addEventListener('click', function(){
+      var f = $('bg-import-file');
+      if(f) f.click();
+      close();
+    });
+    cancel.addEventListener('click', function(){ close(); });
+    row.appendChild(go);
+    row.appendChild(fileBtn);
+    row.appendChild(cancel);
+    sh.appendChild(row);
+  });
+}
+function paintBgLibrary(){
+  var host = $('bg-lib-list');
+  var empty = $('bg-lib-empty');
+  if(!host) return;
+  host.innerHTML = '';
+  var list = loadBgCustoms();
+  list = list.map(function(item){
+    if(item.cfg) return item;
+    if(item.recipe && item.recipe.kind==='mh'){
+      return {id:item.id, name:item.name, kind:'mh', cfg:mhCfgFromRecipe(item.recipe, item.name), savedAt:item.savedAt};
+    }
+    if(item.recipe){
+      var built = buildCustomBgLayers(item.recipe);
+      built.id = item.id; built.name = item.name;
+      return {id:item.id, name:item.name, kind:'custom', cfg:built, savedAt:item.savedAt};
+    }
+    return item;
+  });
+  try{ localStorage.setItem(LS_BG_CUSTOMS, JSON.stringify(list)); }catch(e){}
+  if(empty) empty.hidden = list.length>0;
+  var cur = bgPref();
+  list.forEach(function(item){
+    if(!item || !item.cfg) return;
+    var row = el('div',{class:'bg-lib-item'});
+    var on = !!(cur && (cur.libraryId===item.id || (cur.recipe && item.cfg.recipe && JSON.stringify(cur.recipe)===JSON.stringify(item.cfg.recipe))));
+    if(on) row.classList.add('on');
+    var sw = el('div',{class:'bg-lib-swatch'});
+    if(item.kind==='mh' || (item.cfg.recipe && item.cfg.recipe.kind==='mh')){
+      sw.style.background = 'linear-gradient(135deg,'+(item.cfg.recipe.neon1||'#0ff')+','+(item.cfg.recipe.neon2||'#f0c')+','+(item.cfg.recipe.black||'#05070c')+')';
+    }else if(item.cfg.type==='solid'){
+      sw.style.background = item.cfg.value || item.cfg.base || DEFAULT_BG;
+    }else if(item.cfg.value && item.cfg.value!=='none'){
+      sw.style.backgroundColor = item.cfg.base || DEFAULT_BG;
+      sw.style.backgroundImage = item.cfg.value;
+      if(item.cfg.size) sw.style.backgroundSize = item.cfg.size;
+    }else sw.style.background = item.cfg.base || DEFAULT_BG;
+    var meta = el('div',{class:'bg-lib-meta'});
+    meta.appendChild(el('div',{class:'bg-lib-name'}, item.name||'Untitled'));
+    meta.appendChild(el('div',{class:'bg-lib-kind'}, libraryKindLabel(item)));
+    var btns = el('div',{class:'bg-lib-btns'});
+    var applyB = el('button',{type:'button', class:'btn small'}, 'Apply');
+    var expB = el('button',{type:'button', class:'btn small ghost'}, 'Export');
+    var shareB = el('button',{type:'button', class:'linkbtn'}, 'Copy code');
+    var delB = el('button',{type:'button', class:'linkbtn'}, 'Delete');
+    applyB.addEventListener('click', function(){
+      var cfg = Object.assign({}, item.cfg);
+      if(cfg.recipe && cfg.recipe.kind==='mh') cfg = mhCfgFromRecipe(cfg.recipe, item.name);
+      cfg.libraryId = item.id;
+      setBgConfig(cfg);
+      toast('Background applied.');
+    });
+    expB.addEventListener('click', function(){
+      try{
+        var includeImg = false;
+        if(item.cfg.type==='image' && bgImageData()){
+          includeImg = window.confirm('Include picture data in the export? Files can get large.');
+        }
+        downloadExpenseBg(item, {includeImage:includeImg});
+        toast('Exported.');
+      }catch(e){ toast('Export failed.', true); }
+    });
+    shareB.addEventListener('click', function(){
+      try{ copyShareCode(item); }catch(e){ toast('Could not copy share code.', true); }
+    });
+    delB.addEventListener('click', function(){
+      deleteBgLibraryItem(item.id);
+      toast('Deleted.');
+    });
+    if(item.kind==='mh' || (item.cfg.recipe && item.cfg.recipe.kind==='mh')){
+      var editB = el('button',{type:'button', class:'btn small ghost'}, 'Edit');
+      editB.addEventListener('click', function(){ openMhEditor(item); });
+      btns.appendChild(editB);
+    }
+    btns.appendChild(applyB);
+    btns.appendChild(expB);
+    btns.appendChild(shareB);
+    btns.appendChild(delB);
+    row.appendChild(sw);
+    row.appendChild(meta);
+    row.appendChild(btns);
+    host.appendChild(row);
+  });
+}
+function paintBgCustoms(){ paintBgLibrary(); }
+function wireBgShareControls(){
+  var imp = $('bg-import-open');
+  if(imp && imp.getAttribute('data-wired')!=='1'){
+    imp.setAttribute('data-wired','1');
+    imp.addEventListener('click', openBgImportSheet);
+  }
+  var file = $('bg-import-file');
+  if(file && file.getAttribute('data-wired')!=='1'){
+    file.setAttribute('data-wired','1');
+    file.addEventListener('change', function(){
+      var f = file.files && file.files[0];
+      file.value = '';
+      if(!f) return;
+      var reader = new FileReader();
+      reader.onerror = function(){ toast('Could not read file.', true); };
+      reader.onload = function(){
+        try{
+          var obj = JSON.parse(String(reader.result||''));
+          importExpenseBgPayload(obj, {apply:true});
+          toast('Background imported.');
+        }catch(e){ toast('Import failed: '+(e.message||e), true); }
+      };
+      reader.readAsText(f);
+    });
+  }
+}
+
+function interpretAiBgPrompt(prompt){
+  var t = String(prompt||'').toLowerCase();
+  var r = mhDefaultRecipe();
+  var name = 'AI scene';
+  /* Keyword → MH recipe. Local, no network. */
+  if(/asteroid|space|stars|cosmos|galaxy|nebula/.test(t)){
+    name = 'Asteroid field';
+    r.black='#02040a'; r.neon1='#7dd3fc'; r.neon2='#c084fc'; r.accent='#fde68a';
+    r.washOn=true; r.gridOn=false; r.horizonOn=false; r.scanOn=true; r.stripeOn=false;
+    r.glitchOn=true; r.cityOn=true; r.vignetteOn=true; r.chromaOn=true;
+    r.scanOpacity=0.35; r.beam=0.25; r.flicker=0.2; r.noise=0.35; r.rgb=4;
+    r.cityOpacity=0.55; r.shapeCount=1; r.shapeSize=0.7; r.cityPulse=3.2;
+    r.speed=1.35; r.intensity=1.1; r.vignette=0.65; r.chroma=0.35;
+  }else if(/ocean|sea|wave|aqua/.test(t)){
+    name = 'Neon ocean';
+    r.black='#021018'; r.neon1='#22d3ee'; r.neon2='#38bdf8'; r.accent='#a7f3d0';
+    r.stripeOn=false; r.glitchOn=false; r.cityOn=false; r.gridOn=true; r.horizonOn=true;
+    r.vpY=58; r.gridDepth=70; r.gridDur=4.5; r.vpMove=true; r.vpAmp=6; r.vpDur=9;
+  }else if(/highway|road|drive|night drive/.test(t)){
+    name = 'Night highway';
+    r.black='#05070c'; r.neon1='#00ffff'; r.neon2='#ff00c8'; r.accent='#ffe600';
+    r.gridOn=true; r.horizonOn=true; r.stripeOn=true; r.scanOn=true; r.glitchOn=true;
+    r.gridRot=-6; r.vpX=50; r.vpY=42; r.vpMove=true; r.vpAmp=10; r.gridRand=2;
+  }else if(/calm|minimal|quiet|soft|empty|solid/.test(t)){
+    name = 'Quiet CRT';
+    r.washOn=true; r.gridOn=false; r.horizonOn=false; r.scanOn=false; r.stripeOn=false;
+    r.glitchOn=false; r.cityOn=false; r.vignetteOn=true; r.chromaOn=false;
+    r.vignette=0.55; r.intensity=0.7;
+  }else if(/glitch|static|noise|vhs/.test(t)){
+    name = 'Heavy glitch';
+    r.glitchOn=true; r.scanOn=true; r.stripeOn=true; r.gridOn=true; r.tear=1.3; r.noise=0.45;
+    r.rgb=10; r.stutter=1.6; r.speed=1.6; r.flicker=0.55;
+  }else{
+    name = (prompt||'').trim().slice(0,32) || 'AI Max Headroom';
+    r.vpMove=true; r.gridRand=1.5;
+  }
+  if(/fast|faster|speedy/.test(t)) r.speed = Math.min(2.5, (r.speed||1)*1.4);
+  if(/slow|slower|chill/.test(t)) r.speed = Math.max(0.35, (r.speed||1)*0.65);
+  if(/no grid|without grid/.test(t)){ r.gridOn=false; r.horizonOn=false; }
+  if(/no glow|no wash/.test(t)) r.washOn=false;
+  return {name:name, recipe:normalizeMhRecipe(r)};
+}
+function openAiBgCreator(){
+  var prevCfg = bgPref();
+  var cancelled = true;
+  var sheetClose = null;
+  function restorePrevBg(){
+    if(!cancelled) return;
+    if(prevCfg) applyBgCss(prevCfg);
+    else clearBgCss();
+    syncBgControls();
+  }
+  openSheet(function(sh, close){
+    sheetClose = close;
+    var sheetEl = sh.closest('.sheet') || sh.parentNode;
+    var head = sheetEl && sheetEl.querySelector ? sheetEl.querySelector('.sheet-head') : null;
+    if(head) head.appendChild(el('div',{class:'sheet-head-title'}, 'AI background'));
+    else sh.appendChild(el('h2',{}, 'AI background'));
+    sh.appendChild(el('p',{class:'mh-ed-hint'},
+      'Describe a scene (e.g. “asteroid field”, “night highway”). Builds a Max Headroom recipe on-device.'));
+    var ta = el('textarea',{id:'ai-bg-prompt', rows:'3', placeholder:'Asteroid field drifting through neon static…',
+      style:'width:100%;min-height:72px;resize:vertical;border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;background:var(--input-bg);color:var(--text)'});
+    sh.appendChild(ta);
+    var previewWrap = el('div',{class:'mh-ed-preview-wrap', style:'margin-top:12px'});
+    previewWrap.appendChild(el('div',{class:'mh-ed-preview-cap'}, 'Preview'));
+    var previewBox = el('div',{class:'mh-ed-preview', 'aria-label':'AI background preview'});
+    var previewStage = el('div',{class:'mh-custom'});
+    previewStage.innerHTML = mhCustomLayersHtml();
+    previewBox.appendChild(previewStage);
+    previewWrap.appendChild(previewBox);
+    sh.appendChild(previewWrap);
+    var nameIn = el('input',{type:'text', maxlength:'40', placeholder:'Name', value:''});
+    var nameField = el('div',{class:'bg-ed-field', style:'margin-top:8px'});
+    nameField.appendChild(el('label',{}, 'Name'));
+    nameField.appendChild(nameIn);
+    sh.appendChild(nameField);
+    var last = null;
+    function generate(){
+      last = interpretAiBgPrompt(ta.value);
+      if(!nameIn.value.trim()) nameIn.value = last.name;
+      applyMhRecipe(last.recipe, {live:true, target:previewStage});
+    }
+    var actions = el('div',{class:'btnrow stickybar'});
+    var genBtn = el('button',{type:'button', class:'btn small'}, 'Generate');
+    var applyBtn = el('button',{type:'button', class:'btn small ghost'}, 'Apply');
+    var saveBtn = el('button',{type:'button', class:'btn small ghost'}, 'Save & apply');
+    var cancelBtn = el('button',{type:'button', class:'btn small ghost'}, 'Cancel');
+    genBtn.addEventListener('click', generate);
+    applyBtn.addEventListener('click', function(){
+      if(!last) generate();
+      cancelled = false;
+      setBgConfig(mhCfgFromRecipe(last.recipe, (nameIn.value||'').trim()||last.name));
+      toast('AI background applied.');
+      close();
+    });
+    saveBtn.addEventListener('click', function(){
+      if(!last) generate();
+      cancelled = false;
+      var nm = (nameIn.value||'').trim() || last.name;
+      var cfg = mhCfgFromRecipe(last.recipe, nm);
+      var id = 'ai'+Date.now().toString(36);
+      upsertBgLibraryItem({id:id, name:nm, kind:'mh', cfg:cfg});
+      cfg.libraryId = id;
+      setBgConfig(cfg);
+      toast('Saved to My backgrounds.');
+      close();
+    });
+    cancelBtn.addEventListener('click', function(){
+      var ov = sheetEl && sheetEl.closest ? sheetEl.closest('.overlay') : null;
+      if(ov && ov._dismiss) ov._dismiss();
+      else { restorePrevBg(); close(); }
+    });
+    actions.appendChild(genBtn);
+    actions.appendChild(applyBtn);
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+    sh.appendChild(actions);
+    setTimeout(function(){ ta.focus(); }, 200);
+  }, function(){
+    restorePrevBg();
+    if(sheetClose) sheetClose();
+  });
+}
+function wireAiBgControls(){
+  var open = $('ai-bg-open');
+  if(open && open.getAttribute('data-wired')!=='1'){
+    open.setAttribute('data-wired','1');
+    open.addEventListener('click', function(){
+      var motion = $('bg-motion');
+      if(motion) motion.open = true;
+      openAiBgCreator();
+    });
+  }
+}
+function wireMhEditorControls(){
+  var open = $('mh-editor-open');
+  if(open && open.getAttribute('data-wired')!=='1'){
+    open.setAttribute('data-wired','1');
+    open.addEventListener('click', function(){
+      var motion = $('bg-motion');
+      if(motion) motion.open = true;
+      openMhEditor(null);
+    });
+  }
+}
+
+function wireBgEditorControls(){
+  var open = $('bg-editor-open');
+  if(open && open.getAttribute('data-wired')!=='1'){
+    open.setAttribute('data-wired','1');
+    open.addEventListener('click', function(){ openBgEditor(null); });
+  }
+}
+
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', effectiveDark()?'dark':'light');
   document.querySelectorAll('#theme-seg button').forEach(function(b){
@@ -2243,7 +5223,11 @@ if(window.matchMedia){
       if(themePref()==='system'){ applyTheme(); renderReports(); }
     });
   }catch(e){}
+  try{
+    window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', syncDynamicBgMotion);
+  }catch(e){}
 }
+document.addEventListener('visibilitychange', syncDynamicBgMotion);
 var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -2625,19 +5609,21 @@ function openSheet(build, onDismiss){
   root.innerHTML='';
   var ov = el('div',{class:'overlay'});
   var sh = el('div',{class:'sheet'});
-  sh.appendChild(el('div',{class:'grab'}));
+  var head = el('div',{class:'sheet-head'});
+  head.appendChild(el('div',{class:'grab'}));
+  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
+  head.appendChild(xBtn);
+  var body = el('div',{class:'sheet-body'});
+  sh.appendChild(head);
+  sh.appendChild(body);
   ov.appendChild(sh);
   root.appendChild(ov);
   function close(){ root.innerHTML=''; }
   wireOverlayDismiss(ov, onDismiss, close);
   ov._dismiss = function(){ if(onDismiss) onDismiss(); else close(); }; // swipe-right closes like tap-outside
-  /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
-     First child + sticky so it stays reachable while the sheet scrolls. */
-  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
   xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
-  sh.insertBefore(xBtn, sh.firstChild);
-  build(sh, close);
-  padStickyBars(sh);
+  build(body, close);
+  padStickyBars(body);
   wireSheetResize(sh);
   applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
@@ -2651,19 +5637,21 @@ function openSheetStacked(build, onDismiss){
   var root = $('modal-root');
   var ov = el('div',{class:'overlay'});
   var sh = el('div',{class:'sheet'});
-  sh.appendChild(el('div',{class:'grab'}));
+  var head = el('div',{class:'sheet-head'});
+  head.appendChild(el('div',{class:'grab'}));
+  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
+  head.appendChild(xBtn);
+  var body = el('div',{class:'sheet-body'});
+  sh.appendChild(head);
+  sh.appendChild(body);
   ov.appendChild(sh);
   root.appendChild(ov);
   function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
   wireOverlayDismiss(ov, onDismiss, close);
   ov._dismiss = function(){ if(onDismiss) onDismiss(); else close(); }; // swipe-right closes like tap-outside
-  /* ✕ in a circle at the top-right: closes without scrolling to Cancel.
-     First child + sticky so it stays visible while the sheet scrolls. */
-  var xBtn = el('button',{class:'sheet-x',type:'button','aria-label':'Close'},'✕');
   xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
-  sh.insertBefore(xBtn, sh.firstChild);
-  build(sh, close);
-  padStickyBars(sh);
+  build(body, close);
+  padStickyBars(body);
   wireSheetResize(sh);
   applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
@@ -2722,7 +5710,7 @@ function promptName(){
       var b2 = el('button',{class:'btn ghost'},'Nancy');
       var inp = el('input',{type:'text',id:'nm-input',placeholder:'Or type a name…',autocomplete:'off'});
       var save = el('button',{class:'btn'},'Save');
-      function pick(v){ try{localStorage.setItem(LS_USER,v);}catch(e){} state.userName=v; updateUserChip(); done(); resolve(v); }
+      function pick(v){ if(!saveUserName(v)) return; done(); resolve(v); }
       b1.onclick=function(){pick('Dave');};
       b2.onclick=function(){pick('Nancy');};
       save.onclick=function(){ var v=inp.value.trim(); if(v) pick(v); else toast('Enter a name first',true); };
@@ -3439,8 +6427,66 @@ function showScreen(name){
   }
   if(!same) window.scrollTo(0, name==='transactions' ? txnScrollY() : (scrollPosByScreen[name] || 0));
 }
+function saveUserName(v){
+  v = String(v||'').trim();
+  if(!v) return false;
+  try{ localStorage.setItem(LS_USER, v); }catch(e){}
+  state.userName = v;
+  updateUserChip();
+  var su = $('set-user');
+  if(su) su.value = v;
+  return true;
+}
 function updateUserChip(){
-  $('user-chip').textContent = state.userName ? ('Hi, '+state.userName) : '';
+  var chip = $('user-chip');
+  if(!chip) return;
+  if(state.userName){
+    chip.textContent = 'Hi, '+state.userName;
+    chip.setAttribute('aria-label', "Change who's entering (currently "+state.userName+")");
+  }else{
+    chip.textContent = 'Set name';
+    chip.setAttribute('aria-label', "Set who's entering");
+  }
+}
+function openRenameUserSheet(){
+  openSheet(function(sh, close){
+    sh.appendChild(el('h2',{}, "Who's entering?"));
+    sh.appendChild(el('p',{class:'muted', style:'margin:0 0 10px;font-size:13.5px'},
+      'Your name is saved on every transaction.'));
+    var qp = el('div',{class:'quickpick'});
+    ['Dave','Nancy'].forEach(function(nm){
+      var b = el('button',{type:'button', class:'btn small ghost'}, nm);
+      if(state.userName===nm) b.classList.add('on');
+      b.addEventListener('click', function(){
+        if(saveUserName(nm)){ toast('Name saved.'); close(); }
+      });
+      qp.appendChild(b);
+    });
+    sh.appendChild(qp);
+    var inp = el('input',{type:'text', id:'rename-user-input', autocomplete:'off',
+      list:'user-suggest', placeholder:'Or type a name…', value:state.userName||''});
+    sh.appendChild(el('label',{class:'f', for:'rename-user-input'}, 'Name'));
+    sh.appendChild(inp);
+    var row = el('div',{class:'btnrow', style:'margin-top:12px'});
+    var save = el('button',{type:'button', class:'btn'}, 'Save');
+    var cancel = el('button',{type:'button', class:'btn ghost'}, 'Cancel');
+    save.addEventListener('click', function(){
+      var v = inp.value.trim();
+      if(!v){ toast('Enter a name first.', true); return; }
+      if(saveUserName(v)){ toast('Name saved.'); close(); }
+    });
+    cancel.addEventListener('click', function(){ close(); });
+    row.appendChild(save);
+    row.appendChild(cancel);
+    sh.appendChild(row);
+    setTimeout(function(){ inp.focus(); inp.select && inp.select(); }, 280);
+  });
+}
+function wireUserChip(){
+  var chip = $('user-chip');
+  if(!chip || chip.getAttribute('data-wired')==='1') return;
+  chip.setAttribute('data-wired','1');
+  chip.addEventListener('click', function(){ openRenameUserSheet(); });
 }
 
 /* ================= info screen =================
@@ -3612,7 +6658,8 @@ document.addEventListener('DOMContentLoaded', function(){
    Cmd+1..8 for their own tab switching and never deliver them to the page),
    and Cmd+Shift+1..9 (or Ctrl+Shift+1..9) does the same with a modifier.
    Ignored while typing in a field or when a sheet is open.
-   Escape clicks the visible Cancel or Done button of the topmost open sheet. */
+   Escape clicks Cancel/Done on the topmost sheet, else calls overlay._dismiss
+   (same as ✕ / tap-outside / swipe-right). */
 (function(){
   var order = ['dashboard','transactions','reports','import','budgets','bills','tax','settings','info'];
   document.addEventListener('keydown', function(e){
@@ -3638,11 +6685,19 @@ document.addEventListener('DOMContentLoaded', function(){
       var btns = top.querySelectorAll('button');
       for(var i = btns.length - 1; i >= 0; i--){
         var b = btns[i];
-        if(!b.disabled && b.offsetParent !== null && /^\s*(cancel|done)\s*$/i.test(b.textContent)){
+        /* Prefer labeled Cancel/Done so sheets with custom restore-on-cancel run that path.
+           Skip offsetParent check — sticky/overflow footers can report null and blocked Esc. */
+        if(!b.disabled && /^\s*(cancel|done)\s*$/i.test(b.textContent||'')){
           e.preventDefault();
           b.click();
           return;
         }
+      }
+      /* Same path as circle ✕ / tap-outside / swipe-right */
+      if(top._dismiss){
+        e.preventDefault();
+        top._dismiss();
+        return;
       }
       return;
     }
@@ -4113,12 +7168,10 @@ function wireSettings(){
   });
   $('set-user-save').addEventListener('click', function(){
     var v = $('set-user').value.trim();
-    if(!v){ toast('Enter a name first.', true); return; }
-    try{ localStorage.setItem(LS_USER, v); }catch(e){}
-    state.userName = v;
-    updateUserChip();
+    if(!saveUserName(v)){ toast('Enter a name first.', true); return; }
     toast('Name saved.');
   });
+  wireUserChip();
   // theme segmented control
   document.querySelectorAll('#theme-seg button').forEach(function(b){
     b.addEventListener('click', function(){
@@ -4128,15 +7181,27 @@ function wireSettings(){
       toast('Theme updated.');
     });
   });
-  // background (light mode) — solids / gradients / patterns / custom
+  // background — intensity tabs + picture + editor + motion
   paintBgPresetButtons();
+  wireBgIntensityControls();
+  wireBgPictureControls();
+  wireBgEditorControls();
+  wireMhEditorControls();
+  wireAiBgControls();
+  wireBgShareControls();
+  syncBgControls();
   var bgPick = $('set-bg');
+  function syncBgHex(){
+    var hx = $('set-bg-hex');
+    if(hx && bgPick) hx.textContent = (bgPick.value||'').toLowerCase();
+  }
   if(bgPick){
-    bgPick.addEventListener('input', function(){ setBg(bgPick.value); });
+    bgPick.addEventListener('input', function(){ setBg(bgPick.value); syncBgHex(); });
     bgPick.addEventListener('change', function(){
-      setBg(bgPick.value);
+      setBg(bgPick.value); syncBgHex();
       toast('Background updated.');
     });
+    syncBgHex();
   }
   var bgReset = $('set-bg-reset');
   if(bgReset) bgReset.addEventListener('click', function(){
