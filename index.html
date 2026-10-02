@@ -1420,7 +1420,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020322';
+var APP_VERSION = '202610020327';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -3372,7 +3372,7 @@ function renderCatList(){
     row.appendChild(info);
     var rn=el('button',{class:'btn ghost small'},'Rename');
     rn.onclick=function(){ openCatRename(name); };
-    var del=el('button',{class:'btn ghost small danger-text'},'Delete');
+    var del=el('button',{class:'btn ghost small danger-text',title:'Delete category','aria-label':'Delete category'},'🗑️');
     del.onclick=function(){ openCatDelete(name); };
     row.appendChild(rn);
     row.appendChild(del);
