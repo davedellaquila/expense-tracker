@@ -736,6 +736,11 @@ table.ptable.top-table th:nth-child(4){width:22%;}
 .mapgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
 .ptablewrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px; margin:10px 0;}
 table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:640px;}
+/* Narrow tables (e.g. Income by category): drop the min-width so columns
+   size dynamically to the viewport instead of scrolling sideways. Numeric
+   columns stay compact; the first column takes the remaining space. */
+table.ptable.fit{min-width:0;}
+table.ptable.fit th:nth-child(n+2), table.ptable.fit td:nth-child(n+2){white-space:nowrap;}
 .ptable th{background:var(--th-bg); text-align:left; padding:8px; font-size:13px; position:sticky; top:0;}
 .ptable td{padding:6px; border-top:1px solid var(--border); vertical-align:middle;}
 .ptable input,.ptable select{font-size:14.5px; padding:6px 8px;}
@@ -4059,7 +4064,7 @@ function renderDashChartBody(pick, box, c){
     var tI = ics.reduce(function(s,c){ return s+d.byCatInc[c]; },0);
     if(!ics.length){ box.innerHTML = '<p class="muted">No income in this period.</p>'; }
     else{
-      var ih = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
+      var ih = '<div class="ptablewrap"><table class="ptable fit"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
       ics.forEach(function(c){
         ih += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(d.byCatInc[c])+'</td><td style="text-align:right">'+(tI>0?Math.round(d.byCatInc[c]/tI*100):0)+'%</td></tr>';
       });
@@ -11420,7 +11425,7 @@ function renderReports(){
   var ics = Object.keys(byInc).sort(function(a,b){ return byInc[b]-byInc[a]; });
   if(!ics.length){ ic2.innerHTML = '<p class="muted">No income in this period.</p>'; }
   else{
-    var ih2 = '<div class="ptablewrap"><table class="ptable"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
+    var ih2 = '<div class="ptablewrap"><table class="ptable fit"><tr><th>Category</th><th style="text-align:right">Amount</th><th style="text-align:right">% of total</th></tr>';
     ics.forEach(function(c){ ih2 += '<tr class="rep-click" data-icat="'+esc(c)+'"><td>'+esc(c)+'</td><td style="text-align:right">'+money(byInc[c])+'</td><td style="text-align:right">'+Math.round(byInc[c]/inc*100)+'%</td></tr>'; });
     ic2.innerHTML = ih2 + '</table></div>';
     var icRows = ic2.querySelectorAll('[data-icat]');

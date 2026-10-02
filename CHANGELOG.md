@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- Income by category table: columns now size dynamically to the viewport (no more 640px minimum forcing sideways scroll) — all three columns visible on iPhone, on both Home and Reports.
 - Category Bars: tapping an "Other" bar now labels the drill "Other" in the info card instead of expanding to the first underlying category ("Rent and Lease + 2 more").
 - Home: Category Bars and Income by category are now Home chart cards too — every chart is available on both Home and Reports from here on; existing installs get the two new cards appended at the bottom.
 - Bulk update: the Delete button now sits midway between Update and the ✕ done button on the selection bar.
