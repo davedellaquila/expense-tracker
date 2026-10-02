@@ -278,13 +278,14 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar{background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
   border-left:3px solid var(--blue);
   box-shadow:0 2px 10px rgba(10,20,15,.08); padding:8px 10px; margin:0 0 12px;
-  display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  display:flex; align-items:center; gap:6px; flex-wrap:nowrap;}
 .selbar .btn{margin:0;}
-.selbar .selbar-left{display:flex; align-items:center; gap:6px; flex:1;}
-.selbar #selbar-update{flex:none;}
+.selbar .btn:disabled{opacity:.45;}
+.selbar .selbar-left{display:flex; align-items:center; gap:6px; flex:1; min-width:0;}
+.selbar #selbar-update{flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 /* Delete sits midway between Update and the xmark: the middle zone absorbs
    the same free space as the left group, keeping Update centered. */
-.selbar .selbar-mid{flex:1; display:flex; align-items:center; justify-content:center;}
+.selbar .selbar-mid{flex:1; display:flex; align-items:center; justify-content:center; min-width:0;}
 /* bulk-update bar dismiss: compact xmark at the bar's far right, kept well
    clear of Delete to avoid mis-taps */
 .selbar #selbar-done{flex:none; width:34px; height:34px; padding:0; margin-left:14px;
@@ -1416,7 +1417,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020303';
+var APP_VERSION = '202610020313';
 
 /* ================= in-app update check =================
    Fetches version.json fresh (never from cache). When the deployed version
@@ -4572,13 +4573,20 @@ function updateSelbar(){
   var before = items ? items.map(function(el){
     var r = el.getBoundingClientRect(); return {left:r.left, top:r.top};
   }) : null;
-  if(selbarUndoArmed && undoAvailable()){
+  /* Compact count label ("Update 3") keeps the bar on one row; the dialog it
+     opens is still titled "Update N transactions". Update and Delete are
+     visibly disabled with nothing selected instead of toasting. */
+  var undoing = selbarUndoArmed && undoAvailable();
+  var n = txnSelCount();
+  if(undoing){
     btn.textContent = 'Undo Bulk Update';
   }else{
     selbarUndoArmed = false;
-    var n = txnSelCount();
-    btn.textContent = 'Update ' + n + ' transaction' + (n===1 ? '' : 's') + (n ? '…' : '');
+    btn.textContent = 'Update ' + n;
   }
+  btn.disabled = !undoing && n===0;
+  var delBtn = $('selbar-delete');
+  if(delBtn) delBtn.disabled = n===0;
   if(!items) return;
   requestAnimationFrame(function(){
     items.forEach(function(el, i){
