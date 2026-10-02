@@ -2890,7 +2890,7 @@ html.bg-paused body{
 
     <!-- SETTINGS -->
     <section id="screen-settings" class="screen" hidden>
-      <div class="card">
+      <div class="card" data-setcard="storage">
         <h2>Data storage</h2>
         <label class="f">Where your data lives</label>
         <div class="seg" id="set-store-seg">
@@ -2944,7 +2944,7 @@ html.bg-paused body{
         </div>
         <p class="muted">Switching storage only changes where new reads and writes go — the data in the other location stays untouched until you copy it over.</p>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="who">
         <h2>Who's entering?</h2>
         <label class="f" for="set-user">Your name (saved on each transaction)</label>
         <div class="set-fieldrow">
@@ -2953,12 +2953,12 @@ html.bg-paused body{
         </div>
         <datalist id="user-suggest"><option value="Dave"></option><option value="Nancy"></option></datalist>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="categories">
         <h2>Categories</h2>
         <p class="muted" style="font-size:13px;margin:0 0 10px">Rename or delete a category — its transactions, budgets, and planner settings move with it.</p>
         <div id="set-cat-list"></div>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="cleanup">
         <div class="set-card-head">
           <h2>Data cleanup</h2>
           <button class="btn small" id="set-scrub" type="button">Scan for statement junk</button>
@@ -2966,7 +2966,7 @@ html.bg-paused body{
         <p class="muted" style="font-size:13px;margin:10px 0 0">Older PDF imports sometimes glued statement text onto merchant names — section headers (like "JANE DOE #1234: Transactions"), debit-card prefixes (like "Purchase authorized on 08/15 …") or fine print (like "Important Information You Should Know …"). Scan finds those rows so you can review and fix them — with undo.</p>
         <div id="set-scrub-results" style="margin-top:6px"></div>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="appearance">
         <h2>Appearance</h2>
         <div class="seg" id="theme-seg">
           <button data-theme-opt="light">☀️ Light</button>
@@ -3116,7 +3116,7 @@ html.bg-paused body{
           <p class="bg-hint">Space on the left and right of the content on wide desktop screens, so the page background shows through. Saved on this device.</p>
         </div>
       </div>
-      <div class="card" id="set-steps-card">
+      <div class="card" id="set-steps-card" data-setcard="setup">
         <h2>Setup steps</h2>
         <div class="steps" style="border:none; padding:0; margin:0;">
           <ol>
@@ -3316,7 +3316,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022341';
+var APP_VERSION = '202610022355';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -6706,7 +6706,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('#tabbar button').forEach(function(b){
     b.addEventListener('click', function(){ showScreen(b.getAttribute('data-screen')); });
   });
-  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
+  wireSetup(); wireSettings(); wireSetCards(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
   applyTheme();
   /* Keep each tab's scroll position across reloads: remember it while
      scrolling (throttled) and make sure it's saved on refresh/close. */
@@ -7986,6 +7986,62 @@ function applyRepChartOrder(){
     var k = card.getAttribute('data-repchart');
     if(!seen[k]){ sec.insertBefore(card, endRef); seen[k]=1; }
   });
+}
+/* ---- Settings card order (drag to reorder) ----
+   Same pattern as the chart cards: grip handles in each card header,
+   order saved per device. */
+var SET_ORDER_KEY = 'expenseTracker.setCardOrder';
+var SET_CARDS = ['storage','who','categories','cleanup','appearance','setup'];
+var SET_CARD_NAMES = {storage:'Data storage', who:"Who's entering?", categories:'Categories',
+  cleanup:'Data cleanup', appearance:'Appearance', setup:'Setup steps'};
+function setCardOrder(){
+  try{
+    var l = JSON.parse(localStorage.getItem(SET_ORDER_KEY)||'null');
+    if(Array.isArray(l) && l.length) return l.filter(function(k){ return SET_CARDS.indexOf(k)>=0; });
+  }catch(e){}
+  return SET_CARDS.slice();
+}
+function saveSetCardOrder(l){
+  try{ localStorage.setItem(SET_ORDER_KEY, JSON.stringify(l)); }catch(e){}
+}
+function applySetCardOrder(){
+  var sec = $('screen-settings');
+  if(!sec) return;
+  var endRef = $('build-stamp'); // keep the version stamp last
+  var order = setCardOrder(), seen = {};
+  order.forEach(function(k){
+    var card = sec.querySelector('[data-setcard="'+k+'"]');
+    if(card){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+  Array.prototype.forEach.call(sec.querySelectorAll('[data-setcard]'), function(card){
+    var k = card.getAttribute('data-setcard');
+    if(!seen[k]){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+}
+function wireSetCards(){
+  var sec = $('screen-settings');
+  if(!sec || sec.dataset.setWired) return;
+  sec.dataset.setWired = '1';
+  sec.querySelectorAll('[data-setcard]').forEach(function(card){
+    var key = card.getAttribute('data-setcard');
+    var h2 = card.querySelector('h2');
+    if(!h2 || h2.dataset.gripped) return;
+    h2.dataset.gripped = '1';
+    var head = el('div',{style:'display:flex;align-items:center;gap:8px;flex:1;min-width:0'});
+    h2.parentNode.insertBefore(head, h2);
+    head.appendChild(el('span',{class:'card-grip no-print',title:'Drag to reorder '+(SET_CARD_NAMES[key]||key)},'\u283f'));
+    head.appendChild(h2);
+    h2.style.margin = '0';
+    h2.style.flex = '1';
+  });
+  wireCardReorder({
+    container: sec,
+    cardSel: '[data-setcard]',
+    keyAttr: 'data-setcard',
+    saveOrder: saveSetCardOrder,
+    endRef: $('build-stamp')
+  });
+  applySetCardOrder();
 }
 /* ---- drag-to-reorder chart cards (Home + Reports) ----
    Pointer Events (not HTML5 drag-and-drop) so touch dragging works on iPhone.

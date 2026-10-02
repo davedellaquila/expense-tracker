@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-02
+### App 202610022355
+- Settings: cards can now be rearranged by dragging the ⋮⋮ grip in each card header. Order is saved on this device.
 ### App 202610022341
 - Charts: text now stays a fixed readable size regardless of content width — no more tiny labels when side margins are large.
 ### App 202610022334
