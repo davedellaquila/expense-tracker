@@ -1,5 +1,6 @@
 # Changelog
 ## 2026-10-01
+- iPhone: all modal button bars are now static end-of-content rows — extended from the sheet sticky bars to the page-style bars docked in the bill form, scanner review, budget copy, and delete-bill sheets. Other platforms unchanged.
 - iPhone: sheet button bars (bulk update, transaction form) no longer float — they're a static end-of-content row, since the floating panel could cover the focused field when the keyboard is open. Other platforms keep the floating bar.
 - Transactions selection bar: Delete is now a 🗑️ trash can icon (narrower, so the single row no longer overlaps on iPhone); All/Clear no longer get squeezed under the Update button.
 - Setup Categories: per-row delete is now the ✕ icon, matching the delete buttons used in the Bills list and budget planner (replacing the one-off 🗑️).
