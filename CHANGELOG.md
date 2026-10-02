@@ -1,5 +1,57 @@
 # Changelog
+
+<!-- Version convention: under each ## date, add ### App YYYYMMDDHHMM (UTC) matching
+     APP_VERSION / version.json for that deploy, newest first. "See what's new" shows
+     every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
+
 ## 2026-10-02
+### App 202610022104
+- Ship: Home category chips + Upcoming Bills polish, Settings rename/appearance/compact layouts, trash vs circle-✕ affordances, What’s New (header control, pulse, scroll lock, sticky Load new version only when an update exists), and desktop chart labels ~16–18px.
+### App 202610022058
+- What’s new: hide “Load new version” when you’re already on the latest logged build (header browse); still show it when an update is detected or there are newer changelog entries.
+### App 202610022049
+- What’s new: fix scroll — panel was parked off-screen after page scroll (sticky header rect went negative under overflow lock). Now uses a fixed body lock, viewport-safe positioning, and one scrollable panel body with sticky “Load new version” so Earlier changes scroll inside the dialog.
+### App 202610022039
+- What’s new panel: Expanding Earlier changes scrolls inside the dialog (page behind locked); sticky button label is “Load new version”.
+- Header What’s new: slow pulse while an update is available; clears when opened from the header, banner dismissed, or new version loaded. Respects reduced-motion.
+- Desktop/tablet chart labels: CSS sizes account for SVG viewBox scaling so labels land ~16–18px on wide screens.
+### App 202610022034
+- Desktop/tablet charts: SVG labels capped around 16–18px via CSS so wide screens don’t blow up user-unit text; phone chart label sizing unchanged.
+### App 202610022033
+- Header: lasting “What’s new” control (next to the user chip) opens the changelog panel anytime — without forcing the update banner; real updates still show the blue banner and auto-open the panel.
+### App 202610022029
+- What’s new panel: Refresh is a centered sticky strip between the scrollable “new since your version” list and Earlier changes (not lost when recent notes are long). Banner stays title + circle dismiss only; ≥30px gap under the blue bar.
+### App 202610022023
+- Update banner is slimmer (title + circle dismiss only); What’s new auto-opens with Refresh between “new since your version” and Earlier changes; panel sits with a gap under the banner; panel close is an animated circle ✕ (banner stays until its own dismiss).
+### App 202610022017
+- Clarified remove affordances: soft-red trash = delete data (bills, categories, split parts, planners); Home/Reports chart hide is a small circle ✕ again, with the same grow+fade press-out as sheet close.
+### App 202610022015
+- Data-delete ✕ controls use the shared soft-red trash chip (Settings categories, Budget/Income planner remove-category, split remove-part). Close/dismiss ✕ unchanged.
+### App 202610022012
+- Update banner: What’s new opens automatically the first time a newer version is detected; closing the panel (Esc / ✕ / scrim) leaves the banner up, and focus checks don’t re-open it — use “See what’s new” to peek again.
+### App 202610021957
+- Delete bill? confirm sheet: more space under the payee/amount line before Cancel/Delete; uses a plain button row (not stickybar) so short confirms don’t dock tight against the text.
+### App 202610021941
+- Bills delete controls (Home Upcoming Bills, Bills tiles, Paid list): unified soft-red `.row-del` chip with a trash-can SVG instead of mixed ghost ✕ styles.
+### App 202610021911
+- Settings → Appearance: page backgrounds expand beyond solids — more solid swatches, CSS gradients, subtle patterns (dots/grid/paper/diagonals/mesh), plus an explicit Custom color picker; light mode only; cards stay opaque for readability.
+- Settings → Data cleanup: “Scan for statement junk” is a compact header-row button (title left, button right), matching Who’s entering? / Upcoming Bills.
+### App 202610021858
+- Settings → Data storage: Firebase auth actions are compact (Sign in primary; Create account / Google as small ghosts; Forgot password + Download backup as quiet links) instead of oversized full-width blocks.
+- Settings → Who's entering?: Save name sits beside the name field on one row (stacks on very narrow phones).
+- Update banner What’s new: shows everything newer than the version you’re running (skipped builds grouped), with earlier history collapsed; CHANGELOG now uses `### App YYYYMMDDHHMM` markers tied to APP_VERSION.
+### App 202610021832
+- Settings (formerly Setup tab): Appearance now includes a background color picker, a few presets, and Reset to default — saved on this device and applied in Light mode via `--bg`.
+- Tab bar: the Setup tab is renamed to Settings (internal screen id unchanged).
+- Update banner: “See what’s new” is now a clear outlined button (was an easy-to-miss underline link), with subtitle “See what’s changed, then refresh when you’re ready.”
+- Update banner: new What's new control opens a lightweight panel with the newest CHANGELOG sections (fetched live); Esc, ✕, or tap outside closes it without blocking Refresh / Dismiss.
+- Home Upcoming Bills: each row now has a delete ✕ next to Paid (same confirm + delete path as the Bills page).
+- Home Upcoming Bills: adding, editing, or deleting a bill from Home now refreshes the card immediately (was only re-rendering the Bills page).
+- Home Upcoming Bills empty state now says "All clear! Yay!" (was "all clear").
+- Round buttons (sheet ✕, selection-bar ✕, + FAB, search clear): press still grows to 1.5× and now fades to invisible in sync (150ms); sheet ✕ delays dismiss so the fade finishes as the sheet closes.
+- Home Upcoming Bills: marking a bill Paid now refreshes the Home card so the bill leaves the list immediately (was only re-rendering the Bills page).
+- Home Upcoming Bills card: lists bills due in the next 14 days (plus overdue), with name, due date, days-left, amount, and a Paid button — capped at 6 rows with a link to the full Bills page.
+- Home (and Reports) category filter chips now include categories from the Categories list — so a category created via Add bill / Add transaction shows up immediately, even before any transaction uses it.
 - Update banner: on window focus (and visibility), the app re-checks same-origin `version.json` + `index.html` (throttled) and shows the blue "new version" bar when the tab is stale — including after a git pull / file change without leaving the tab. Refresh reloads past the cache; Dismiss hides until a newer build appears.
 - Add/Edit bill: the category menu now includes ＋ New category… (same as Add/Edit transaction) and saves the new category to the Categories list.
 - Scan bill / receipt: new "Paste from clipboard" option (and ⌘V / Ctrl+V) runs the same on-device recognition as Choose photo — images and PDFs when the browser exposes them.
