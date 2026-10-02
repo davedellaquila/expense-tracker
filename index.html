@@ -1451,7 +1451,7 @@ var LS_THEME = 'expenseTracker.theme';
 
 /* App build version (UTC YYYYMMDDHHMM). Bumped on EVERY deploy together with
    version.json — the in-app update checker compares the two. */
-var APP_VERSION = '202610020357';
+var APP_VERSION = '202610020412';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -4651,7 +4651,7 @@ function updateSelbar(){
   var undoing = selbarUndoArmed && undoAvailable();
   var n = txnSelCount();
   if(undoing){
-    btn.textContent = 'Undo Bulk Update';
+    btn.textContent = (typeof IS_IPHONE!=='undefined' && IS_IPHONE) ? 'Undo' : 'Undo Bulk Update';
   }else{
     selbarUndoArmed = false;
     btn.textContent = 'Update ' + n;
