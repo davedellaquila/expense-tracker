@@ -1239,7 +1239,7 @@ table.ptable{border-collapse:collapse; width:100%; font-size:14.5px; min-width:6
         <div class="stat-grid" id="rep-stats" style="grid-template-columns:1fr 1fr 1fr 1fr"></div>
       </div>
       <div class="card" data-repchart="catmix"><h2>Category Mix</h2><p class="chart-sub">Share of total spend</p><div id="rep-catchart"></div></div>
-      <div class="card" data-repchart="catbars"><h2>Category Bars</h2><p class="chart-sub">Spend by category, side by side — tap a bar to drill in</p><div id="rep-catbars"></div></div>
+      <div class="card" data-repchart="catbars"><h2>Category Bars</h2><p class="chart-sub">Each month's spend by category, side by side — tap a bar to drill in</p><div id="rep-catbars"></div></div>
       <div class="card" data-repchart="catmixtable"><h2>Category Mix table</h2><p class="chart-sub">Income and expenses by category</p><div id="rep-cattable"></div></div>
       <div class="card" data-repchart="budget"><h2>Budget vs Actual</h2><p class="chart-sub">Budgeted vs spent by category for the selected period</p><div id="rep-budgetchart"></div><div id="rep-budgettable"></div></div>
       <div class="card" data-repchart="trend"><h2>Monthly Trend</h2><p class="chart-sub">Spend and cumulative total by month</p><div id="rep-monthchart"></div><div id="rep-monthtable"></div></div>
@@ -10575,15 +10575,28 @@ function repStackedVBars(el, series, labels, onSeg){
 function repGroupedVBars(el, series, labels, onBar){
   var n = labels.length;
   if(!series.length || !n){ emptyInto(el,'📊','Nothing here yet.'); return; }
-  var W=680, H=300, pad={top:38, right:12, bottom:46, left:60};
-  var plotW=W-pad.left-pad.right, plotH=H-pad.top-pad.bottom;
+  var W=680, pad={top:38, right:12, bottom:46, left:60}, plotH=216;
+  /* The legend packs into as many rows as it needs — with up to 8 series a
+     single row overflows the viewBox on phones. */
+  var legW = W - pad.left - pad.right + 44, legRows = [[]], rowW = 0;
+  series.forEach(function(sr){
+    var w = 20 + sr.name.length*(repPhone()?13:7) + 14;
+    if(rowW + w > legW && legRows[legRows.length-1].length){ legRows.push([]); rowW = 0; }
+    legRows[legRows.length-1].push({sr:sr, w:w});
+    rowW += w;
+  });
+  pad.top = 12 + legRows.length*22;
+  var H = pad.top + plotH + pad.bottom;
+  var plotW=W-pad.left-pad.right;
   var max=1, li, si;
   for(si=0; si<series.length; si++) for(li=0; li<n; li++) max=Math.max(max, series[si].values[li]||0);
   var step=plotW/n, groupW=step*0.8, slotW=groupW/series.length, svg='';
-  var lx=pad.left;
-  series.forEach(function(sr){
-    svg += '<rect x="'+lx+'" y="8" width="12" height="12" rx="3" fill="'+sr.color+'"/><text x="'+(lx+16)+'" y="18" font-size="12" class="cx-mut">'+esc(sr.name)+'</text>';
-    lx += 20 + sr.name.length*(repPhone()?13:7) + 14;
+  legRows.forEach(function(row, ri){
+    var lx=pad.left, ly=8+ri*22;
+    row.forEach(function(e){
+      svg += '<rect x="'+lx+'" y="'+ly+'" width="12" height="12" rx="3" fill="'+e.sr.color+'"/><text x="'+(lx+16)+'" y="'+(ly+10)+'" font-size="12" class="cx-mut">'+esc(e.sr.name)+'<title>'+esc(e.sr.name)+'</title></text>';
+      lx += e.w;
+    });
   });
   for(li=0; li<n; li++){
     for(si=0; si<series.length; si++){
@@ -10605,6 +10618,37 @@ function repGroupedVBars(el, series, labels, onBar){
       });
     })(gn[gi]);
   }
+}
+/* Monthly Category Bars series builder: top-N categories by period total +
+   Other, matching the donut's grouping and palette order. In multi-category
+   mode (selCats) it's one series per selected category, no Other. Pure — the
+   caller wires drill-throughs from the returned metadata. */
+function catBarsGrouped(byCat, byMC, months, selCats, topN){
+  var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+  var names, tail;
+  if(selCats && selCats.length){
+    names = selCats.filter(function(c){ return byCat[c]!=null; });
+    tail = [];
+  }else{
+    names = cats.slice(0, topN);
+    tail = cats.slice(topN);
+  }
+  var series = names.map(function(c, i){
+    return {name:c, color:REP_PALETTE[i%REP_PALETTE.length],
+      values: months.map(function(m){ var mm=byMC[m]; return (mm && mm[c]) || 0; })};
+  });
+  var otherByMonth = {};
+  if(tail.length){
+    series.push({name:'Other', color:REP_PALETTE[names.length%REP_PALETTE.length],
+      values: months.map(function(m){
+        var mm=byMC[m]||{}, s=0, on=[];
+        tail.forEach(function(c){ if(mm[c]){ s+=mm[c]; on.push(c); } });
+        otherByMonth[m]=on;
+        return s;
+      })});
+  }
+  return {months:months, selNames:names, series:series, otherByMonth:otherByMonth,
+    isOther:function(si){ return !selCats && si===names.length; }};
 }
 /* Pareto: descending bars + cumulative-share line + 80% guide. items sorted desc. */
 function repPareto(el, items, onBar){
@@ -10770,13 +10814,14 @@ function renderReports(){
       return !!_sel[cc];
     });
   }
-  var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byIncN={}, byMonth={}, byMerch={}, top=[];
+  var inc=0, exp=0, byCat={}, byCatN={}, byInc={}, byIncN={}, byMonth={}, byMerch={}, byMC={}, top=[];
   var byDay=[0,0,0,0,0,0,0]; // Mon..Sun
   rows.forEach(function(t){
     var a = num(t.amount), m = (t.date||'').slice(0,7);
     if(!byMonth[m]) byMonth[m] = {inc:0, exp:0};
     if(t.txn_type==='income'){ inc+=a; byMonth[m].inc+=a; var ic=t.category||'Uncategorized'; byInc[ic]=(byInc[ic]||0)+a; byIncN[ic]=(byIncN[ic]||0)+1; }
     else if(t.txn_type==='expense'){ exp+=a; byMonth[m].exp+=a; var c=repDisplayCat(t); byCat[c]=(byCat[c]||0)+a; byCatN[c]=(byCatN[c]||0)+1; top.push(t);
+      var bmc=byMC[m]||(byMC[m]={}); bmc[c]=(bmc[c]||0)+a; // per-month × category, for the grouped Category Bars
       var mk=String(t.merchant||t.description||'Unknown').trim()||'Unknown'; byMerch[mk]=(byMerch[mk]||0)+a;
       var wd=weekdayIdx(t.date); if(wd>=0) byDay[wd]+=a;
     }
@@ -10829,20 +10874,19 @@ function renderReports(){
     drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
       dispCats: (it.names && it.names.length ? it.names : [it.name])});
   });
-  // --- category bars: vertical bars side by side (not stacked), same data as
-  // the donut. Top 12 categories + Other, like the donut's long-tail grouping.
-  var topBars = cats.slice(0, 12);
-  var barItems = topBars.map(function(c){ return {name:c, value:byCat[c]}; });
-  var restNames = cats.slice(12);
-  if(restNames.length){
-    var restSum = restNames.reduce(function(s,c){ return s + byCat[c]; }, 0);
-    if(restSum > 0.005) barItems.push({name:'Other', value:restSum, names:restNames});
-  }
-  repVBars($('rep-catbars'), barItems,
-    REP_CORAL, 'No expenses in this period.', money, function(it){
-      drillToTransactions({banks: repBanks,from:from, to:to, type:'expense', bp:bpVal, carryCats:repCatSel,
-        dispCats: (it.names && it.names.length ? it.names : [it.name])});
-    });
+  // --- category bars: grouped vertical bars — each month shows every
+  // category side by side. Top 7 + Other, like the donut; one series per
+  // selected category when multi-selecting. Tap a bar to drill into that
+  // month + category.
+  var cbMonths = Object.keys(byMonth).sort();
+  var cb = catBarsGrouped(byCat, byMC, cbMonths, (multiCat && mselExp.length) ? mselExp : null, 7);
+  repGroupedVBars($('rep-catbars'), cb.series, cbMonths.map(function(m){
+    return m.slice(5)==='01' ? m.slice(2,4)+m.slice(4) : m.slice(5);
+  }), function(si, mi){
+    var m = cb.months[mi];
+    drillToTransactions({banks:repBanks, singleMonth:m, type:'expense', bp:bpVal,
+      carryCats:repCatSel, dispCats: cb.isOther(si) ? cb.otherByMonth[m] : [cb.selNames[si]]});
+  });
   // --- category table ---
   // Monthly average is per active month: total / months the category actually had spending.
   $('rep-cattable').innerHTML = catMixTable(byCat, byCatN, exp, {periodMonths:monthsInRange(from, to),

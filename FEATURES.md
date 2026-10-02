@@ -64,8 +64,9 @@ live copy of this list.
   Transactions filtered to that tile's data, carrying the report filters.
 - Sticky filter-summary panel appears when the filters scroll off-screen (tap
   jumps back to the filters).
-- 17 chart cards: monthly trend, weekday pattern, top merchants, category mix
-  donut, transaction size bands, owner split (Dave/Nancy), card split by bank,
+- 18 chart cards: monthly trend, weekday pattern, top merchants, category mix
+  donut, monthly category bars (each month's categories side by side),
+  transaction size bands, owner split (Dave/Nancy), card split by bank,
   category volume, average ticket, category spend trend, owner vs category,
   spend Pareto, category x month heatmap, budget vs actual, income by category,
   largest expenses.
