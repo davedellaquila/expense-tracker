@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-02
+### App 202610022328
+- Bill scan: scanned values only fill blank fields — if you've already typed a name, amount, or changed the due date, the scan won't overwrite them. Re-scanning also won't wipe edits you made to previously scanned values.
+
 <!-- Version convention: under each ## date, add ### App YYYYMMDDHHMM (UTC) matching
      APP_VERSION / version.json for that deploy, newest first. "See what's new" shows
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->

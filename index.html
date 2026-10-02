@@ -3306,7 +3306,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022351';
+var APP_VERSION = '202610022328';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -14759,38 +14759,49 @@ function openBillForm(b, opts){
     var lastBillScan = null; // snapshot of what the previous scan set, for rollback
     function rollbackBillScan(){
       if(!lastBillScan) return;
-      if(lastBillScan.setName){ inName.value = lastBillScan.prev.name; unmarkScanned(inName); }
-      if(lastBillScan.setAmount){ inAmt.value = lastBillScan.prev.amount; unmarkScanned(inAmt); }
-      if(lastBillScan.setDate){ inDate.value = lastBillScan.prev.date; unmarkScanned(inDate); }
-      if(lastBillScan.paymentInfo && inNotes.value.indexOf(lastBillScan.paymentInfo) !== -1){
-        inNotes.value = inNotes.value.split(lastBillScan.paymentInfo).join('')
+      var s = lastBillScan;
+      /* Only roll back fields the user hasn't changed since the scan set them —
+         if they typed over a scanned value, their edit wins. */
+      if(s.setName && inName.value === s.setName){ inName.value = s.prev.name; unmarkScanned(inName); }
+      if(s.setAmount && inAmt.value === s.setAmount){ inAmt.value = s.prev.amount; unmarkScanned(inAmt); }
+      if(s.setDate && inDate.value === s.setDate){ inDate.value = s.prev.date; unmarkScanned(inDate); }
+      if(s.paymentInfo && inNotes.value.indexOf(s.paymentInfo) !== -1){
+        inNotes.value = inNotes.value.split(s.paymentInfo).join('')
           .replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
         inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
         unmarkScanned(inNotes);
       }
       lastBillScan = null;
     }
+    /* A scanned value only fills a field the user hasn't already valued:
+       name/amount must be empty; the due date must still be the untouched
+       today-default on a new bill (edits and prefills keep their dates);
+       payment info only goes into empty notes. */
     function startBillScan(){
       openScanSheet('bill', function(res){
         scanPhoto = {blob:res.blob, dataUrl:res.dataUrl, pdfBlob:res.pdfBlob||null};
         // A fresh scan replaces the previous scan: roll back what the last scan
-        // set first, so fields the new scan didn't find don't keep stale values
-        // (manually typed or previously saved values are restored, not cleared).
+        // set first (leaving user edits alone), so fields the new scan didn't
+        // find don't keep stale values.
         rollbackBillScan();
         var snap = {prev:{name:inName.value, amount:inAmt.value, date:inDate.value},
-                    setName:false, setAmount:false, setDate:false, paymentInfo:null};
-        if(res.values.name){ inName.value = res.values.name; markScanned(inName); snap.setName = true; }
-        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = true; }
-        if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); snap.setDate = true; }
-        if(res.values.paymentInfo){
+                    setName:null, setAmount:null, setDate:null, paymentInfo:null};
+        var filled = 0;
+        if(res.values.name && !inName.value.trim()){ inName.value = res.values.name; markScanned(inName); snap.setName = String(res.values.name); filled++; }
+        if(res.values.amount && !String(inAmt.value).trim()){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = String(res.values.amount); filled++; }
+        if(res.values.dueDate && !isEdit && !src.dueDate && inDate.value === todayLocal()){
+          inDate.value = res.values.dueDate; markScanned(inDate); snap.setDate = String(res.values.dueDate); filled++;
+        }
+        if(res.values.paymentInfo && !inNotes.value.trim()){
           snap.paymentInfo = res.values.paymentInfo;
-          inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + snap.paymentInfo;
+          inNotes.value = snap.paymentInfo;
           inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
-          markScanned(inNotes);
+          markScanned(inNotes); filled++;
         }
         lastBillScan = snap;
         renderScanBox();
-        toast('Filled from scan \u2014 check the fields.');
+        toast(filled ? 'Filled '+filled+' field'+(filled>1?'s':'')+' from scan \u2014 check the fields.'
+                     : 'Scan found nothing new \u2014 your entries were kept.');
       });
     }
     var scanBtn = el('button',{class:'btn ghost', type:'button', style:'margin-bottom:6px'},'\uD83D\uDCF7 Scan bill');
