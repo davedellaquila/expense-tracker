@@ -195,26 +195,29 @@ body{
 }
 [hidden]{display:none !important;}
 
+/* CPA report: typography + tables (used for both PDF generation and print fallback) */
+#cpa-report{ color:#000; background:#fff; font-family:Georgia,'Times New Roman',serif; max-width:7.5in; margin:0 auto; padding:24px; }
+#cpa-report h1{ font-size:22px; margin:0 0 4px; }
+#cpa-report .cpa-sub{ font-size:12px; color:#444; margin:0 0 20px; }
+#cpa-report h2{ font-size:15px; margin:22px 0 6px; border-bottom:2px solid #000; padding-bottom:4px; }
+#cpa-report table.cpa-table{ width:100%; border-collapse:collapse; font-size:13px; margin:0 0 6px; }
+#cpa-report table.cpa-table td{ padding:4px 6px; border-bottom:1px solid #ddd; vertical-align:top; }
+#cpa-report table.cpa-table td.cpa-amt{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+#cpa-report table.cpa-table tfoot td{ font-weight:bold; border-bottom:none; border-top:2px solid #000; }
+#cpa-report .cpa-n{ color:#666; font-size:11.5px; }
+#cpa-report .cpa-note{ font-size:11.5px; color:#333; margin:14px 0 0; }
+#cpa-report .cpa-summary{ margin-top:18px; border:2px solid #000; padding:10px 14px; }
+#cpa-report .cpa-summary .rowline{ display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
+#cpa-report .cpa-summary .rowline.grand{ font-weight:bold; font-size:16px; border-top:1px solid #000; margin-top:6px; padding-top:8px; }
+/* off-screen but rendered, so the PDF library can capture it */
+#cpa-report.cpa-render{ position:absolute; left:-9999px; top:0; display:block !important; width:7.5in; }
 @media print{
   .app-header, .tabbar, .toast-wrap, .no-print{ display:none !important; }
   body{ background:#fff; }
   .card{ box-shadow:none; break-inside:avoid; }
-  /* CPA report: print only the report, nothing else */
+  /* CPA report print fallback: print only the report, nothing else */
   body.cpa-print > *:not(#cpa-report){ display:none !important; }
-  body.cpa-print #cpa-report{ display:block !important; }
-  #cpa-report{ color:#000; font-family:Georgia,'Times New Roman',serif; max-width:7.5in; margin:0 auto; }
-  #cpa-report h1{ font-size:22px; margin:0 0 4px; }
-  #cpa-report .cpa-sub{ font-size:12px; color:#444; margin:0 0 20px; }
-  #cpa-report h2{ font-size:15px; margin:22px 0 6px; border-bottom:2px solid #000; padding-bottom:4px; }
-  #cpa-report table.cpa-table{ width:100%; border-collapse:collapse; font-size:13px; margin:0 0 6px; }
-  #cpa-report table.cpa-table td{ padding:4px 6px; border-bottom:1px solid #ddd; vertical-align:top; }
-  #cpa-report table.cpa-table td.cpa-amt{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
-  #cpa-report table.cpa-table tfoot td{ font-weight:bold; border-bottom:none; border-top:2px solid #000; }
-  #cpa-report .cpa-n{ color:#666; font-size:11.5px; }
-  #cpa-report .cpa-note{ font-size:11.5px; color:#333; margin:14px 0 0; }
-  #cpa-report .cpa-summary{ margin-top:18px; border:2px solid #000; padding:10px 14px; }
-  #cpa-report .cpa-summary .rowline{ display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
-  #cpa-report .cpa-summary .rowline.grand{ font-weight:bold; font-size:16px; border-top:1px solid #000; margin-top:6px; padding-top:8px; }
+  body.cpa-print #cpa-report{ display:block !important; position:static; }
 }
 
 /* ---------- report charts (style inspired by capital_one_dashboard) ---------- */
@@ -3427,7 +3430,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031454';
+var APP_VERSION = '202610031505';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -16544,8 +16547,42 @@ function renderCpaReport(){
   var node = $('cpa-report');
   node.innerHTML = h;
   node.hidden = false;
-  document.body.classList.add('cpa-print');
-  window.print();
+  // Generate a real PDF file (window.print() silently fails in iOS home-screen web apps).
+  var btn = $('tax-cpa');
+  var origLabel = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Generating PDF…'; }
+  function done(){
+    node.hidden = true;
+    node.classList.remove('cpa-render');
+    if(btn){ btn.disabled = false; btn.textContent = origLabel; }
+  }
+  cpaPdfReady().then(function(){
+    node.classList.add('cpa-render');
+    return window.html2pdf().set({
+      margin: 12,
+      filename: 'tax-summary-'+y+'.pdf',
+      image: { type:'jpeg', quality:0.95 },
+      html2canvas: { scale:2, useCORS:true },
+      jsPDF: { unit:'mm', format:'letter', orientation:'portrait' }
+    }).from(node).save();
+  }).then(done, function(){
+    // Fallback: print dialog (desktop browsers).
+    node.classList.remove('cpa-render');
+    document.body.classList.add('cpa-print');
+    if(btn){ btn.disabled = false; btn.textContent = origLabel; }
+    window.print();
+  });
+}
+function cpaPdfReady(){
+  return new Promise(function(resolve, reject){
+    if(window.html2pdf){ resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('PDF library failed to load')); };
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!window.html2pdf) reject(new Error('PDF library timed out')); }, 20000);
+  });
 }
 window.addEventListener('afterprint', function(){
   document.body.classList.remove('cpa-print');
