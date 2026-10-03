@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030433
+- Settings: background swatches use setAttribute for styles (another attempt at iPad rendering).
 ### App 202610030351
 - Settings: background preset swatches now force their backgrounds with !important to override any theme CSS.
 ### App 202610030348
