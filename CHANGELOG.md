@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030331
+- AI background is now real AI image generation (via Pollinations): describe the image, preview it, then use it as your background or save it to My backgrounds. The old keyword-to-pattern matcher is gone.
 ### App 202610030326
 - Settings: the card collapse button now sits at the far right of the header, outside any card controls (e.g. after Data cleanup's Scan button).
 ### App 202610030324
