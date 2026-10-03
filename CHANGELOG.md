@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030324
+- What's New button pulse is now more noticeable (larger scale + glow) when an update is available.
 ### App 202610030322
 - Settings: the card collapse button is now 48px with a stronger background and bolder chevron — much easier to see and tell what it is.
 ### App 202610030318
