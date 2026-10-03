@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030316
+- Settings: the Side margins slider now works on iPad/tablet too (was desktop-only).
 ### App 202610030315
 - Settings: the collapse chevron is now a 44px round button with a larger symbol, matching the other round buttons' press animation.
 ## 2026-10-02

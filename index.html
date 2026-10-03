@@ -923,7 +923,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    (e.g. 12.9" iPad, 1366px) that would otherwise use the desktop widths. ---------- */
 @media (min-width:761px) and (max-width:1199px),
        (pointer:coarse) and (min-width:761px){
-  main{max-width:1000px;}
+  main{max-width:min(1000px, calc(100% - var(--side-margin)*2));}
   .sheet{max-width:880px;}
 }
 
@@ -3324,7 +3324,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030315';
+var APP_VERSION = '202610030316';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
