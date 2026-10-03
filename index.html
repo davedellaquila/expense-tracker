@@ -1424,14 +1424,14 @@ html[data-bg-anim="1"] body{
 .mh-wire .mh-floor{
   bottom:-12%; top:auto;
   transform:perspective(480px) rotateX(64deg);
-  animation:mh-grid-scroll 3.2s linear infinite;
+  animation:mh-grid-scroll 3.2s linear infinite, mh-grid-rotate 14s ease-in-out infinite;
   mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
   -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
 }
 .mh-wire .mh-ceil{
   top:-12%;
   transform:perspective(480px) rotateX(-64deg);
-  animation:mh-grid-scroll 3.8s linear infinite reverse;
+  animation:mh-grid-scroll 3.8s linear infinite reverse, mh-grid-rotate-ceil 16s ease-in-out infinite reverse;
   mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
   -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
 }
@@ -1443,6 +1443,15 @@ html[data-bg-anim="1"] body{
 }
 @keyframes mh-grid-scroll{
   to{ background-position:0 36px, 36px 0, 0 72px, 72px 0; }
+}
+/* OG Max Headroom rotation: slow oscillation of the grid plane. */
+@keyframes mh-grid-rotate{
+  0%, 100%{ transform:perspective(480px) rotateX(64deg) rotateZ(-10deg); }
+  50%{ transform:perspective(480px) rotateX(64deg) rotateZ(10deg); }
+}
+@keyframes mh-grid-rotate-ceil{
+  0%, 100%{ transform:perspective(480px) rotateX(-64deg) rotateZ(10deg); }
+  50%{ transform:perspective(480px) rotateX(-64deg) rotateZ(-10deg); }
 }
 @keyframes mh-horizon-pulse{
   0%,100%{ opacity:.75; filter:brightness(1); }
@@ -3324,7 +3333,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030331';
+var APP_VERSION = '202610030333';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */

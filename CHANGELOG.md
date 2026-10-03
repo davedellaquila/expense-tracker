@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030333
+- Max Headroom wireframe preset now rotates the grid planes (slow oscillation, like the OG) in addition to scrolling.
 ### App 202610030331
 - AI background is now real AI image generation (via Pollinations): describe the image, preview it, then use it as your background or save it to My backgrounds. The old keyword-to-pattern matcher is gone.
 ### App 202610030326
