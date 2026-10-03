@@ -5,11 +5,15 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
-### App 202610030434
+### App 202610030642
 - Appearance Customize → Color: **Apply** (and tap the hex) uses the swatch’s current color without reopening the picker.
 - Max Headroom Stripes card: angle can **animate continuously** between lower/upper limits (plus period); fixed angle when Animate is off.
 - iPhone: page backgrounds stay **viewport-fixed** while content scrolls (same as desktop) — static fills use a fixed plate; dynamic `#bg-dynamic` no longer uses negative z-index.
 - Max Headroom editor **locks its open height** so layer pills don’t move the top edge; drag the grab handle to see more.
+### App 202610030437
+- Settings: background preset swatches are now hardcoded HTML (no JS rendering) — they should appear on all devices.
+### App 202610030433
+- Settings: background swatches use setAttribute for styles (another attempt at iPad rendering).
 ### App 202610030351
 - Settings: background preset swatches now force their backgrounds with !important to override any theme CSS.
 ### App 202610030348
