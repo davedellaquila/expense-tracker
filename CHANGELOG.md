@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031536
+- Transactions bulk bar: blue border now runs all the way around (was just a left-edge strip, briefly removed) so the bar stands out from the filter card above it.
 ### App 202610031535
 - Transactions bulk bar: Delete is now the red SVG trash icon (was "Delete" text), freeing room so "Update 187" no longer truncates; removed the blue left-edge strip.
 ### App 202610031528
