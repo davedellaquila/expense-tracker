@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031518
+- Delete buttons now use the shared red SVG trash icon everywhere: transaction form, bill form, and category delete dialog (replacing the 🗑️ emoji / text buttons). Confirm-dialog buttons keep red "Delete" text.
 ### App 202610031513
 - Tax: new **Business income** card showing business income by category (with counts and totals), plus its own Download CSV. Tapping a row drills into those transactions.
 ### App 202610031507

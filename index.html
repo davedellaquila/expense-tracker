@@ -3433,21 +3433,28 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031513';
+var APP_VERSION = '202610031518';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
 var IS_IPHONE = /iPhone/.test(navigator.userAgent || '');
 if(IS_IPHONE && document.documentElement) document.documentElement.classList.add('iphone');
-/* Standard delete-button label: the full word everywhere except iPhone,
-   where the 🗑️ icon saves space. */
-function delLabel(){ return IS_IPHONE ? '🗑️' : 'Delete'; }
+/* Delete-button label for confirm dialogs (plain text; icon buttons use delIconBtn). */
+function delLabel(){ return 'Delete'; }
 /* Shared trash icon for data deletes (bills, categories, split parts, etc.).
    Card/UI chrome hide uses cardDismissBtn (circle ✕) instead. */
 var TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
 function rowDeleteBtn(ariaLabel){
   var label = ariaLabel || 'Delete';
   return el('button',{class:'row-del',type:'button',title:label,'aria-label':label,html:TRASH_SVG});
+}
+/* Red SVG trash icon button for form/dialog button rows (transaction form, bill form, etc.).
+   .iconbtn already colors currentColor as var(--danger), so the SVG renders red. */
+function delIconBtn(ariaLabel){
+  var label = ariaLabel || 'Delete';
+  var b = el('button',{class:'iconbtn',type:'button',title:label,'aria-label':label});
+  b.innerHTML = TRASH_SVG;
+  return b;
 }
 function cardDismissBtn(ariaLabel){
   var label = ariaLabel || 'Remove';
@@ -7828,7 +7835,7 @@ function openCatDelete(oldName){
     if(!others.length) rUnas.checked=true;
     var row=el('div',{class:'btnrow'});
     var cancel=el('button',{class:'btn ghost'},'Cancel');
-    var del=el('button',{class:'btn danger','aria-label':'Delete'},delLabel());
+    var del=delIconBtn('Delete category');
     cancel.onclick=function(){ close(); };
     del.onclick=async function(){
       var target=sel.value;
@@ -11213,9 +11220,7 @@ function openTxnForm(t){
     var save = el('button',{class:'btn',type:'button'}, isEdit?'Save':'Add');
     row.appendChild(cancel); row.appendChild(save);
     if(isEdit){
-      var del = el('button',{type:'button',title:'Delete transaction','aria-label':'Delete transaction'});
-      if(IS_IPHONE){ del.className='iconbtn'; del.textContent='🗑️'; }
-      else{ del.className='btn ghost'; del.textContent='Delete'; del.style.color='var(--danger)'; }
+      var del = delIconBtn('Delete transaction');
       del.onclick = async function(){
         var ok = await confirmDialog('Delete this transaction? This cannot be undone.');
         if(!ok) return;
@@ -15310,7 +15315,7 @@ function openBillForm(b, opts){
     bar.appendChild(cancelBtn);
     bar.appendChild(saveBtn);
     if(isEdit){
-      var delBtn = el('button',{class:'btn ghost',type:'button',style:'color:var(--danger)','aria-label':'Delete'},delLabel());
+      var delBtn = delIconBtn('Delete bill');
       delBtn.addEventListener('click', function(){ deleteBill(b, close); });
       bar.appendChild(delBtn);
     }
