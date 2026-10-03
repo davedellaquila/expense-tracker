@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031600';
+var APP_VERSION = '202610031602';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -9189,6 +9189,14 @@ function updateSelbar(){
   btn.disabled = !undoing && n===0;
   var delBtn = $('selbar-delete');
   if(delBtn) delBtn.disabled = n===0;
+  /* All/None smart states: All is disabled when everything visible is already
+     selected; None is disabled when nothing is selected. */
+  var allBtn = $('selbar-all'), noneBtn = $('selbar-clear');
+  if(allBtn || noneBtn){
+    var visCount = state.transactions.filter(txnVisible).length;
+    if(allBtn) allBtn.disabled = n>=visCount;
+    if(noneBtn) noneBtn.disabled = n===0;
+  }
   if(!items) return;
   requestAnimationFrame(function(){
     items.forEach(function(el, i){

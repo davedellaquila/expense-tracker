@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031602
+- Transactions bulk bar: All/None buttons now disable intelligently — All is disabled when everything visible is selected, None when nothing is.
 ### App 202610031600
 - All modal dialogs now pin their bottom action bar flush to the sheet's bottom edge in a dedicated footer (same as the bulk update dialog) — transaction form, bill form, Max Headroom editor, AI background generator, budget copy, etc.
 ### App 202610031558
