@@ -474,6 +474,19 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 .selbar{background:var(--card); border:2px solid var(--blue); border-radius:var(--radius);
   box-shadow:0 2px 10px rgba(10,20,15,.08); padding:8px 10px; margin:0 0 12px;
   display:flex; align-items:center; gap:6px; flex-wrap:nowrap;}
+/* Select mode: the filter card and bulk bar merge into one continuous
+   blue-bordered panel — the bar reads as an extension of the card. */
+#txn-filtercard.merged{
+  border:2px solid var(--blue);
+  border-bottom:none;
+  border-radius:var(--radius) var(--radius) 0 0;
+  margin-bottom:0;
+}
+#txn-filtercard.merged ~ .selbar:not(.stuck){
+  margin-top:0;
+  border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);
+}
 .selbar .btn{margin:0;}
 .selbar .btn:disabled{opacity:.45;}
 .selbar .selbar-left{display:flex; align-items:center; gap:6px; flex:none;}
@@ -2696,7 +2709,7 @@ html.bg-paused body::before{
                 </select>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+            <div style="display:flex;align-items:center;gap:6px;margin-top:14px">
               <button class="linkbtn" id="f-select" type="button" style="flex:none" title="Select transactions to update or delete in bulk">Bulk update</button>
               <button class="linkbtn" id="f-tidy" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
               <button class="linkbtn" id="f-export" type="button" style="flex:none">Export CSV</button>
@@ -2725,7 +2738,7 @@ html.bg-paused body::before{
             </select>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-top:14px">
           <button class="linkbtn" id="f-select-stick" type="button" style="flex:none" title="Select transactions to update or delete in bulk">Bulk update</button>
           <button class="linkbtn" id="f-tidy-stick" type="button" style="flex:none" title="Clean up messy merchant names">Tidy</button>
           <button class="linkbtn" id="f-export-stick" type="button" style="flex:none">Export CSV</button>
@@ -3445,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031556';
+var APP_VERSION = '202610031558';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -9081,6 +9094,7 @@ function setTxnSelectMode(on){
   $('f-select-stick').textContent = on ? 'Done' : 'Bulk update';
   $('f-select').classList.toggle('on', on);
   $('f-select-stick').classList.toggle('on', on);
+  $('txn-filtercard').classList.toggle('merged', on);
   var selTip = on ? 'Exit bulk update mode' : 'Select transactions to update or delete in bulk';
   $('f-select').title = selTip; $('f-select-stick').title = selTip;
   $('selbar').hidden = !on;

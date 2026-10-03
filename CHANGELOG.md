@@ -5,6 +5,9 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031558
+- Transactions: in select mode, the filter card and bulk bar now merge into one continuous blue-bordered panel (the bar reads as an extension of the card); tapping Done splits them apart again.
+- Filter card: action row top margin increased to 14px to match the bottom padding.
 ### App 202610031556
 - Bulk update dialog: Cancel/Update now live in a footer pinned flush to the sheet's bottom edge (outside the scroll area) — no more gap, and content can't show through behind the buttons.
 ### App 202610031553
