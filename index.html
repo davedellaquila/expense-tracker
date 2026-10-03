@@ -3333,7 +3333,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030433';
+var APP_VERSION = '202610030435';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -3944,11 +3944,11 @@ function paintBgPresetButtons(){
       });
       var css = '';
       if(type==='solid'){
-        css = 'background:' + p.value + ' !important;';
+        css = 'background:' + p.value + ';';
       }else{
-        css = 'background-color:' + (p.base || DEFAULT_BG) + ' !important;' +
-              'background-image:' + p.value + ' !important;' +
-              (p.size ? 'background-size:' + p.size + ' !important;' : '');
+        css = 'background-color:' + (p.base || DEFAULT_BG) + ';' +
+              'background-image:' + p.value + ';' +
+              (p.size ? 'background-size:' + p.size + ';' : '');
       }
       b.setAttribute('style', css);
       b.addEventListener('click', function(){
