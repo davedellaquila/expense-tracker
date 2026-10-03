@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031615
+- No-transactions note now suggests trying a different period to see transactions.
 ### App 202610031612
 - Budget vs Actual chart: cleaner row layout — category + actual on one line, full-width bars, "vs budget" delta on its own line; no more overlapping text.
 - iPhone tab bar: slimmer (74px vs 96px) — less dead space below the buttons; home-indicator safe area preserved.
