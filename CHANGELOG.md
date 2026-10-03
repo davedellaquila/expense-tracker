@@ -5,6 +5,13 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-02
+### App 202610022357
+- Appearance Customize → Color: **Apply** (and tap the hex) uses the swatch’s current color without reopening the picker.
+- Max Headroom Stripes card: angle can **animate continuously** between lower/upper limits (plus period); fixed angle when Animate is off.
+### App 202610022355
+- iPhone: page backgrounds stay **viewport-fixed** while content scrolls (same as desktop) — static fills use a fixed plate; dynamic `#bg-dynamic` no longer uses negative z-index.
+### App 202610022353
+- Max Headroom editor **locks its open height** so layer pills don’t move the top edge; drag the grab handle to see more.
 ### App 202610022351
 - Max Headroom Grid card: plane rotation can **animate continuously** between a **lower** and **upper** limit (plus period). Fixed rotation remains when Animate is off.
 ### App 202610022340

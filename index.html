@@ -43,6 +43,9 @@
           scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
           beam:'--mh-beam', flicker:'--mh-flicker',
           stripeOn:'--mh-stripe-on', stripeThick:'--mh-stripe-thick', stripeAngle:'--mh-stripe-angle',
+          stripeAngleAnimate:'--mh-stripe-angle-animate',
+          stripeAngleMin:'--mh-stripe-angle-min', stripeAngleMax:'--mh-stripe-angle-max',
+          stripeAngleDur:'--mh-stripe-angle-dur-num',
           stripeOpacity:'--mh-stripe-opacity', stripeDur:'--mh-stripe-dur',
           glitchOn:'--mh-glitch-on', tear:'--mh-tear', glitchDur:'--mh-glitch-dur', rgb:'--mh-rgb',
           noise:'--mh-noise', stutter:'--mh-stutter',
@@ -74,6 +77,11 @@
         root.style.setProperty('--mh-scan-dur', (r.scanDur||1.4)+'s');
         root.style.setProperty('--mh-stripe-thick-px', (r.stripeThick||28)+'px');
         root.style.setProperty('--mh-stripe-angle-deg', (r.stripeAngle||-32)+'deg');
+        var aMin = (r.stripeAngleMin!=null?r.stripeAngleMin:-48), aMax = (r.stripeAngleMax!=null?r.stripeAngleMax:-16);
+        if(aMin>aMax){ var _at=aMin; aMin=aMax; aMax=_at; }
+        root.style.setProperty('--mh-stripe-angle-min-deg', aMin+'deg');
+        root.style.setProperty('--mh-stripe-angle-max-deg', aMax+'deg');
+        root.style.setProperty('--mh-stripe-angle-dur', (r.stripeAngleDur!=null?r.stripeAngleDur:8)+'s');
         root.style.setProperty('--mh-stripe-dur', (r.stripeDur||4)+'s');
         root.style.setProperty('--mh-glitch-dur', (r.glitchDur||2.2)+'s');
         root.style.setProperty('--mh-rgb-px', (r.rgb||6)+'px');
@@ -93,6 +101,7 @@
             st.setAttribute('data-mh-chroma', r.chromaOn===false?'0':'1');
             st.setAttribute('data-vp-move', (r.vpMove && r.gridOn!==false)?'1':'0');
             st.setAttribute('data-grid-rot', (r.gridRotAnimate && r.gridOn!==false)?'1':'0');
+            st.setAttribute('data-stripe-angle', (r.stripeAngleAnimate && r.stripeOn!==false)?'1':'0');
             st.setAttribute('data-grid-rand', ((r.gridRand||0)>0 && r.gridOn!==false)?'1':'0');
           }
         }catch(_e){}
@@ -1183,7 +1192,13 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 .bg-cust-row input[type=color].on{
   box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent); border-color:var(--accent);
 }
-.bg-cust-hex{font-size:12.5px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums;}
+.bg-cust-hex{
+  appearance:none; -webkit-appearance:none; border:0; background:none; padding:4px 2px; margin:0;
+  font:inherit; font-size:12.5px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums;
+  cursor:pointer; border-radius:6px;
+}
+.bg-cust-hex:hover{ color:var(--text); text-decoration:underline; }
+.bg-cust-hex:focus-visible{ outline:2px solid var(--blue-soft); outline-offset:2px; }
 .bg-pic-thumb{
   width:44px; height:32px; border-radius:8px; border:1px solid var(--border);
   background:#edf0f3 center/cover no-repeat; flex:none; overflow:hidden;
@@ -1280,7 +1295,14 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 }
 @media (min-width:520px){ .mh-ed-preview{height:190px;} }
 .mh-ed-preview .mh-custom{ position:absolute; inset:0; display:block; }
-.sheet.mh-ed-sheet .sheet-body{ padding-top:8px; }
+/* Height is locked in JS after open so layer pills don't move the top edge.
+   Flex + margin-top:auto keeps the action bar docked when content shrinks. */
+.sheet.mh-ed-sheet .sheet-body{
+  padding-top:8px;
+  display:flex; flex-direction:column;
+}
+.sheet.mh-ed-sheet .sheet-body > *{ flex:0 0 auto; }
+.sheet.mh-ed-sheet .mh-ed-actions{ margin-top:auto; }
 
 .bg-motion{margin-top:14px; border:1px solid var(--border); border-radius:12px; background:transparent;}
 .bg-motion > summary{
@@ -1360,6 +1382,42 @@ html[data-bg-dynamic] #bg-dynamic{display:block;}
 html[data-bg-dynamic] body{
   background-color:transparent !important;
   background-image:none !important;
+}
+/* iPhone Safari: background-attachment:fixed is ignored, and position:fixed with
+   z-index < 0 scrolls with the page. Paint static bgs on a fixed z-index:0 plate
+   and raise app chrome above it (same viewport-locked feel as desktop). */
+html.iphone body{
+  background-color:transparent;
+  background-image:none;
+}
+html.iphone body::before{
+  content:"";
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-color:var(--page-bg, var(--bg));
+  background-image:var(--bg-extra, none);
+  background-size:var(--bg-size, auto);
+  background-repeat:var(--bg-repeat, repeat);
+  background-position:var(--bg-pos, 0 0);
+  transform:translateZ(0);
+}
+html.iphone[data-bg-dynamic] body::before{ display:none; }
+html.iphone[data-bg-anim="1"] body{
+  animation:none !important;
+}
+html.iphone[data-bg-anim="1"] body::before{
+  background-size:200% 200%;
+  background-repeat:no-repeat;
+  animation:dg-shift 14s ease-in-out infinite;
+}
+html.iphone.bg-paused[data-bg-anim="1"] body::before{ animation:none; }
+html.iphone #bg-dynamic{
+  z-index:0;
+  transform:translateZ(0);
+}
+html.iphone #app,
+html.iphone #setup-screen{
+  position:relative;
+  z-index:1;
 }
 #bg-dynamic .mh-scene{position:absolute; inset:0; display:none;}
 html[data-bg-dynamic="mh-wireframe"] #bg-dynamic .mh-scene[data-mh="mh-wireframe"],
@@ -1641,7 +1699,9 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
   --mh-wash-on:1; --mh-horizon-on:1; --mh-vignette-on:1; --mh-chroma-on:0;
   --mh-scan-on:1; --mh-scan-gap:3; --mh-scan-opacity:.55; --mh-scan-dur:1.4;
   --mh-beam:0.55; --mh-flicker:0.35;
-  --mh-stripe-on:1; --mh-stripe-thick:28; --mh-stripe-angle:-32; --mh-stripe-opacity:.55; --mh-stripe-dur:4;
+  --mh-stripe-on:1; --mh-stripe-thick:28; --mh-stripe-angle:-32; --mh-stripe-angle-deg:-32deg;
+  --mh-stripe-angle-min-deg:-48deg; --mh-stripe-angle-max-deg:-16deg; --mh-stripe-angle-dur:8s;
+  --mh-stripe-opacity:.55; --mh-stripe-dur:4;
   --mh-glitch-on:1; --mh-tear:1; --mh-glitch-dur:2.2; --mh-rgb:6; --mh-noise:.2; --mh-stutter:1;
   --mh-city-on:1; --mh-city-opacity:.85; --mh-city-pulse:2.2; --mh-shape-size:1; --mh-shape-count:1;
 }
@@ -1789,6 +1849,10 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
 @keyframes mhc-beam{ 0%{ top:-20%; } 100%{ top:110%; } }
 @keyframes mhc-flicker{ 0%,100%{ opacity:0; } 30%{ opacity:calc(var(--mh-flicker,.35)*.8); } 60%{ opacity:0; } 85%{ opacity:calc(var(--mh-flicker,.35)); } }
 
+/* Angle is a registered custom property so it can animate between min/max. */
+@property --mh-stripe-angle-deg{
+  syntax:"<angle>"; inherits:true; initial-value:-32deg;
+}
 .mh-custom .mhc-stripes{ opacity:calc(var(--mh-stripe-on,1) * var(--mh-stripe-opacity,.55) * var(--mh-intensity,1)); }
 .mh-custom .mhc-band{
   position:absolute; inset:-40%;
@@ -1802,8 +1866,15 @@ html[data-bg-dynamic="mh-custom"] #bg-dynamic{
 .mh-custom[data-mh-stripe="1"] .mhc-band{
   animation:mhc-stripe-march calc(var(--mh-stripe-dur,4s) / var(--_spd)) linear infinite;
 }
+.mh-custom[data-mh-stripe="1"][data-stripe-angle="1"] .mhc-stripes{
+  animation:mhc-stripe-angle calc(var(--mh-stripe-angle-dur,8s) / var(--_spd)) ease-in-out infinite;
+}
 .mh-custom[data-mh-stripe="1"] .mhc-b2{ opacity:.65; animation-direction:reverse; animation-duration:calc(var(--mh-stripe-dur,4s) * .7 / var(--_spd)); filter:hue-rotate(40deg); }
 @keyframes mhc-stripe-march{ to{ transform:translate3d(120px, 80px, 0); } }
+@keyframes mhc-stripe-angle{
+  0%,100%{ --mh-stripe-angle-deg:var(--mh-stripe-angle-min-deg,-48deg); }
+  50%{ --mh-stripe-angle-deg:var(--mh-stripe-angle-max-deg,-16deg); }
+}
 
 .mh-custom .mhc-glitch{ opacity:calc(var(--mh-glitch-on,1) * var(--mh-intensity,1)); }
 .mh-custom .mhc-slice{
@@ -2187,7 +2258,8 @@ html.bg-paused #bg-dynamic *,
 html.bg-paused .bg-presets-dynamic .mh-thumb *,
 html.bg-paused .bg-presets-journey .mh-thumb *,
 html.bg-paused .bg-presets-dgrad .mh-thumb *,
-html.bg-paused body{
+html.bg-paused body,
+html.bg-paused body::before{
   animation-play-state:paused !important;
 }
 @media (prefers-reduced-motion: reduce){
@@ -2195,7 +2267,8 @@ html.bg-paused body{
   .bg-presets-dynamic .mh-thumb *,
   .bg-presets-journey .mh-thumb *,
   .bg-presets-dgrad .mh-thumb *,
-  html[data-bg-anim="1"] body{
+  html[data-bg-anim="1"] body,
+  html.iphone[data-bg-anim="1"] body::before{
     animation:none !important;
   }
   .mh-glitch .mh-slice{ opacity:.45; }
@@ -3036,8 +3109,9 @@ html.bg-paused body{
                 <div class="bg-cust-row">
                   <div class="bg-cust-kicker">Color</div>
                   <div class="bg-cust-actions">
-                    <input type="color" id="set-bg" value="#f3f5f7" title="Pick any color" aria-label="Custom background color">
-                    <span class="bg-cust-hex" id="set-bg-hex">#f3f5f7</span>
+                    <input type="color" id="set-bg" value="#f3f5f7" title="Open color picker" aria-label="Custom background color">
+                    <button type="button" class="bg-cust-hex" id="set-bg-hex" title="Apply this color">#f3f5f7</button>
+                    <button type="button" class="btn small" id="set-bg-apply" title="Apply the color shown in the swatch">Apply</button>
                   </div>
                 </div>
                 <div class="bg-cust-row" style="align-items:start">
@@ -3306,7 +3380,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022351';
+var APP_VERSION = '202610022357';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -4308,7 +4382,9 @@ function mhDefaultRecipe(){
     gridRot:0, gridRotAnimate:false, gridRotMin:-18, gridRotMax:18, gridRotDur:8,
     vpX:50, vpY:47, vpMove:false, vpAmp:8, vpDur:6, gridRand:0,
     scanOn:true, scanGap:3, scanOpacity:0.55, scanDur:1.4, beam:0.55, flicker:0.35,
-    stripeOn:true, stripeThick:28, stripeAngle:-32, stripeOpacity:0.55, stripeDur:4,
+    stripeOn:true, stripeThick:28, stripeAngle:-32,
+    stripeAngleAnimate:false, stripeAngleMin:-48, stripeAngleMax:-16, stripeAngleDur:8,
+    stripeOpacity:0.55, stripeDur:4,
     glitchOn:true, tear:1, glitchDur:2.2, rgb:6, noise:0.2, stutter:1,
     cityOn:true, cityOpacity:0.85, cityPulse:2.2, shapeSize:1, shapeCount:1
   };
@@ -4326,6 +4402,9 @@ var MH_CSS_MAP = {
   scanOn:'--mh-scan-on', scanGap:'--mh-scan-gap', scanOpacity:'--mh-scan-opacity', scanDur:'--mh-scan-dur',
   beam:'--mh-beam', flicker:'--mh-flicker',
   stripeOn:'--mh-stripe-on', stripeThick:'--mh-stripe-thick', stripeAngle:'--mh-stripe-angle',
+  stripeAngleAnimate:'--mh-stripe-angle-animate',
+  stripeAngleMin:'--mh-stripe-angle-min', stripeAngleMax:'--mh-stripe-angle-max',
+  stripeAngleDur:'--mh-stripe-angle-dur-num',
   stripeOpacity:'--mh-stripe-opacity', stripeDur:'--mh-stripe-dur',
   glitchOn:'--mh-glitch-on', tear:'--mh-tear', glitchDur:'--mh-glitch-dur', rgb:'--mh-rgb',
   noise:'--mh-noise', stutter:'--mh-stutter',
@@ -4338,7 +4417,8 @@ function clearMhCssVars(){
   ['--mh-grid-size-px','--mh-grid-thick-px','--mh-grid-persp-px','--mh-grid-depth-deg','--mh-grid-dur',
    '--mh-grid-rot-deg','--mh-grid-rot-min-deg','--mh-grid-rot-max-deg','--mh-grid-rot-dur',
    '--mh-vp-x','--mh-vp-y','--mh-vp-amp','--mh-vp-dur',
-   '--mh-scan-gap-px','--mh-scan-dur','--mh-stripe-thick-px','--mh-stripe-angle-deg','--mh-stripe-dur',
+   '--mh-scan-gap-px','--mh-scan-dur','--mh-stripe-thick-px','--mh-stripe-angle-deg',
+   '--mh-stripe-angle-min-deg','--mh-stripe-angle-max-deg','--mh-stripe-angle-dur','--mh-stripe-dur',
    '--mh-glitch-dur','--mh-rgb-px','--mh-city-pulse'].forEach(function(p){ root.style.removeProperty(p); });
 }
 function normalizeMhRecipe(raw){
@@ -4356,9 +4436,11 @@ function normalizeMhRecipe(raw){
       r[k] = /^#[0-9a-fA-F]{6}$/.test(hx) ? hx.toLowerCase() : d[k];
     }
   });
-  if(r.gridRotMin > r.gridRotMax){
-    var swap = r.gridRotMin; r.gridRotMin = r.gridRotMax; r.gridRotMax = swap;
-  }
+  [['gridRotMin','gridRotMax'],['stripeAngleMin','stripeAngleMax']].forEach(function(pair){
+    if(r[pair[0]] > r[pair[1]]){
+      var swap = r[pair[0]]; r[pair[0]] = r[pair[1]]; r[pair[1]] = swap;
+    }
+  });
   return r;
 }
 function syncMhLayerFlags(host, recipe){
@@ -4380,6 +4462,7 @@ function syncMhLayerFlags(host, recipe){
     n.setAttribute('data-mh-chroma', r.chromaOn?'1':'0');
     n.setAttribute('data-vp-move', (r.vpMove && r.gridOn)?'1':'0');
     n.setAttribute('data-grid-rot', (r.gridRotAnimate && r.gridOn)?'1':'0');
+    n.setAttribute('data-stripe-angle', (r.stripeAngleAnimate && r.stripeOn)?'1':'0');
     n.setAttribute('data-grid-rand', (r.gridRand>0 && r.gridOn)?'1':'0');
     n.setAttribute('data-mh-all-off', anyOn?'0':'1');
   });
@@ -4409,6 +4492,9 @@ function applyMhVarsTo(el, recipe){
   el.style.setProperty('--mh-scan-dur', r.scanDur+'s');
   el.style.setProperty('--mh-stripe-thick-px', r.stripeThick+'px');
   el.style.setProperty('--mh-stripe-angle-deg', r.stripeAngle+'deg');
+  el.style.setProperty('--mh-stripe-angle-min-deg', r.stripeAngleMin+'deg');
+  el.style.setProperty('--mh-stripe-angle-max-deg', r.stripeAngleMax+'deg');
+  el.style.setProperty('--mh-stripe-angle-dur', r.stripeAngleDur+'s');
   el.style.setProperty('--mh-stripe-dur', r.stripeDur+'s');
   el.style.setProperty('--mh-glitch-dur', r.glitchDur+'s');
   el.style.setProperty('--mh-rgb-px', r.rgb+'px');
@@ -4519,7 +4605,11 @@ var MH_LAYER_PILLS = [
   ]},
   {id:'stripe', label:'Stripes', onKey:'stripeOn', fields:[
     {key:'stripeThick', label:'Thickness', type:'range', min:10, max:60, step:1},
-    {key:'stripeAngle', label:'Angle', type:'range', min:-60, max:60, step:1},
+    {key:'stripeAngle', label:'Angle (fixed)', type:'range', min:-80, max:80, step:1},
+    {key:'stripeAngleAnimate', label:'Animate angle', type:'toggle'},
+    {key:'stripeAngleMin', label:'Angle lower limit', type:'range', min:-80, max:80, step:1},
+    {key:'stripeAngleMax', label:'Angle upper limit', type:'range', min:-80, max:80, step:1},
+    {key:'stripeAngleDur', label:'Angle period (s)', type:'range', min:2, max:20, step:0.5},
     {key:'stripeOpacity', label:'Blend strength', type:'range', min:0, max:1, step:0.01},
     {key:'stripeDur', label:'March period (s)', type:'range', min:1, max:10, step:0.1}
   ]},
@@ -4701,6 +4791,7 @@ function openMhEditor(editItem){
           syncControl('gridRotAnimate', false);
         }
       }
+      if(layer.id==='stripe' && !on) syncControl('stripeAngleAnimate', false);
     }
     function syncPillUi(){
       var anyOff = false, anyOn = false;
@@ -4797,6 +4888,14 @@ function openMhEditor(editItem){
     actions.appendChild(resetBtn);
     actions.appendChild(cancelBtn);
     sh.appendChild(actions);
+    /* Lock height after openSheet finishes padStickyBars — layer toggles must
+       not move the top edge; user can drag the grab handle to grow/shrink. */
+    setTimeout(function(){
+      if(!sheetEl || !sheetEl.isConnected) return;
+      if(sheetEl.style.height) return; /* user already dragged */
+      var h = Math.round(sheetEl.getBoundingClientRect().height);
+      if(h > 0) sheetEl.style.height = h + 'px';
+    }, 0);
   }, function(){
     restorePrevBg();
     if(sheetClose) sheetClose();
@@ -7233,6 +7332,12 @@ function wireSettings(){
     var hx = $('set-bg-hex');
     if(hx && bgPick) hx.textContent = (bgPick.value||'').toLowerCase();
   }
+  function applyPickerColor(){
+    if(!bgPick) return;
+    setBg(bgPick.value);
+    syncBgHex();
+    toast('Background updated.');
+  }
   if(bgPick){
     bgPick.addEventListener('input', function(){ setBg(bgPick.value); syncBgHex(); });
     bgPick.addEventListener('change', function(){
@@ -7241,6 +7346,10 @@ function wireSettings(){
     });
     syncBgHex();
   }
+  var bgApply = $('set-bg-apply');
+  if(bgApply) bgApply.addEventListener('click', applyPickerColor);
+  var bgHex = $('set-bg-hex');
+  if(bgHex) bgHex.addEventListener('click', applyPickerColor);
   var bgReset = $('set-bg-reset');
   if(bgReset) bgReset.addEventListener('click', function(){
     setBgConfig(null);
