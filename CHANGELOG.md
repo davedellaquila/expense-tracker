@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031556
+- Bulk update dialog: Cancel/Update now live in a footer pinned flush to the sheet's bottom edge (outside the scroll area) — no more gap, and content can't show through behind the buttons.
 ### App 202610031553
 - What's new dialog on iPhone: body text now 20px.
 - Transactions bulk bar: removed the redundant circle × (the filter card's Done button already exits select mode).
