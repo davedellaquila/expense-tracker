@@ -214,10 +214,10 @@ body{
 .card-drop-ph{ border:2px dashed var(--accent); border-radius:var(--radius);
   margin:0 0 12px; background:rgba(127,127,127,.08); }
 /* Settings card collapse toggle: round button like the other round buttons. */
-.set-collapse{ flex:none; width:44px; height:44px; border-radius:50%; border:none; cursor:pointer; padding:0;
-  background:rgba(127,127,127,.18); color:var(--muted);
-  font-size:24px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
-.set-collapse:hover{ color:var(--text); }
+.set-collapse{ flex:none; width:48px; height:48px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  background:rgba(127,127,127,.32); color:var(--text);
+  font-size:28px; font-weight:700; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+.set-collapse:hover{ background:rgba(127,127,127,.45); }
 /* Collapsed: hide everything except the header row */
 .card[data-setcard].set-collapsed > :not(.set-chead):not(.set-card-head){ display:none; }
 .card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead){ display:none; }
@@ -3324,7 +3324,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030318';
+var APP_VERSION = '202610030322';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -8043,7 +8043,7 @@ function wireSetCards(){
     h2.style.flex = '1';
     /* Collapse toggle: chevron at the right of the header. */
     var chev = el('button',{class:'set-collapse no-print', type:'button',
-      title:'Collapse '+(SET_CARD_NAMES[key]||key), 'aria-label':'Collapse '+(SET_CARD_NAMES[key]||key)},'\u25be');
+      title:'Collapse '+(SET_CARD_NAMES[key]||key), 'aria-label':'Collapse '+(SET_CARD_NAMES[key]||key)},'\u25bc');
     chev.addEventListener('click', function(e){
       e.stopPropagation();
       var collapsed = setCollapsed();
@@ -8086,7 +8086,7 @@ function applySetCollapsed(){
     card.classList.toggle('set-collapsed', isCol);
     var chev = card.querySelector('.set-collapse');
     if(chev){
-      chev.textContent = isCol ? '\u25b8' : '\u25be';
+      chev.textContent = isCol ? '\u25b6' : '\u25bc';
       chev.title = (isCol ? 'Expand ' : 'Collapse ') + (SET_CARD_NAMES[key]||key);
       chev.setAttribute('aria-label', chev.title);
     }
