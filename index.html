@@ -484,12 +484,6 @@ main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)
 /* Update and Delete share the middle zone, spread evenly between Clear and the
    far-right xmark so both buttons have breathing room. */
 .selbar .selbar-mid{flex:1; display:flex; align-items:center; justify-content:space-evenly; min-width:0;}
-/* bulk-update bar dismiss: compact xmark at the bar's far right, kept well
-   clear of Delete to avoid mis-taps */
-.selbar #selbar-done{flex:none; width:34px; height:34px; padding:0; margin-left:14px;
-  border-radius:50%; border:1px solid var(--border); background:var(--bg); color:var(--muted);
-  font-size:16px; line-height:1; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center;}
 /* docked: while the floating sticky card is visible, the bulk-update bar
    becomes an attached section inside it */
 .selbar.stuck{
@@ -1008,11 +1002,11 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    Buttons that stay on screen (FAB, search clear) ease back on release;
    sheet ✕ / card ✕ use .press-out + a matching delay so the fade finishes as
    the sheet dismisses or the card is removed. */
-.sheet-x, .card-x, #selbar-done, .fab, .clearbtn, .set-collapse{
+.sheet-x, .card-x, .fab, .clearbtn, .set-collapse{
   transition:transform .15s ease-out, opacity .15s ease-out;
 }
-.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active, .set-collapse:active,
-.sheet-x.press-out, .card-x.press-out, #selbar-done.press-out{
+.sheet-x:active, .card-x:active, .fab:active, .set-collapse:active,
+.sheet-x.press-out, .card-x.press-out{
   transform:scale(1.5); opacity:0;
 }
 .clearbtn:active, .clearbtn.press-out{
@@ -1116,7 +1110,7 @@ table.ptable.fit th, table.ptable.fit td{padding-left:4px; padding-right:4px;}
 /* iPhone: What's-new type matches the normal app text size for readability */
 html.iphone #updNews .updNews-head h2{font-size:20px;}
 html.iphone #updNews .updNews-sub{font-size:15px;}
-html.iphone #updNews .updNews-body{font-size:18px;line-height:1.45;}
+html.iphone #updNews .updNews-body{font-size:20px;line-height:1.45;}
 html.iphone #updNews .updNews-body h2{font-size:18px;}
 #updNews .updNews-body h3{font-size:15px;margin:14px 0 6px;}
 #updNews .updNews-body h4{font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px;}
@@ -2750,7 +2744,6 @@ html.bg-paused body::before{
           <button class="btn small" id="selbar-update" type="button">Update&hellip;</button>
           <button class="row-del" id="selbar-delete" type="button" title="Delete selected" aria-label="Delete selected transactions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
         </div>
-        <button id="selbar-done" type="button" aria-label="Done">&#10005;</button>
       </div>
       <div id="txn-list"></div>
       <button class="fab" id="txn-add" aria-label="Add transaction" title="Add transaction">+</button>
@@ -3453,7 +3446,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031550';
+var APP_VERSION = '202610031553';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -9032,7 +9025,6 @@ function wireTransactions(){
     if(!ids.length){ toast('No transactions selected.', true); return; }
     openBulkUpdate(ids);
   });
-  $('selbar-done').addEventListener('click', function(){ setTxnSelectMode(false); });
   // drop the soft-in class once its animation finishes, so later label
   // changes can tell "appearing" apart from "already visible"
   $('selbar').addEventListener('animationend', function(e){
@@ -9148,7 +9140,7 @@ function updateSelbar(){
      reduced motion. */
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var items = (!reduceMotion && bar && !bar.hidden && !bar.classList.contains('soft-in'))
-    ? [bar.querySelector('.selbar-left'), btn, bar.querySelector('.selbar-mid'), bar.querySelector('#selbar-done')] : null;
+    ? [bar.querySelector('.selbar-left'), btn, bar.querySelector('.selbar-mid')] : null;
   var before = items ? items.map(function(el){
     var r = el.getBoundingClientRect(); return {left:r.left, top:r.top};
   }) : null;

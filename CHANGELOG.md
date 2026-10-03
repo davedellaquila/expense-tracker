@@ -5,6 +5,9 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031553
+- What's new dialog on iPhone: body text now 20px.
+- Transactions bulk bar: removed the redundant circle × (the filter card's Done button already exits select mode).
 ### App 202610031550
 - What's new dialog on iPhone: type now matches the normal app text size (18px body) instead of the smaller dialog scale.
 ### App 202610031549
