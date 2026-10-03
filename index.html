@@ -2698,7 +2698,7 @@ html.bg-paused body::before{
               </div>
               <div style="flex:none;width:132px">
                 <label class="f" style="margin-top:0" for="f-sort">Sort</label>
-                <select id="f-sort" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
+                <select id="f-sort" aria-label="Sort transactions" style="width:100%;min-width:0">
                     <option value="date-desc" selected>Newest</option>
                     <option value="date-asc">Oldest</option>
                     <option value="amount-desc">Amount ↓</option>
@@ -2727,7 +2727,7 @@ html.bg-paused body::before{
           </div>
           <div style="flex:none;width:132px">
             <label class="f" style="margin-top:0" for="f-sort-stick">Sort</label>
-            <select id="f-sort-stick" aria-label="Sort transactions" style="width:100%;min-width:0;font-size:14px;padding:9px 6px">
+            <select id="f-sort-stick" aria-label="Sort transactions" style="width:100%;min-width:0">
               <option value="date-desc" selected>Newest</option>
               <option value="date-asc">Oldest</option>
               <option value="amount-desc">Amount ↓</option>
@@ -3457,7 +3457,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031622';
+var APP_VERSION = '202610031624';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */

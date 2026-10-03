@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031624
+- Transactions Sort dropdown now matches the height of the other filter dropdowns.
 ### App 202610031622
 - Spend Pareto and Trend chart legends: the second legend label now starts after the measured width of the first, so they can't overlap on iPhone.
 - Drill pill now shows the signed sum of the currently shown transactions.
