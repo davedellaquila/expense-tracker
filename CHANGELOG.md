@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030326
+- Settings: the card collapse button now sits at the far right of the header, outside any card controls (e.g. after Data cleanup's Scan button).
 ### App 202610030324
 - What's New button pulse is now more noticeable (larger scale + glow) when an update is available.
 ### App 202610030322

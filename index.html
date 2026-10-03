@@ -220,7 +220,7 @@ body{
 .set-collapse:hover{ background:rgba(127,127,127,.45); }
 /* Collapsed: hide everything except the header row */
 .card[data-setcard].set-collapsed > :not(.set-chead):not(.set-card-head){ display:none; }
-.card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead){ display:none; }
+.card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead):not(.set-collapse){ display:none; }
 .card-dragging{ position:fixed !important; z-index:70; pointer-events:none;
   opacity:.95; box-shadow:0 14px 34px rgba(0,0,0,.35); margin:0 !important; }
 .rep-svg text{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
@@ -3324,7 +3324,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030324';
+var APP_VERSION = '202610030326';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -8041,7 +8041,7 @@ function wireSetCards(){
     head.appendChild(h2);
     h2.style.margin = '0';
     h2.style.flex = '1';
-    /* Collapse toggle: chevron at the right of the header. */
+    /* Collapse toggle: at the far right of the header, outside any card controls. */
     var chev = el('button',{class:'set-collapse no-print', type:'button',
       title:'Collapse '+(SET_CARD_NAMES[key]||key), 'aria-label':'Collapse '+(SET_CARD_NAMES[key]||key)},'\u25bc');
     chev.addEventListener('click', function(e){
@@ -8052,7 +8052,12 @@ function wireSetCards(){
       saveSetCollapsed(collapsed);
       applySetCollapsed();
     });
-    head.appendChild(chev);
+    /* If the card has its own header row with controls (e.g. Data cleanup's
+       Scan button), the collapse button goes last in that row; otherwise it
+       goes last in the title wrapper. */
+    var cardHead = card.querySelector(':scope > .set-card-head');
+    if(cardHead) cardHead.appendChild(chev);
+    else head.appendChild(chev);
   });
   wireCardReorder({
     container: sec,
