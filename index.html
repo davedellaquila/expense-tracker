@@ -3407,7 +3407,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030642';
+var APP_VERSION = '202610031406';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -16451,7 +16451,7 @@ function renderTaxGroup(node, rows, drillBase){
     grand += groups[k].total;
     var r = el('div',{class:'rowline rep-click'});
     r.appendChild(el('span',null, k+' ('+groups[k].count+')'));
-    r.appendChild(el('b',null,money(groups[k].total)));
+    r.appendChild(el('span',null,money(groups[k].total)));
     // Tapping a row opens its transactions for the tax year.
     r.addEventListener('click', function(){
       drillToTransactions({from:drillBase.from, to:drillBase.to, type:'expense', bp:drillBase.bp, taxCat:k});
@@ -16460,7 +16460,7 @@ function renderTaxGroup(node, rows, drillBase){
   });
   var g = el('div',{class:'rowline gtotal'});
   g.appendChild(el('span',null,'Total'));
-  g.appendChild(el('span',null,money(grand)));
+  g.appendChild(el('b',null,money(grand)));
   node.appendChild(g);
 }
 function renderTax(){

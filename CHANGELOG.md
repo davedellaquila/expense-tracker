@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031406
+- Tax: category amounts are now plain weight; only the Total is bold.
 ### App 202610030642
 - Appearance Customize → Color: **Apply** (and tap the hex) uses the swatch’s current color without reopening the picker.
 - Max Headroom Stripes card: angle can **animate continuously** between lower/upper limits (plus period); fixed angle when Animate is off.
