@@ -890,10 +890,10 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ---------- iPhone layout refinements (≤560px) ---------- */
 @media (max-width:560px){
   /* tab bar: 50% bigger icons/text; scroll sideways to reach every tab */
-  :root{--tabbar-h:96px;}
+  :root{--tabbar-h:74px;}
   .tabbar{overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
   .tabbar::-webkit-scrollbar{display:none;}
-  .tabbar button{flex:none; min-width:72px; font-size:16px; gap:4px; padding:8px 0 10px;}
+  .tabbar button{flex:none; min-width:72px; font-size:16px; gap:4px; padding:4px 0 6px;}
   .tabbar button svg{width:33px; height:33px;}
   /* home stat tiles: stay 3-across, compact */
   .stat{padding:8px 6px;}
@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031609';
+var APP_VERSION = '202610031612';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -8033,7 +8033,7 @@ function renderDashboard(){
       });
       _dChipBox.appendChild(_b);
     });
-    if(!_dAllCats.length) _dChipBox.appendChild(el('span',{class:'muted',style:'font-size:13px;align-self:center'},'No transactions in this period, so there are no categories to show.'));
+    if(!_dAllCats.length) _dChipBox.appendChild(el('span',{class:'muted',style:'font-size:13px;align-self:center;flex:1;min-width:140px'},'No transactions in this period, so there are no categories to show.'));
   }
   setDashCatCollapsed(dashCatCollapsed()); // keep collapsed state across re-renders
   if(dashCatSel.length){
@@ -15680,30 +15680,30 @@ function repHBars(el, items, color, emptyMsg, onBar){
    the category's transactions, like the other report charts. */
 function repBudgetActual(el, items, onBar){
   if(!items.length){ emptyInto(el,'🎯','No budgets set for this period. Add some under Budget.'); return; }
-  var PH=repPhone(), W=720, labelW=PH?270:168, rowH=PH?78:54, top=32, bot=8;
+  var PH=repPhone(), W=720, rowH=PH?92:68, top=34, bot=10;
   var H = top + items.length*rowH + bot;
   var max = 1;
   items.forEach(function(it){ max = Math.max(max, it.budget, it.actual); });
-  var plotW = W-labelW-150;
+  var trackW = W-8;
   var svg = '<g font-size="12">'+
-    '<rect x="'+labelW+'" y="6" width="12" height="12" rx="3" fill="'+REP_TEAL+'"/>'+
-    '<text x="'+(labelW+18)+'" y="16" class="cx-text">Budget</text>'+
-    '<rect x="'+(labelW+96)+'" y="6" width="12" height="12" rx="3" fill="'+REP_CORAL+'"/>'+
-    '<text x="'+(labelW+114)+'" y="16" class="cx-text">Actual</text></g>';
+    '<rect x="0" y="6" width="12" height="12" rx="3" fill="'+REP_TEAL+'"/>'+
+    '<text x="18" y="16" class="cx-text">Budget</text>'+
+    '<rect x="100" y="6" width="12" height="12" rx="3" fill="'+REP_CORAL+'"/>'+
+    '<text x="118" y="16" class="cx-text">Actual</text></g>';
   items.forEach(function(it, i){
     var y = top + i*rowH;
-    var bw = Math.max(2, (it.budget/max)*plotW), aw = Math.max(2, (it.actual/max)*plotW);
-    var tMax=PH?16:22;
+    var bw = Math.max(2, (it.budget/max)*trackW), aw = Math.max(2, (it.actual/max)*trackW);
+    var tMax=PH?30:44;
     var nm = it.name.length>tMax ? it.name.slice(0,tMax-1)+'…' : it.name;
     var over = it.actual > it.budget, v = it.actual - it.budget;
     var cls = onBar ? ' class="rep-click" data-bar="'+i+'"' : '';
     svg += '<g>'+
-      '<text x="0" y="'+(y+24)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
-      '<rect x="'+labelW+'" y="'+y+'" width="'+plotW+'" height="42" rx="8" class="cx-track"/>'+
-      '<rect x="'+labelW+'" y="'+(y+5)+'" width="'+Math.round(bw)+'" height="14" rx="7" fill="'+REP_TEAL+'" opacity="0.9"'+cls+'><title>'+esc(it.name)+' budget: '+money(it.budget)+'</title></rect>'+
-      '<rect x="'+labelW+'" y="'+(y+23)+'" width="'+Math.round(aw)+'" height="14" rx="7"'+(over?' style="fill:var(--danger)"':' fill="'+REP_GREEN+'"')+' opacity="0.9"'+cls+'><title>'+esc(it.name)+' actual: '+money(it.actual)+'</title></rect>'+
-      '<text x="'+(W-4)+'" y="'+(y+17)+'" text-anchor="end" font-size="12" class="cx-text">'+money(it.actual)+'</text>'+
-      '<text x="'+(W-4)+'" y="'+(y+35)+'" text-anchor="end" font-size="12" class="'+(over?'cx-neg':'cx-faint')+'">'+(v>0?'+':'')+money(v)+' vs budget</text>'+
+      '<text x="0" y="'+(y+18)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
+      '<text x="'+(W-4)+'" y="'+(y+18)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+money(it.actual)+'</text>'+
+      '<rect x="0" y="'+(y+26)+'" width="'+trackW+'" height="34" rx="8" class="cx-track"/>'+
+      '<rect x="0" y="'+(y+30)+'" width="'+Math.round(bw)+'" height="11" rx="5.5" fill="'+REP_TEAL+'" opacity="0.9"'+cls+'><title>'+esc(it.name)+' budget: '+money(it.budget)+'</title></rect>'+
+      '<rect x="0" y="'+(y+45)+'" width="'+Math.round(aw)+'" height="11" rx="5.5"'+(over?' style="fill:var(--danger)"':' fill="'+REP_GREEN+'"')+' opacity="0.9"'+cls+'><title>'+esc(it.name)+' actual: '+money(it.actual)+'</title></rect>'+
+      '<text x="'+(W-4)+'" y="'+(y+78)+'" text-anchor="end" font-size="11" class="'+(over?'cx-neg':'cx-faint')+'">'+(v>0?'+':'')+money(v)+' vs budget</text>'+
       '</g>';
   });
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
@@ -16100,7 +16100,7 @@ function renderReports(){
       });
       _chipBox.appendChild(_b);
     });
-    if(!_allCats.length) _chipBox.appendChild(el('span',{class:'muted',style:'font-size:13px;align-self:center'},'No transactions in this period, so there are no categories to show.'));
+    if(!_allCats.length) _chipBox.appendChild(el('span',{class:'muted',style:'font-size:13px;align-self:center;flex:1;min-width:140px'},'No transactions in this period, so there are no categories to show.'));
   }
   setRepCatCollapsed(repCatCollapsed()); // keep collapsed state across re-renders
   if(repCatSel.length){
