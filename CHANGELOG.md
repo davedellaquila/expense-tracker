@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031513
+- Tax: new **Business income** card showing business income by category (with counts and totals), plus its own Download CSV. Tapping a row drills into those transactions.
 ### App 202610031507
 - Tax: fixed blank **CPA report PDF** — the report is now rendered visibly in the page (html2canvas can't capture off-screen elements) before generating the PDF.
 ### App 202610031505

@@ -2915,6 +2915,11 @@ html.bg-paused body::before{
         <div style="margin-top:10px"><button class="btn small ghost" id="tax-csv-biz">Download CSV</button></div>
       </div>
       <div class="card">
+        <h2>Business income</h2>
+        <div id="tax-bizinc"></div>
+        <div style="margin-top:10px"><button class="btn small ghost" id="tax-csv-bizinc">Download CSV</button></div>
+      </div>
+      <div class="card">
         <h2>Personal deductions</h2>
         <div id="tax-per"></div>
         <div style="margin-top:10px"><button class="btn small ghost" id="tax-csv-per">Download CSV</button></div>
@@ -3428,7 +3433,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031507';
+var APP_VERSION = '202610031513';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -15466,6 +15471,13 @@ function wireTax(){
     });
     downloadCsv('personal-tax-'+y+'.csv', TXN_HEADERS, rows);
   });
+  $('tax-csv-bizinc').addEventListener('click', function(){
+    var y = $('tax-year').value;
+    var rows = state.transactions.filter(function(t){
+      return String(t.date||'').slice(0,4)===String(y) && t.txn_type==='income' && t.business_personal==='Business';
+    });
+    downloadCsv('business-income-'+y+'.csv', TXN_HEADERS, rows);
+  });
 }
 var PERSONAL_DEDUCTION_CATS = ['Mortgage interest','Property tax (SALT)','Charitable contributions','Medical expenses'];
 
@@ -16460,9 +16472,11 @@ function statHtml(label, value, cls, sub, attr){
 function renderTaxGroup(node, rows, drillBase){
   node.innerHTML='';
   if(!rows.length){ emptyInto(node,'🧾','Nothing here for this year.'); return; }
+  var gk = drillBase.groupKey || 'tax_category';
+  var dtype = drillBase.type || 'expense';
   var groups = {};
   rows.forEach(function(t){
-    var k = t.tax_category || 'Uncategorized';
+    var k = t[gk] || 'Uncategorized';
     if(!groups[k]) groups[k]={count:0,total:0};
     groups[k].count++; groups[k].total += num(t.amount);
   });
@@ -16475,7 +16489,9 @@ function renderTaxGroup(node, rows, drillBase){
     r.appendChild(el('span',null,money(groups[k].total)));
     // Tapping a row opens its transactions for the tax year.
     r.addEventListener('click', function(){
-      drillToTransactions({from:drillBase.from, to:drillBase.to, type:'expense', bp:drillBase.bp, taxCat:k});
+      var d = {from:drillBase.from, to:drillBase.to, type:dtype, bp:drillBase.bp};
+      if(gk==='tax_category') d.taxCat = k; else d.dispCats = [k];
+      drillToTransactions(d);
     });
     node.appendChild(r);
   });
@@ -16493,7 +16509,11 @@ function renderTax(){
     return String(t.date||'').slice(0,4)===y && t.txn_type==='expense' && t.business_personal==='Personal' &&
       (PERSONAL_DEDUCTION_CATS.indexOf(t.tax_category)!==-1);
   });
+  var bizInc = state.transactions.filter(function(t){
+    return String(t.date||'').slice(0,4)===y && t.txn_type==='income' && t.business_personal==='Business';
+  });
   renderTaxGroup($('tax-biz'), biz, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business · '+y});
+  renderTaxGroup($('tax-bizinc'), bizInc, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business income · '+y, type:'income', groupKey:'category'});
   renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y});
 }
 // --- CPA report: print-optimized summary (category totals, no transaction detail) ---
