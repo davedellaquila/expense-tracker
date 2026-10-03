@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030344
+- Settings: the build stamp at the bottom now shows the actual app version number, so you can verify what version you're running.
 ### App 202610030340
 - Settings: collapse button triangle is now 50% smaller (button stays the same size).
 ### App 202610030333
