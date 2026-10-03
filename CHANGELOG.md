@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-03
+### App 202610030315
+- Settings: the collapse chevron is now a 44px round button with a larger symbol, matching the other round buttons' press animation.
 ## 2026-10-02
 ### App 202610022356
 - Settings: cards are now collapsible too — tap the chevron in any card header to collapse/expand it. Collapsed state is saved on this device.

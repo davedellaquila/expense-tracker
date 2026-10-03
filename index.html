@@ -213,10 +213,11 @@ body{
 .card-grip:active{ cursor:grabbing; color:var(--text); }
 .card-drop-ph{ border:2px dashed var(--accent); border-radius:var(--radius);
   margin:0 0 12px; background:rgba(127,127,127,.08); }
-/* Settings card collapse toggle */
-.set-collapse{ flex:none; width:36px; height:36px; border:0; background:none; cursor:pointer;
-  color:var(--muted); font-size:18px; line-height:1; border-radius:8px; padding:0; }
-.set-collapse:hover{ color:var(--text); background:rgba(127,127,127,.12); }
+/* Settings card collapse toggle: round button like the other round buttons. */
+.set-collapse{ flex:none; width:44px; height:44px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  background:rgba(127,127,127,.18); color:var(--muted);
+  font-size:24px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+.set-collapse:hover{ color:var(--text); }
 /* Collapsed: hide everything except the header row */
 .card[data-setcard].set-collapsed > :not(.set-chead):not(.set-card-head){ display:none; }
 .card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead){ display:none; }
@@ -971,10 +972,10 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    Buttons that stay on screen (FAB, search clear) ease back on release;
    sheet ✕ / card ✕ use .press-out + a matching delay so the fade finishes as
    the sheet dismisses or the card is removed. */
-.sheet-x, .card-x, #selbar-done, .fab, .clearbtn{
+.sheet-x, .card-x, #selbar-done, .fab, .clearbtn, .set-collapse{
   transition:transform .15s ease-out, opacity .15s ease-out;
 }
-.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active,
+.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active, .set-collapse:active,
 .sheet-x.press-out, .card-x.press-out, #selbar-done.press-out{
   transform:scale(1.5); opacity:0;
 }
@@ -3323,7 +3324,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022356';
+var APP_VERSION = '202610030315';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
