@@ -2924,6 +2924,11 @@ html.bg-paused body::before{
         <div id="tax-per"></div>
         <div style="margin-top:10px"><button class="btn small ghost" id="tax-csv-per">Download CSV</button></div>
       </div>
+      <div class="card">
+        <h2>Personal income</h2>
+        <div id="tax-perinc"></div>
+        <div style="margin-top:10px"><button class="btn small ghost" id="tax-csv-perinc">Download CSV</button></div>
+      </div>
       <div class="card"><p class="muted" style="margin:0">Note: deductible business meals are generally only 50% deductible. Amounts above are shown in full — apply the 50% limit on your return.</p></div>
     </section>
 
@@ -3433,7 +3438,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031536';
+var APP_VERSION = '202610031539';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -15485,6 +15490,13 @@ function wireTax(){
     });
     downloadCsv('business-income-'+y+'.csv', TXN_HEADERS, rows);
   });
+  $('tax-csv-perinc').addEventListener('click', function(){
+    var y = $('tax-year').value;
+    var rows = state.transactions.filter(function(t){
+      return String(t.date||'').slice(0,4)===String(y) && t.txn_type==='income' && t.business_personal==='Personal';
+    });
+    downloadCsv('personal-income-'+y+'.csv', TXN_HEADERS, rows);
+  });
 }
 var PERSONAL_DEDUCTION_CATS = ['Mortgage interest','Property tax (SALT)','Charitable contributions','Medical expenses'];
 
@@ -16525,9 +16537,13 @@ function renderTax(){
   var bizInc = state.transactions.filter(function(t){
     return String(t.date||'').slice(0,4)===y && t.txn_type==='income' && t.business_personal==='Business';
   });
+  var perInc = state.transactions.filter(function(t){
+    return String(t.date||'').slice(0,4)===y && t.txn_type==='income' && t.business_personal==='Personal';
+  });
   renderTaxGroup($('tax-biz'), biz, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business · '+y});
   renderTaxGroup($('tax-bizinc'), bizInc, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business income · '+y, type:'income', groupKey:'category'});
   renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y, taxCats: PERSONAL_DEDUCTION_CATS.slice()});
+  renderTaxGroup($('tax-perinc'), perInc, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal income · '+y, type:'income', groupKey:'category'});
 }
 // --- CPA report: print-optimized summary (category totals, no transaction detail) ---
 function cpaSectionHtml(title, rows, groupKey){

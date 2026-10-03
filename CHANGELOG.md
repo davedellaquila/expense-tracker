@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031539
+- Tax: new **Personal income** card showing personal income by category (with counts and totals), plus its own Download CSV. Category rows and Total drill to Transactions.
 ### App 202610031536
 - Transactions bulk bar: blue border now runs all the way around (was just a left-edge strip, briefly removed) so the bar stands out from the filter card above it.
 ### App 202610031535
