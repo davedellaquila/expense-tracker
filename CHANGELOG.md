@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030437
+- Settings: background preset swatches are now hardcoded HTML (no JS rendering) — they should appear on all devices.
 ### App 202610030433
 - Settings: background swatches use setAttribute for styles (another attempt at iPad rendering).
 ### App 202610030351
