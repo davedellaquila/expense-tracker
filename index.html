@@ -671,6 +671,16 @@ html.iphone .stickybar{
   background:none;
   z-index:auto;
 }
+/* Bulk update dialog: pinned action bar on iPhone too (Dave's request) —
+   stays stuck to the bottom edge while the fields scroll above it. */
+html.iphone .stickybar.stickybar-pin{
+  position:sticky; bottom:0; z-index:5;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  box-shadow:0 -8px 18px rgba(10,20,15,.08);
+  margin:16px -18px calc(-22px - env(safe-area-inset-bottom));
+  padding:12px 18px calc(14px + env(safe-area-inset-bottom));
+}
 /* Same for the page-style bar docked at a sheet's bottom (bill form, scanner
    review, budget copy, delete-bill confirm). */
 html.iphone .sheet .stickybar-page{
@@ -3443,7 +3453,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031547';
+var APP_VERSION = '202610031549';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -10752,7 +10762,7 @@ function openBulkUpdate(ids){
     sNotes.addEventListener('change', function(){ inNotes.style.display = sNotes.value==='__set__' ? '' : 'none'; });
     changeRow('Notes', sNotes);
     sh.appendChild(inNotes);
-    var row = el('div',{class:'btnrow stickybar'});
+    var row = el('div',{class:'btnrow stickybar stickybar-pin'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.onclick = close;
     var apply = el('button',{class:'btn',type:'button'},'Update '+ids.length);

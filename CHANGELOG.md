@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031549
+- Bulk update dialog: on iPhone, the Cancel/Update footer now sticks to the bottom edge while fields scroll (was a static end-of-content row).
 ### App 202610031547
 - Transactions bulk bar: "Clear" button relabeled to "None" (select none).
 ### App 202610031545
