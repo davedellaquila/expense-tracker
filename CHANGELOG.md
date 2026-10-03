@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031535
+- Transactions bulk bar: Delete is now the red SVG trash icon (was "Delete" text), freeing room so "Update 187" no longer truncates; removed the blue left-edge strip.
 ### App 202610031528
 - Tax: tapping the **Total** row now drills to all transactions in that section (Business, Business income, Personal deductions) on the Transactions page. Category rows already drilled; now every number on the page is tappable.
 ### App 202610031518
