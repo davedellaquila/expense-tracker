@@ -157,6 +157,7 @@
   --track:#edf0f3; --th-bg:#f0f3f6; --input-bg:#ffffff; --seg-bg:#edf0f3;
   --tabbar-bg:rgba(255,255,255,.96);
   --radius:14px; --tabbar-h:64px;
+  --side-margin:100px; /* desktop content side margins, adjustable in Settings → Appearance */
 }
 [data-theme="dark"]{
   --bg:#0f141a; --card:#182028; --text:#edf1f5; --muted:#9aa7b4;
@@ -221,6 +222,14 @@ body{
 .card-grip:active{ cursor:grabbing; color:var(--text); }
 .card-drop-ph{ border:2px dashed var(--accent); border-radius:var(--radius);
   margin:0 0 12px; background:rgba(127,127,127,.08); }
+/* Settings card collapse toggle: round button like the other round buttons. */
+.set-collapse{ flex:none; width:48px; height:48px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  background:rgba(127,127,127,.32); color:var(--text);
+  font-size:14px; font-weight:700; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+.set-collapse:hover{ background:rgba(127,127,127,.45); }
+/* Collapsed: hide everything except the header row */
+.card[data-setcard].set-collapsed > :not(.set-chead):not(.set-card-head){ display:none; }
+.card[data-setcard].set-collapsed > .set-card-head > :not(.set-chead):not(.set-collapse){ display:none; }
 .card-dragging{ position:fixed !important; z-index:70; pointer-events:none;
   opacity:.95; box-shadow:0 14px 34px rgba(0,0,0,.35); margin:0 !important; }
 .rep-svg text{ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
@@ -257,8 +266,8 @@ body{
 /* Slow pulse while an update is available — cleared when the user opens
    What's new from the header, dismisses the banner, or loads the new build. */
 @keyframes hdrNewsPulse{
-  0%, 100%{ opacity:1; transform:scale(1); }
-  50%{ opacity:.68; transform:scale(1.045); }
+  0%, 100%{ opacity:1; transform:scale(1); box-shadow:0 0 0 0 rgba(53,160,108,.0); }
+  50%{ opacity:.75; transform:scale(1.12); box-shadow:0 0 0 6px rgba(53,160,108,.25); }
 }
 .hdr-news.pulse{ animation:hdrNewsPulse 2.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce){
@@ -913,7 +922,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    that shrank the default 760px column into a postage-stamp phone strip on
    large screens. pointer:fine keeps this off actual iPads (see tablet). ---------- */
 @media (min-width:1200px) and (pointer:fine){
-  main{max-width:min(1600px, 100%);}
+  main{max-width:min(1600px, calc(100% - var(--side-margin)*2));}
   .sheet{max-width:1100px;}
 }
 
@@ -923,7 +932,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    (e.g. 12.9" iPad, 1366px) that would otherwise use the desktop widths. ---------- */
 @media (min-width:761px) and (max-width:1199px),
        (pointer:coarse) and (min-width:761px){
-  main{max-width:1000px;}
+  main{max-width:min(1000px, calc(100% - var(--side-margin)*2));}
   .sheet{max-width:880px;}
 }
 
@@ -972,10 +981,10 @@ html.iphone .tabbar{ bottom:0; transition:none; }
    Buttons that stay on screen (FAB, search clear) ease back on release;
    sheet ✕ / card ✕ use .press-out + a matching delay so the fade finishes as
    the sheet dismisses or the card is removed. */
-.sheet-x, .card-x, #selbar-done, .fab, .clearbtn{
+.sheet-x, .card-x, #selbar-done, .fab, .clearbtn, .set-collapse{
   transition:transform .15s ease-out, opacity .15s ease-out;
 }
-.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active,
+.sheet-x:active, .card-x:active, #selbar-done:active, .fab:active, .set-collapse:active,
 .sheet-x.press-out, .card-x.press-out, #selbar-done.press-out{
   transform:scale(1.5); opacity:0;
 }
@@ -1153,10 +1162,10 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 }
 .bg-presets{display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-height:36px;}
 .bg-presets button{
-  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  width:44px; height:44px; border-radius:12px; border:1px solid rgba(127,127,127,.45);
   padding:0; cursor:pointer; background-color:var(--track); background-size:cover;
   background-position:center; flex:none; position:relative;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 1px 3px rgba(0,0,0,.18);
   transition: box-shadow .15s ease, border-color .15s ease, transform .12s ease;
 }
 .bg-presets button:hover{transform:translateY(-1px);}
@@ -1473,14 +1482,14 @@ html[data-bg-anim="1"] body{
 .mh-wire .mh-floor{
   bottom:-12%; top:auto;
   transform:perspective(480px) rotateX(64deg);
-  animation:mh-grid-scroll 3.2s linear infinite;
+  animation:mh-grid-scroll 3.2s linear infinite, mh-grid-rotate 14s ease-in-out infinite;
   mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
   -webkit-mask-image:linear-gradient(to top, rgba(0,0,0,.95), transparent 88%);
 }
 .mh-wire .mh-ceil{
   top:-12%;
   transform:perspective(480px) rotateX(-64deg);
-  animation:mh-grid-scroll 3.8s linear infinite reverse;
+  animation:mh-grid-scroll 3.8s linear infinite reverse, mh-grid-rotate-ceil 16s ease-in-out infinite reverse;
   mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
   -webkit-mask-image:linear-gradient(to bottom, rgba(0,0,0,.85), transparent 88%);
 }
@@ -1492,6 +1501,15 @@ html[data-bg-anim="1"] body{
 }
 @keyframes mh-grid-scroll{
   to{ background-position:0 36px, 36px 0, 0 72px, 72px 0; }
+}
+/* OG Max Headroom rotation: slow oscillation of the grid plane. */
+@keyframes mh-grid-rotate{
+  0%, 100%{ transform:perspective(480px) rotateX(64deg) rotateZ(-10deg); }
+  50%{ transform:perspective(480px) rotateX(64deg) rotateZ(10deg); }
+}
+@keyframes mh-grid-rotate-ceil{
+  0%, 100%{ transform:perspective(480px) rotateX(-64deg) rotateZ(10deg); }
+  50%{ transform:perspective(480px) rotateX(-64deg) rotateZ(-10deg); }
 }
 @keyframes mh-horizon-pulse{
   0%,100%{ opacity:.75; filter:brightness(1); }
@@ -2962,7 +2980,7 @@ html.bg-paused body::before{
 
     <!-- SETTINGS -->
     <section id="screen-settings" class="screen" hidden>
-      <div class="card">
+      <div class="card" data-setcard="storage">
         <h2>Data storage</h2>
         <label class="f">Where your data lives</label>
         <div class="seg" id="set-store-seg">
@@ -3016,7 +3034,7 @@ html.bg-paused body::before{
         </div>
         <p class="muted">Switching storage only changes where new reads and writes go — the data in the other location stays untouched until you copy it over.</p>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="who">
         <h2>Who's entering?</h2>
         <label class="f" for="set-user">Your name (saved on each transaction)</label>
         <div class="set-fieldrow">
@@ -3025,12 +3043,12 @@ html.bg-paused body::before{
         </div>
         <datalist id="user-suggest"><option value="Dave"></option><option value="Nancy"></option></datalist>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="categories">
         <h2>Categories</h2>
         <p class="muted" style="font-size:13px;margin:0 0 10px">Rename or delete a category — its transactions, budgets, and planner settings move with it.</p>
         <div id="set-cat-list"></div>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="cleanup">
         <div class="set-card-head">
           <h2>Data cleanup</h2>
           <button class="btn small" id="set-scrub" type="button">Scan for statement junk</button>
@@ -3038,7 +3056,7 @@ html.bg-paused body::before{
         <p class="muted" style="font-size:13px;margin:10px 0 0">Older PDF imports sometimes glued statement text onto merchant names — section headers (like "JANE DOE #1234: Transactions"), debit-card prefixes (like "Purchase authorized on 08/15 …") or fine print (like "Important Information You Should Know …"). Scan finds those rows so you can review and fix them — with undo.</p>
         <div id="set-scrub-results" style="margin-top:6px"></div>
       </div>
-      <div class="card">
+      <div class="card" data-setcard="appearance">
         <h2>Appearance</h2>
         <div class="seg" id="theme-seg">
           <button data-theme-opt="light">☀️ Light</button>
@@ -3179,8 +3197,17 @@ html.bg-paused body::before{
 
           <p class="bg-hint">Presets, color, picture, and the editor are for <b>Light</b> mode. Motion effects work in any theme and pause with reduced-motion. Saved on this device.</p>
         </div>
+
+        <div class="bg-section">
+          <div class="bg-head">
+            <label class="f" for="set-side-margin">Side margins</label>
+            <span class="muted" id="set-side-margin-val" style="font-size:13px">100px</span>
+          </div>
+          <input type="range" id="set-side-margin" min="0" max="300" step="10" value="100" style="width:100%" aria-label="Side margins on wide screens">
+          <p class="bg-hint">Space on the left and right of the content on wide desktop screens, so the page background shows through. Saved on this device.</p>
+        </div>
       </div>
-      <div class="card" id="set-steps-card">
+      <div class="card" id="set-steps-card" data-setcard="setup">
         <h2>Setup steps</h2>
         <div class="steps" style="border:none; padding:0; margin:0;">
           <ol>
@@ -3380,7 +3407,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610022357';
+var APP_VERSION = '202610030434';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -3720,9 +3747,27 @@ function effectiveDark(){
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 /* Parse stored bg: JSON config or legacy "#rrggbb". */
-function bgPref(){
+/* Settings → Appearance: side margins on wide desktop screens (px each side).
+   Saved per device like the background. */
+var LS_SIDE_MARGIN = 'expenseTracker.sideMargin';
+function sideMarginVal(){
   try{
-    var raw = localStorage.getItem(LS_BG) || '';
+    var v = parseInt(localStorage.getItem(LS_SIDE_MARGIN), 10);
+    if(isNaN(v)) return 100;
+    return Math.max(0, Math.min(300, v));
+  }catch(e){ return 100; }
+}
+function applySideMargin(){
+  var v = sideMarginVal();
+  document.documentElement.style.setProperty('--side-margin', v+'px');
+  var slider = $('set-side-margin'), label = $('set-side-margin-val');
+  if(slider) slider.value = v;
+  if(label) label.textContent = v+'px';
+  /* Content width changed — re-fit chart text sizes. */
+  if(typeof fixAllChartText === 'function') requestAnimationFrame(fixAllChartText);
+}
+function bgPref(){
+  try{    var raw = localStorage.getItem(LS_BG) || '';
     if(!raw) return null;
     if(raw.charAt(0)==='{'){
       var cfg = JSON.parse(raw);
@@ -3972,11 +4017,11 @@ function paintBgPresetButtons(){
         class: type==='solid' ? 'solid' : ''
       });
       if(type==='solid'){
-        b.style.background = p.value;
+        b.style.setProperty('background', p.value, 'important');
       }else{
-        b.style.backgroundColor = p.base || DEFAULT_BG;
-        b.style.backgroundImage = p.value;
-        if(p.size) b.style.backgroundSize = p.size;
+        b.style.setProperty('background-color', p.base || DEFAULT_BG, 'important');
+        b.style.setProperty('background-image', p.value, 'important');
+        if(p.size) b.style.setProperty('background-size', p.size, 'important');
       }
       b.addEventListener('click', function(){
         setBgConfig(p.id==='default' ? null : Object.assign({}, p));
@@ -5252,54 +5297,112 @@ function openAiBgCreator(){
     if(head) head.appendChild(el('div',{class:'sheet-head-title'}, 'AI background'));
     else sh.appendChild(el('h2',{}, 'AI background'));
     sh.appendChild(el('p',{class:'mh-ed-hint'},
-      'Describe a scene (e.g. “asteroid field”, “night highway”). Builds a Max Headroom recipe on-device.'));
-    var ta = el('textarea',{id:'ai-bg-prompt', rows:'3', placeholder:'Asteroid field drifting through neon static…',
+      'Describe the image you want (e.g. “asteroid field”, “misty forest at dawn”). Generated by AI, saved on this device.'));
+    var ta = el('textarea',{id:'ai-bg-prompt', rows:'3', placeholder:'Asteroid field with distant nebula…',
       style:'width:100%;min-height:72px;resize:vertical;border:1px solid var(--border);border-radius:10px;padding:10px;font:inherit;background:var(--input-bg);color:var(--text)'});
     sh.appendChild(ta);
     var previewWrap = el('div',{class:'mh-ed-preview-wrap', style:'margin-top:12px'});
     previewWrap.appendChild(el('div',{class:'mh-ed-preview-cap'}, 'Preview'));
-    var previewBox = el('div',{class:'mh-ed-preview', 'aria-label':'AI background preview'});
-    var previewStage = el('div',{class:'mh-custom'});
-    previewStage.innerHTML = mhCustomLayersHtml();
-    previewBox.appendChild(previewStage);
+    var previewBox = el('div',{class:'mh-ed-preview', 'aria-label':'AI background preview',
+      style:'display:flex;align-items:center;justify-content:center;min-height:180px;background:var(--track);border-radius:12px;overflow:hidden'});
+    var previewImg = el('img',{alt:'AI generated preview', style:'max-width:100%;max-height:320px;display:none;border-radius:12px'});
+    var previewMsg = el('div',{class:'muted', style:'padding:24px;text-align:center;font-size:14px'}, 'Your image will appear here.');
+    previewBox.appendChild(previewMsg);
+    previewBox.appendChild(previewImg);
     previewWrap.appendChild(previewBox);
     sh.appendChild(previewWrap);
-    var nameIn = el('input',{type:'text', maxlength:'40', placeholder:'Name', value:''});
-    var nameField = el('div',{class:'bg-ed-field', style:'margin-top:8px'});
-    nameField.appendChild(el('label',{}, 'Name'));
-    nameField.appendChild(nameIn);
-    sh.appendChild(nameField);
-    var last = null;
+    var lastUrl = null, generating = false;
+    function setMsg(t){ previewMsg.textContent = t; previewMsg.style.display=''; previewImg.style.display='none'; }
+    function showImg(url){
+      lastUrl = url;
+      previewImg.src = url;
+      previewImg.style.display='';
+      previewMsg.style.display='none';
+    }
     function generate(){
-      last = interpretAiBgPrompt(ta.value);
-      if(!nameIn.value.trim()) nameIn.value = last.name;
-      applyMhRecipe(last.recipe, {live:true, target:previewStage});
+      var prompt = ta.value.trim();
+      if(!prompt){ toast('Describe the image first.', true); return; }
+      if(generating) return;
+      generating = true;
+      genBtn.disabled = true;
+      genBtn.textContent = 'Generating…';
+      setMsg('Generating your image… (takes ~20 seconds)');
+      /* Pollinations.ai: free text-to-image, no API key. Seed randomizes each run. */
+      var seed = Math.floor(Math.random()*1000000);
+      var url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) +
+        '?width=1920&height=1080&nologo=true&seed=' + seed;
+      /* Preload to confirm it rendered before showing. */
+      var probe = new Image();
+      probe.onload = function(){
+        generating = false;
+        genBtn.disabled = false;
+        genBtn.textContent = 'Generate';
+        showImg(url);
+      };
+      probe.onerror = function(){
+        generating = false;
+        genBtn.disabled = false;
+        genBtn.textContent = 'Generate';
+        setMsg('Generation failed. Check your connection and try again.');
+      };
+      probe.src = url;
+    }
+    /* Fetch the generated image and store as a data URL so the background
+       works offline and doesn't depend on the generator staying up. */
+    function fetchAsDataUrl(url, cb){
+      fetch(url, {mode:'cors'}).then(function(r){
+        if(!r.ok) throw new Error('fetch failed');
+        return r.blob();
+      }).then(function(blob){
+        var rd = new FileReader();
+        rd.onload = function(){ cb(rd.result); };
+        rd.onerror = function(){ cb(null); };
+        rd.readAsDataURL(blob);
+      }).catch(function(){ cb(null); });
+    }
+    function applyGenerated(saveToLibrary){
+      if(!lastUrl){ toast('Generate an image first.', true); return; }
+      applyBtn.disabled = true; saveBtn.disabled = true;
+      toast('Saving image…');
+      fetchAsDataUrl(lastUrl, function(dataUrl){
+        applyBtn.disabled = false; saveBtn.disabled = false;
+        if(!dataUrl){ toast('Could not save the image. Try again.', true); return; }
+        /* Downscale via canvas to keep localStorage happy. */
+        var img = new Image();
+        img.onload = function(){
+          var maxW = 1600, scale = Math.min(1, maxW / img.naturalWidth);
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(img.naturalWidth * scale);
+          cv.height = Math.round(img.naturalHeight * scale);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          var small = cv.toDataURL('image/jpeg', 0.82);
+          if(!setBgImageData(small)) return;
+          var nm = ta.value.trim().slice(0,40) || 'AI image';
+          var cfg = {type:'image', id:'ai-'+Date.now().toString(36), value:'image', base:'#1a1a1a', mode:'cover', name:nm};
+          if(saveToLibrary){
+            var id = 'ai'+Date.now().toString(36);
+            upsertBgLibraryItem({id:id, name:nm, kind:'image', cfg:cfg});
+            cfg.libraryId = id;
+            toast('Saved to My backgrounds.');
+          }else{
+            toast('AI background applied.');
+          }
+          cancelled = false;
+          setBgConfig(cfg);
+          close();
+        };
+        img.onerror = function(){ toast('Could not read the image. Try again.', true); };
+        img.src = dataUrl;
+      });
     }
     var actions = el('div',{class:'btnrow stickybar'});
     var genBtn = el('button',{type:'button', class:'btn small'}, 'Generate');
-    var applyBtn = el('button',{type:'button', class:'btn small ghost'}, 'Apply');
-    var saveBtn = el('button',{type:'button', class:'btn small ghost'}, 'Save & apply');
+    var applyBtn = el('button',{type:'button', class:'btn small ghost'}, 'Use as background');
+    var saveBtn = el('button',{type:'button', class:'btn small ghost'}, 'Save to My backgrounds');
     var cancelBtn = el('button',{type:'button', class:'btn small ghost'}, 'Cancel');
     genBtn.addEventListener('click', generate);
-    applyBtn.addEventListener('click', function(){
-      if(!last) generate();
-      cancelled = false;
-      setBgConfig(mhCfgFromRecipe(last.recipe, (nameIn.value||'').trim()||last.name));
-      toast('AI background applied.');
-      close();
-    });
-    saveBtn.addEventListener('click', function(){
-      if(!last) generate();
-      cancelled = false;
-      var nm = (nameIn.value||'').trim() || last.name;
-      var cfg = mhCfgFromRecipe(last.recipe, nm);
-      var id = 'ai'+Date.now().toString(36);
-      upsertBgLibraryItem({id:id, name:nm, kind:'mh', cfg:cfg});
-      cfg.libraryId = id;
-      setBgConfig(cfg);
-      toast('Saved to My backgrounds.');
-      close();
-    });
+    applyBtn.addEventListener('click', function(){ applyGenerated(false); });
+    saveBtn.addEventListener('click', function(){ applyGenerated(true); });
     cancelBtn.addEventListener('click', function(){
       var ov = sheetEl && sheetEl.closest ? sheetEl.closest('.overlay') : null;
       if(ov && ov._dismiss) ov._dismiss();
@@ -6777,7 +6880,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('#tabbar button').forEach(function(b){
     b.addEventListener('click', function(){ showScreen(b.getAttribute('data-screen')); });
   });
-  wireSetup(); wireSettings(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
+  wireSetup(); wireSettings(); wireSetCards(); wireDashboard(); wireTransactions(); wireImport(); wireBudgets(); wireBills(); wireTax(); wireReports();
   applyTheme();
   /* Keep each tab's scroll position across reloads: remember it while
      scrolling (throttled) and make sure it's saved on refresh/close. */
@@ -7080,7 +7183,12 @@ var _copyListRun = 0; // guards the copy-button list against overlapping refresh
 async function syncStoreSettings(){
   var _runId = ++_copyListRun;
   var bs = $('build-stamp');
-  if(bs) bs.textContent = 'Build ' + BUILD_STAMP;
+  if(bs){
+    /* Only the last 4 digits (HHMM) change during the day. */
+    var v = String(APP_VERSION||'');
+    if(v.length>4) v = v.slice(-4);
+    bs.textContent = 'Build ' + v;
+  }
   var k = storeKind() || 'local';
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
     var bk = b.getAttribute('data-spick');
@@ -7355,6 +7463,14 @@ function wireSettings(){
     setBgConfig(null);
     toast('Background reset.');
   });
+  /* Side margins (desktop): slider in Settings → Appearance. */
+  var smSlider = $('set-side-margin');
+  if(smSlider) smSlider.addEventListener('input', function(){
+    var v = Math.max(0, Math.min(300, parseInt(smSlider.value,10)||0));
+    try{ localStorage.setItem(LS_SIDE_MARGIN, String(v)); }catch(e){}
+    applySideMargin();
+  });
+  applySideMargin();
   // prefill when settings shown
   document.querySelector('#tabbar button[data-screen="settings"]').addEventListener('click', function(){
     refreshSettingsScreen();
@@ -8058,6 +8174,108 @@ function applyRepChartOrder(){
   Array.prototype.forEach.call(sec.querySelectorAll('[data-repchart]'), function(card){
     var k = card.getAttribute('data-repchart');
     if(!seen[k]){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+}
+/* ---- Settings card order (drag to reorder) ----
+   Same pattern as the chart cards: grip handles in each card header,
+   order saved per device. */
+var SET_ORDER_KEY = 'expenseTracker.setCardOrder';
+var SET_CARDS = ['storage','who','categories','cleanup','appearance','setup'];
+var SET_CARD_NAMES = {storage:'Data storage', who:"Who's entering?", categories:'Categories',
+  cleanup:'Data cleanup', appearance:'Appearance', setup:'Setup steps'};
+function setCardOrder(){
+  try{
+    var l = JSON.parse(localStorage.getItem(SET_ORDER_KEY)||'null');
+    if(Array.isArray(l) && l.length) return l.filter(function(k){ return SET_CARDS.indexOf(k)>=0; });
+  }catch(e){}
+  return SET_CARDS.slice();
+}
+function saveSetCardOrder(l){
+  try{ localStorage.setItem(SET_ORDER_KEY, JSON.stringify(l)); }catch(e){}
+}
+function applySetCardOrder(){
+  var sec = $('screen-settings');
+  if(!sec) return;
+  var endRef = $('build-stamp'); // keep the version stamp last
+  var order = setCardOrder(), seen = {};
+  order.forEach(function(k){
+    var card = sec.querySelector('[data-setcard="'+k+'"]');
+    if(card){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+  Array.prototype.forEach.call(sec.querySelectorAll('[data-setcard]'), function(card){
+    var k = card.getAttribute('data-setcard');
+    if(!seen[k]){ sec.insertBefore(card, endRef); seen[k]=1; }
+  });
+}
+function wireSetCards(){
+  var sec = $('screen-settings');
+  if(!sec || sec.dataset.setWired) return;
+  sec.dataset.setWired = '1';
+  sec.querySelectorAll('[data-setcard]').forEach(function(card){
+    var key = card.getAttribute('data-setcard');
+    var h2 = card.querySelector('h2');
+    if(!h2 || h2.dataset.gripped) return;
+    h2.dataset.gripped = '1';
+    var head = el('div',{class:'set-chead', style:'display:flex;align-items:center;gap:8px;flex:1;min-width:0'});
+    h2.parentNode.insertBefore(head, h2);
+    head.appendChild(el('span',{class:'card-grip no-print',title:'Drag to reorder '+(SET_CARD_NAMES[key]||key)},'\u283f'));
+    head.appendChild(h2);
+    h2.style.margin = '0';
+    h2.style.flex = '1';
+    /* Collapse toggle: at the far right of the header, outside any card controls. */
+    var chev = el('button',{class:'set-collapse no-print', type:'button',
+      title:'Collapse '+(SET_CARD_NAMES[key]||key), 'aria-label':'Collapse '+(SET_CARD_NAMES[key]||key)},'\u25bc');
+    chev.addEventListener('click', function(e){
+      e.stopPropagation();
+      var collapsed = setCollapsed();
+      var i = collapsed.indexOf(key);
+      if(i>=0) collapsed.splice(i,1); else collapsed.push(key);
+      saveSetCollapsed(collapsed);
+      applySetCollapsed();
+    });
+    /* If the card has its own header row with controls (e.g. Data cleanup's
+       Scan button), the collapse button goes last in that row; otherwise it
+       goes last in the title wrapper. */
+    var cardHead = card.querySelector(':scope > .set-card-head');
+    if(cardHead) cardHead.appendChild(chev);
+    else head.appendChild(chev);
+  });
+  wireCardReorder({
+    container: sec,
+    cardSel: '[data-setcard]',
+    keyAttr: 'data-setcard',
+    saveOrder: saveSetCardOrder,
+    endRef: $('build-stamp')
+  });
+  applySetCardOrder();
+  applySetCollapsed();
+}
+/* Collapsed Settings cards: remembered per device. */
+var SET_COLLAPSED_KEY = 'expenseTracker.setCollapsed';
+function setCollapsed(){
+  try{
+    var l = JSON.parse(localStorage.getItem(SET_COLLAPSED_KEY)||'null');
+    if(Array.isArray(l)) return l.filter(function(k){ return SET_CARDS.indexOf(k)>=0; });
+  }catch(e){}
+  return [];
+}
+function saveSetCollapsed(l){
+  try{ localStorage.setItem(SET_COLLAPSED_KEY, JSON.stringify(l)); }catch(e){}
+}
+function applySetCollapsed(){
+  var sec = $('screen-settings');
+  if(!sec) return;
+  var collapsed = setCollapsed();
+  sec.querySelectorAll('[data-setcard]').forEach(function(card){
+    var key = card.getAttribute('data-setcard');
+    var isCol = collapsed.indexOf(key)>=0;
+    card.classList.toggle('set-collapsed', isCol);
+    var chev = card.querySelector('.set-collapse');
+    if(chev){
+      chev.textContent = isCol ? '\u25b6' : '\u25bc';
+      chev.title = (isCol ? 'Expand ' : 'Collapse ') + (SET_CARD_NAMES[key]||key);
+      chev.setAttribute('aria-label', chev.title);
+    }
   });
 }
 /* ---- drag-to-reorder chart cards (Home + Reports) ----
@@ -13415,6 +13633,9 @@ function botRenderTable(){
   var host = $('bot-rows'); host.innerHTML = '';
   if(!botBudget){ return; }
   var rows = botBudget.rows, ym = botBudget.month;
+  /* Prev-month budgets (not actuals) for the "Prev month" stat — tapping a
+     stat copies it into this month's budget. Computed once per render. */
+  var prevMoBudgets = savedBudgetsFor(monthAdd(ym,-1), false);
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
@@ -13465,7 +13686,7 @@ function botRenderTable(){
     var ytd = (botBudget.ytdSums && botBudget.ytdMonths) ? (botBudget.ytdSums[r.category]||0)/botBudget.ytdMonths : 0;
     /* YTD average + last-month actual, grouped with labels for planning. */
     var stats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    var ytdV = Math.round(ytd), lastV = Math.round(r.last);
+    var ytdV = Math.round(ytd), lastV = Math.round(prevMoBudgets[r.category]||0);
     stats.appendChild(botStat('YTD avg', money(ytdV), '', function(){ botTapStat(r, inp, sld, line, check, ym, ytdV, false); }));
     stats.appendChild(botStat('Prev month', money(lastV), '', function(){ botTapStat(r, inp, sld, line, check, ym, lastV, false); }));
     line.appendChild(stats);
@@ -13823,6 +14044,8 @@ function incBotRenderTable(){
   if(!incBotBudget){ return; }
   var rows = incBotBudget.rows, ym = incBotBudget.month;
   var months = incBotBudget.months||1;
+  /* Prev-month targets (not actuals) for the "Prev month" stat. */
+  var prevMoTargets = savedBudgetsFor(monthAdd(ym,-1), true);
   if(rows.length){
     var head = el('div',{class:'muted bot-head',style:'display:grid;grid-template-columns:36px minmax(0,1fr) 170px 96px 32px;gap:8px;align-items:center;padding:4px 10px;font-size:12px'});
     head.appendChild(el('span'));
@@ -13871,7 +14094,7 @@ function incBotRenderTable(){
     line.appendChild(nm);
     /* YTD average + last-month actual, grouped with labels for planning. */
     var istats = el('div',{style:'display:flex;gap:14px;min-width:0'});
-    var iytdV = Math.round((r.ytd||0)/months), ilastV = Math.round(r.lastMo||0);
+    var iytdV = Math.round((r.ytd||0)/months), ilastV = Math.round(prevMoTargets[r.category]||0);
     istats.appendChild(botStat('YTD avg', money(iytdV)+'/mo', '', function(){ botTapStat(r, inp, null, line, check, ym, iytdV, true); }));
     istats.appendChild(botStat('Prev month', money(ilastV), '', function(){ botTapStat(r, inp, null, line, check, ym, ilastV, true); }));
     line.appendChild(istats);
@@ -14868,38 +15091,49 @@ function openBillForm(b, opts){
     var lastBillScan = null; // snapshot of what the previous scan set, for rollback
     function rollbackBillScan(){
       if(!lastBillScan) return;
-      if(lastBillScan.setName){ inName.value = lastBillScan.prev.name; unmarkScanned(inName); }
-      if(lastBillScan.setAmount){ inAmt.value = lastBillScan.prev.amount; unmarkScanned(inAmt); }
-      if(lastBillScan.setDate){ inDate.value = lastBillScan.prev.date; unmarkScanned(inDate); }
-      if(lastBillScan.paymentInfo && inNotes.value.indexOf(lastBillScan.paymentInfo) !== -1){
-        inNotes.value = inNotes.value.split(lastBillScan.paymentInfo).join('')
+      var s = lastBillScan;
+      /* Only roll back fields the user hasn't changed since the scan set them —
+         if they typed over a scanned value, their edit wins. */
+      if(s.setName && inName.value === s.setName){ inName.value = s.prev.name; unmarkScanned(inName); }
+      if(s.setAmount && inAmt.value === s.setAmount){ inAmt.value = s.prev.amount; unmarkScanned(inAmt); }
+      if(s.setDate && inDate.value === s.setDate){ inDate.value = s.prev.date; unmarkScanned(inDate); }
+      if(s.paymentInfo && inNotes.value.indexOf(s.paymentInfo) !== -1){
+        inNotes.value = inNotes.value.split(s.paymentInfo).join('')
           .replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
         inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
         unmarkScanned(inNotes);
       }
       lastBillScan = null;
     }
+    /* A scanned value only fills a field the user hasn't already valued:
+       name/amount must be empty; the due date must still be the untouched
+       today-default on a new bill (edits and prefills keep their dates);
+       payment info only goes into empty notes. */
     function startBillScan(){
       openScanSheet('bill', function(res){
         scanPhoto = {blob:res.blob, dataUrl:res.dataUrl, pdfBlob:res.pdfBlob||null};
         // A fresh scan replaces the previous scan: roll back what the last scan
-        // set first, so fields the new scan didn't find don't keep stale values
-        // (manually typed or previously saved values are restored, not cleared).
+        // set first (leaving user edits alone), so fields the new scan didn't
+        // find don't keep stale values.
         rollbackBillScan();
         var snap = {prev:{name:inName.value, amount:inAmt.value, date:inDate.value},
-                    setName:false, setAmount:false, setDate:false, paymentInfo:null};
-        if(res.values.name){ inName.value = res.values.name; markScanned(inName); snap.setName = true; }
-        if(res.values.amount){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = true; }
-        if(res.values.dueDate){ inDate.value = res.values.dueDate; markScanned(inDate); snap.setDate = true; }
-        if(res.values.paymentInfo){
+                    setName:null, setAmount:null, setDate:null, paymentInfo:null};
+        var filled = 0;
+        if(res.values.name && !inName.value.trim()){ inName.value = res.values.name; markScanned(inName); snap.setName = String(res.values.name); filled++; }
+        if(res.values.amount && !String(inAmt.value).trim()){ inAmt.value = res.values.amount; markScanned(inAmt); snap.setAmount = String(res.values.amount); filled++; }
+        if(res.values.dueDate && !isEdit && !src.dueDate && inDate.value === todayLocal()){
+          inDate.value = res.values.dueDate; markScanned(inDate); snap.setDate = String(res.values.dueDate); filled++;
+        }
+        if(res.values.paymentInfo && !inNotes.value.trim()){
           snap.paymentInfo = res.values.paymentInfo;
-          inNotes.value = (inNotes.value ? inNotes.value.replace(/\s+$/,'') + '\n\n' : '') + snap.paymentInfo;
+          inNotes.value = snap.paymentInfo;
           inNotes.dispatchEvent(new Event('input')); // refit the auto-growing field
-          markScanned(inNotes);
+          markScanned(inNotes); filled++;
         }
         lastBillScan = snap;
         renderScanBox();
-        toast('Filled from scan \u2014 check the fields.');
+        toast(filled ? 'Filled '+filled+' field'+(filled>1?'s':'')+' from scan \u2014 check the fields.'
+                     : 'Scan found nothing new \u2014 your entries were kept.');
       });
     }
     var scanBtn = el('button',{class:'btn ghost', type:'button', style:'margin-bottom:6px'},'\uD83D\uDCF7 Scan bill');
@@ -15254,6 +15488,50 @@ function repDonut(el, items, onSlice, emptyMsg){
   }
 }
 function repPhone(){ return window.matchMedia && window.matchMedia('(max-width:560px)').matches; }
+/* Chart text stays readable at any content width. SVG <text> scales with the
+   viewBox, so a narrow content column (large side margins) shrinks labels to
+   nothing. This measures each chart's rendered scale and sets text sizes in
+   SVG units so they land at a fixed readable px size, independent of width.
+   Desired rendered sizes keyed by the original font-size attribute. */
+var CHART_TEXT_TARGETS = {'11':13, '12':14, '13':14, '18':16, '33':20};
+function fixChartText(svg){
+  var vb = svg.viewBox && svg.viewBox.baseVal;
+  if(!vb || !vb.width) return;
+  var w = svg.getBoundingClientRect().width;
+  if(!w) return;
+  var scale = w / vb.width;
+  function fixEl(elm){
+    if(!elm.hasAttribute('data-orig-fs')) elm.setAttribute('data-orig-fs', elm.getAttribute('font-size') || '12');
+    var target = CHART_TEXT_TARGETS[elm.getAttribute('data-orig-fs')] || 14;
+    elm.style.fontSize = (target / scale) + 'px';
+  }
+  svg.querySelectorAll('text').forEach(fixEl);
+  svg.querySelectorAll('g[font-size]').forEach(fixEl);
+}
+function fixAllChartText(){
+  document.querySelectorAll('.rep-svg').forEach(fixChartText);
+}
+if(window.MutationObserver){
+  var chartObs = new MutationObserver(function(muts){
+    var need = false;
+    for(var i=0;i<muts.length && !need;i++){
+      muts[i].addedNodes.forEach(function(n){
+        if(n.nodeType!==1) return;
+        if((n.classList && n.classList.contains('rep-svg')) ||
+           (n.querySelector && n.querySelector('.rep-svg'))) need = true;
+      });
+    }
+    if(need) requestAnimationFrame(fixAllChartText);
+  });
+  chartObs.observe(document.body, {childList:true, subtree:true});
+}
+var chartResizeT = null;
+window.addEventListener('resize', function(){
+  if(chartResizeT) clearTimeout(chartResizeT);
+  chartResizeT = setTimeout(fixAllChartText, 150);
+});
+if(document.readyState === 'complete') fixAllChartText();
+else window.addEventListener('load', fixAllChartText);
 /* Horizontal bars on a subtle track, label left, value right. */
 function repHBars(el, items, color, emptyMsg, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }

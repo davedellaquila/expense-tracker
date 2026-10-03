@@ -4,14 +4,51 @@
      APP_VERSION / version.json for that deploy, newest first. "See what's new" shows
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
-## 2026-10-02
-### App 202610022357
+## 2026-10-03
+### App 202610030434
 - Appearance Customize → Color: **Apply** (and tap the hex) uses the swatch’s current color without reopening the picker.
 - Max Headroom Stripes card: angle can **animate continuously** between lower/upper limits (plus period); fixed angle when Animate is off.
-### App 202610022355
 - iPhone: page backgrounds stay **viewport-fixed** while content scrolls (same as desktop) — static fills use a fixed plate; dynamic `#bg-dynamic` no longer uses negative z-index.
-### App 202610022353
 - Max Headroom editor **locks its open height** so layer pills don’t move the top edge; drag the grab handle to see more.
+### App 202610030351
+- Settings: background preset swatches now force their backgrounds with !important to override any theme CSS.
+### App 202610030348
+- Settings: build stamp now shows just the last 4 digits (HHMM) — the only part that changes during the day.
+### App 202610030347
+- Settings: build stamp now formats the version as YYYYMM-DDHHMM (e.g. 202610-030347).
+### App 202610030344
+- Settings: the build stamp at the bottom now shows the actual app version number, so you can verify what version you're running.
+### App 202610030340
+- Settings: collapse button triangle is now 50% smaller (button stays the same size).
+### App 202610030333
+- Max Headroom wireframe preset now rotates the grid planes (slow oscillation, like the OG) in addition to scrolling.
+### App 202610030331
+- AI background is now real AI image generation (via Pollinations): describe the image, preview it, then use it as your background or save it to My backgrounds. The old keyword-to-pattern matcher is gone.
+### App 202610030326
+- Settings: the card collapse button now sits at the far right of the header, outside any card controls (e.g. after Data cleanup's Scan button).
+### App 202610030324
+- What's New button pulse is now more noticeable (larger scale + glow) when an update is available.
+### App 202610030322
+- Settings: the card collapse button is now 48px with a stronger background and bolder chevron — much easier to see and tell what it is.
+### App 202610030318
+- Settings: background preset swatches are larger (44px) with a visible border in both themes, so the colors/patterns are actually perceptible.
+### App 202610030316
+- Settings: the Side margins slider now works on iPad/tablet too (was desktop-only).
+### App 202610030315
+- Settings: the collapse chevron is now a 44px round button with a larger symbol, matching the other round buttons' press animation.
+## 2026-10-02
+### App 202610022356
+- Settings: cards are now collapsible too — tap the chevron in any card header to collapse/expand it. Collapsed state is saved on this device.
+### App 202610022355
+- Settings: cards can now be rearranged by dragging the ⋮⋮ grip in each card header. Order is saved on this device.
+### App 202610022341
+- Charts: text now stays a fixed readable size regardless of content width — no more tiny labels when side margins are large.
+### App 202610022334
+- Settings → Appearance: new "Side margins" slider controls the left/right margin of the content on wide desktop screens (default 100px, up to 300px), so the page background shows through. Saved on this device.
+### App 202610022330
+- Budget: the "Prev month" stat now shows last month's budget (not actuals); tapping it copies that budget into the current month.
+### App 202610022328
+- Bill scan: scanned values only fill blank fields — if you've already typed a name, amount, or changed the due date, the scan won't overwrite them. Re-scanning also won't wipe edits you made to previously scanned values.
 ### App 202610022351
 - Max Headroom Grid card: plane rotation can **animate continuously** between a **lower** and **upper** limit (plus period). Fixed rotation remains when Animate is off.
 ### App 202610022340
