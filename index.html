@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031606';
+var APP_VERSION = '202610031607';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -8012,9 +8012,7 @@ function renderDashboard(){
     if(_cc==='Transfers') return;
     if(!_dCatSeen[_cc]){ _dCatSeen[_cc] = 1; _dAllCats.push(_cc); }
   });
-  // Include Categories-sheet names (e.g. just created on Add bill) even when
-  // no transaction in this period uses them yet — matches Transactions' menu.
-  mergeCatalogCats(_dCatSeen, _dAllCats, bpVal);
+  // Only categories with transactions in the current period are offered.
   _dAllCats.sort();
   var dashCatSelBudget = dashCatSel.slice(); // budget card keeps budget-category picks across filter views
   dashCatSel = dashCatSel.filter(function(c){ return !!_dCatSeen[c]; }); // prune cats absent this period
@@ -8929,13 +8927,6 @@ function allCategories(){
 /* Fold Categories-sheet names into a Home/Reports chip accumulator so a
    category created via Add bill / Add transaction appears in the filter
    before any transaction uses it. bpKind '' = all kinds. */
-function mergeCatalogCats(seen, list, bpKind){
-  state.categories.forEach(function(c){
-    if(!c || !c.name || c.name==='Transfers') return;
-    if(bpKind && c.kind && c.kind!==bpKind) return;
-    if(!seen[c.name]){ seen[c.name] = 1; list.push(c.name); }
-  });
-}
 function syncAllChips(){
   ['f-type','f-bp','f-cat','f-bank','f-tax'].forEach(function(id){
     var chip = document.getElementById('allchip-'+id), sel = document.getElementById(id);
@@ -16084,9 +16075,7 @@ function renderReports(){
     var cc = t.txn_type==='expense' ? repDisplayCat(t) : (t.category||'Uncategorized');
     if(!_catSeen[cc]){ _catSeen[cc] = 1; _allCats.push(cc); }
   });
-  // Same as Home: include Categories-sheet names so newly created categories
-  // show up before any transaction in the period uses them.
-  mergeCatalogCats(_catSeen, _allCats, bpVal);
+  // Only categories with transactions in the current period are offered.
   _allCats.sort();
   // Snapshot the selection before pruning: the Budget vs Actual chart honors what
   // was selected even for budgeted categories with no transactions in the period
