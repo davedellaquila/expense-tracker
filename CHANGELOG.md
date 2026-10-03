@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031528
+- Tax: tapping the **Total** row now drills to all transactions in that section (Business, Business income, Personal deductions) on the Transactions page. Category rows already drilled; now every number on the page is tappable.
 ### App 202610031518
 - Delete buttons now use the shared red SVG trash icon everywhere: transaction form, bill form, and category delete dialog (replacing the 🗑️ emoji / text buttons). Confirm-dialog buttons keep red "Delete" text.
 ### App 202610031513

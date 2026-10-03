@@ -3433,7 +3433,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031518';
+var APP_VERSION = '202610031528';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -9336,6 +9336,7 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   if(cat && t.category!==cat) return false;
   if(bk && txnBank(t)!==bk) return false;
   if(tx && (t.tax_category||'Uncategorized')!==tx) return false;
+  if(txnDrill && txnDrill.taxCats && txnDrill.taxCats.indexOf(t.tax_category||'Uncategorized')===-1) return false;
   // Drill context (chart drill-through pill): applies as an additional filter on
   // top of the native controls. Never nulls out the native filters.
   if(txnDrill){
@@ -9397,6 +9398,7 @@ function drillPillLabel(d){
   if(d.q) what.push('\u201C'+d.q+'\u201D');
   if(d.weekday!=null && WD_NAMES[d.weekday]) what.push(WD_NAMES[d.weekday]+'s');
   if(d.taxCat) what.push(d.taxCat);
+  if(d.taxCats && d.taxCats.length) what.push(plusMore(d.taxCats));
   if(d.type==='income') what.push('Income');
   else if(d.type==='expense') what.push('Expenses');
   else if(d.xferOnly) what.push('Transfers');
@@ -9575,7 +9577,7 @@ function exportVisibleTxns(){
 /* Does a drill context carry any filter dimension besides categories? Used to
    decide whether a single-category drill still needs its pill. */
 function drillHasDims(d){
-  return !!(d.from || d.to || d.type || d.bp || d.taxCat || d.rawCats ||
+  return !!(d.from || d.to || d.type || d.bp || d.taxCat || (d.taxCats&&d.taxCats.length) || d.rawCats ||
     d.weekday!=null || (d.owners&&d.owners.length) || (d.banks&&d.banks.length) ||
     d.band || d.minAmt!=null || d.maxAmt!=null || d.q || d.xferOnly || d.noXfer);
 }
@@ -9625,7 +9627,7 @@ function drillToTransactions(o){
   }
   txnDrill = {
     from: from, to: to,
-    type: o.type || '', bp: o.bp || '', taxCat: o.taxCat || null,
+    type: o.type || '', bp: o.bp || '', taxCat: o.taxCat || null, taxCats: o.taxCats || null,
     dispCats: drillCat ? null : effCats, rawCats: o.rawCats || null,
     catLabel: o.catLabel || null,
     weekday: (o.weekday==null ? null : o.weekday),
@@ -16500,9 +16502,15 @@ function renderTaxGroup(node, rows, drillBase){
     });
     node.appendChild(r);
   });
-  var g = el('div',{class:'rowline gtotal'});
+  var g = el('div',{class:'rowline gtotal rep-click'});
   g.appendChild(el('span',null,'Total'));
   g.appendChild(el('b',null,money(grand)));
+  // Tapping Total shows every transaction in this section.
+  g.addEventListener('click', function(){
+    var d = {from:drillBase.from, to:drillBase.to, type:dtype, bp:drillBase.bp};
+    if(drillBase.taxCats) d.taxCats = drillBase.taxCats.slice();
+    drillToTransactions(d);
+  });
   node.appendChild(g);
 }
 function renderTax(){
@@ -16519,7 +16527,7 @@ function renderTax(){
   });
   renderTaxGroup($('tax-biz'), biz, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business · '+y});
   renderTaxGroup($('tax-bizinc'), bizInc, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business income · '+y, type:'income', groupKey:'category'});
-  renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y});
+  renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y, taxCats: PERSONAL_DEDUCTION_CATS.slice()});
 }
 // --- CPA report: print-optimized summary (category totals, no transaction detail) ---
 function cpaSectionHtml(title, rows, groupKey){
