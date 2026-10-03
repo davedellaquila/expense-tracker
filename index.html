@@ -156,7 +156,7 @@
   --warn:#9a6b1a; --warn-soft:#fdf3e0;
   --track:#edf0f3; --th-bg:#f0f3f6; --input-bg:#ffffff; --seg-bg:#edf0f3;
   --tabbar-bg:rgba(255,255,255,.96);
-  --radius:14px; --tabbar-h:64px;
+  --radius:14px; --tabbar-h:64px; --tabbar-pad-b:0px;
   --side-margin:100px; /* desktop content side margins, adjustable in Settings → Appearance */
 }
 [data-theme="dark"]{
@@ -304,7 +304,7 @@ body{
 .user-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 /* ---------- layout ---------- */
-main{padding:14px 14px calc(var(--tabbar-h) + 26px); max-width:760px; margin:0 auto;}
+main{padding:14px 14px calc(var(--tabbar-h) + var(--tabbar-pad-b) + 26px); max-width:760px; margin:0 auto;}
 .screen{animation:fade .18s ease;}
 @keyframes fade{from{opacity:.4}to{opacity:1}}
 .card{
@@ -693,7 +693,7 @@ html.iphone .sheet .stickybar-page{
    just above the tab bar while its card scrolls, settles as the card's last
    element when scrolled to the end */
 .stickybar-page{
-  position:sticky; bottom:var(--tabbar-h); z-index:5;
+  position:sticky; bottom:calc(var(--tabbar-h) + var(--tabbar-pad-b)); z-index:5;
   background:var(--card);
   border-top:1px solid var(--border);
   border-radius:0 0 var(--radius) var(--radius);
@@ -852,7 +852,7 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
 .recrow .recmain{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .recrow .recamt{flex:none; font-weight:600;}
 .fab{
-  position:fixed; right:18px; bottom:calc(var(--tabbar-h) + 20px);
+  position:fixed; right:18px; bottom:calc(var(--tabbar-h) + var(--tabbar-pad-b) + 20px);
   width:58px; height:58px; border-radius:50%; border:none; z-index:30;
   background:color-mix(in srgb, var(--accent) 85%, transparent); color:#fff; font-size:30px; line-height:1; cursor:pointer;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
@@ -863,7 +863,8 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
   position:fixed; left:0; right:0; bottom:var(--kb-h, 0px); z-index:40;
   transform:translateZ(0); /* own compositing layer: stays glued to the viewport on iOS */
   transition:bottom .22s ease-out; /* glide above the iOS keyboard while typing */
-  height:var(--tabbar-h);
+  height:calc(var(--tabbar-h) + var(--tabbar-pad-b));
+  padding-bottom:var(--tabbar-pad-b);
   background:var(--tabbar-bg); backdrop-filter:blur(8px);
   border-top:1px solid var(--border); display:flex;
 }
@@ -889,7 +890,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ---------- iPhone layout refinements (≤560px) ---------- */
 @media (max-width:560px){
   /* tab bar: 50% bigger icons/text; scroll sideways to reach every tab */
-  :root{--tabbar-h:74px;}
+  :root{--tabbar-h:74px; --tabbar-pad-b:max(24px, env(safe-area-inset-bottom));}
   .tabbar{overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
   .tabbar::-webkit-scrollbar{display:none;}
   .tabbar button{flex:none; min-width:72px; font-size:16px; gap:4px; padding:4px 0 6px;}
@@ -1043,7 +1044,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ---------- toast / spinner ---------- */
 #toast{
   position:fixed; left:50%; transform:translateX(-50%) translateY(20px); z-index:80;
-  bottom:calc(var(--tabbar-h) + 18px + var(--kb-h, 0px));
+  bottom:calc(var(--tabbar-h) + var(--tabbar-pad-b) + 18px + var(--kb-h, 0px));
   background:#20262d; color:#fff; padding:11px 18px; border-radius:12px; font-size:15.5px;
   opacity:0; pointer-events:none; transition:all .25s; max-width:92vw; text-align:center;
 }
@@ -3457,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031624';
+var APP_VERSION = '202610031626';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -15892,19 +15893,19 @@ function repGroupedVBars(el, series, labels, onBar){
      single row overflows the viewBox on phones. */
   var legW = W - pad.left - pad.right + 44, legRows = [[]], rowW = 0;
   series.forEach(function(sr){
-    var w = 20 + sr.name.length*(repPhone()?13:7) + 14;
+    var w = 20 + sr.name.length*(repPhone()?15:8) + 18;
     if(rowW + w > legW && legRows[legRows.length-1].length){ legRows.push([]); rowW = 0; }
     legRows[legRows.length-1].push({sr:sr, w:w});
     rowW += w;
   });
-  pad.top = 12 + legRows.length*22;
+  pad.top = 12 + legRows.length*26;
   var H = pad.top + plotH + pad.bottom;
   var plotW=W-pad.left-pad.right;
   var max=1, li, si;
   for(si=0; si<series.length; si++) for(li=0; li<n; li++) max=Math.max(max, series[si].values[li]||0);
   var step=plotW/n, groupW=step*0.95, slotW=groupW/series.length, svg='';
   legRows.forEach(function(row, ri){
-    var lx=pad.left, ly=8+ri*22;
+    var lx=pad.left, ly=8+ri*26;
     row.forEach(function(e){
       svg += '<rect x="'+lx+'" y="'+ly+'" width="12" height="12" rx="3" fill="'+e.sr.color+'"/><text x="'+(lx+16)+'" y="'+(ly+10)+'" font-size="12" class="cx-mut">'+esc(e.sr.name)+'<title>'+esc(e.sr.name)+'</title></text>';
       lx += e.w;
