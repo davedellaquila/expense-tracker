@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031604
+- Confirm dialogs now layer on top of the open sheet instead of replacing it — canceling a delete confirmation returns you to the Edit Transaction dialog (was dropping you out entirely).
 ### App 202610031602
 - Transactions bulk bar: All/None buttons now disable intelligently — All is disabled when everything visible is selected, None when nothing is.
 ### App 202610031600

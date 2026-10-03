@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031602';
+var APP_VERSION = '202610031604';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -6023,7 +6023,8 @@ if(typeof IS_IPHONE!=='undefined' && IS_IPHONE){
 }
 function confirmDialog(message, okLabel){
   return new Promise(function(resolve){
-    var close = openSheet(function(sh, done){
+    // Stacked (not replacing): canceling reveals whatever dialog was open underneath.
+    var close = openSheetStacked(function(sh, done){
       sh.appendChild(el('h2',null,'Please confirm'));
       sh.appendChild(el('p',{class:'muted'},message));
       var row = el('div',{class:'btnrow'});
