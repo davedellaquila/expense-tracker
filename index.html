@@ -304,7 +304,7 @@ body{
 .user-chip:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 /* ---------- layout ---------- */
-main{padding:14px 14px calc(var(--tabbar-h) + 26px + env(safe-area-inset-bottom)); max-width:760px; margin:0 auto;}
+main{padding:14px 14px calc(var(--tabbar-h) + 26px); max-width:760px; margin:0 auto;}
 .screen{animation:fade .18s ease;}
 @keyframes fade{from{opacity:.4}to{opacity:1}}
 .card{
@@ -693,7 +693,7 @@ html.iphone .sheet .stickybar-page{
    just above the tab bar while its card scrolls, settles as the card's last
    element when scrolled to the end */
 .stickybar-page{
-  position:sticky; bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index:5;
+  position:sticky; bottom:var(--tabbar-h); z-index:5;
   background:var(--card);
   border-top:1px solid var(--border);
   border-radius:0 0 var(--radius) var(--radius);
@@ -852,7 +852,7 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
 .recrow .recmain{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .recrow .recamt{flex:none; font-weight:600;}
 .fab{
-  position:fixed; right:18px; bottom:calc(var(--tabbar-h) + 20px + env(safe-area-inset-bottom));
+  position:fixed; right:18px; bottom:calc(var(--tabbar-h) + 20px);
   width:58px; height:58px; border-radius:50%; border:none; z-index:30;
   background:color-mix(in srgb, var(--accent) 85%, transparent); color:#fff; font-size:30px; line-height:1; cursor:pointer;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
@@ -863,8 +863,7 @@ table.ptable.top-table td.top-cat{overflow-wrap:anywhere;}
   position:fixed; left:0; right:0; bottom:var(--kb-h, 0px); z-index:40;
   transform:translateZ(0); /* own compositing layer: stays glued to the viewport on iOS */
   transition:bottom .22s ease-out; /* glide above the iOS keyboard while typing */
-  height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-  padding-bottom:env(safe-area-inset-bottom);
+  height:var(--tabbar-h);
   background:var(--tabbar-bg); backdrop-filter:blur(8px);
   border-top:1px solid var(--border); display:flex;
 }
@@ -1044,7 +1043,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ---------- toast / spinner ---------- */
 #toast{
   position:fixed; left:50%; transform:translateX(-50%) translateY(20px); z-index:80;
-  bottom:calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom) + var(--kb-h, 0px));
+  bottom:calc(var(--tabbar-h) + 18px + var(--kb-h, 0px));
   background:#20262d; color:#fff; padding:11px 18px; border-radius:12px; font-size:15.5px;
   opacity:0; pointer-events:none; transition:all .25s; max-width:92vw; text-align:center;
 }
@@ -3458,7 +3457,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031617';
+var APP_VERSION = '202610031622';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -9409,14 +9408,21 @@ function txnVisible(t){  var ty = $('f-type').value, bp = $('f-bp').value,
   }
   return true;
 }
-function renderDrillChip(){
+function renderDrillChip(rows){
   var td = $('txn-drill');
   td.innerHTML = '';
   if(!txnDrill){ syncDrillDock(); return; }
   // Temporary, dismissible drill pill. The \u00D7 clears ONLY the drill context;
   // the native filters are independent and keep their values.
   var chip = el('div',{class:'drillchip'});
-  chip.appendChild(el('span',null,'📊 '+drillPillLabel(txnDrill)));
+  var label = '📊 '+drillPillLabel(txnDrill);
+  if(rows && rows.length){
+    // Sum of the currently shown transactions: income adds, expenses subtract.
+    var sum = 0;
+    rows.forEach(function(t){ sum += (t.txn_type==='expense' ? -1 : 1)*num(t.amount); });
+    label += ' · '+(sum<0 ? '−' : '+')+money(Math.abs(sum));
+  }
+  chip.appendChild(el('span',null,label));
   var x = el('button',{class:'drillx',type:'button','aria-label':'Clear drill filter'},'\u00D7');
   x.addEventListener('click', function(){ txnDrill = null; disarmSelbarUndo(); renderTransactions(); });
   chip.appendChild(x);
@@ -9728,9 +9734,9 @@ function renderTransactions(){
     ftax.appendChild(o);
   });
 
-  renderDrillChip();
-  syncAllChips();
   var rows = state.transactions.filter(txnVisible);
+  renderDrillChip(rows);
+  syncAllChips();
   var sortMode = txnSortRows(rows);
 
   var list = $('txn-list'); list.innerHTML='';
@@ -15747,7 +15753,7 @@ function repTrend(el, months, onBar){
     svg += '<text x="'+Math.round(cx)+'" y="'+(H-14)+'" text-anchor="middle" font-size="11" class="cx-mut">'+esc(v.label)+'</text>';
   });
   svg += '<text x="'+pad.left+'" y="20" font-size="12" class="cx-mut">Bars: monthly spend</text>'+
-         '<text x="'+(pad.left+170)+'" y="20" font-size="12" fill="'+REP_CORAL+'">Line: cumulative</text>';
+         '<text x="'+(pad.left+Math.ceil(19*(repPhone()?14:7.5))+18)+'" y="20" font-size="12" fill="'+REP_CORAL+'">Line: cumulative</text>';
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
   if(onBar){
     var tn = el.querySelectorAll('[data-bar]');
@@ -15979,7 +15985,7 @@ function repPareto(el, items, onBar){
     '<text x="'+(W-pad.right)+'" y="'+Math.round(y80-6)+'" text-anchor="end" font-size="12" fill="#f6c85f">80%</text>'+
     '<polyline points="'+pts.map(function(p){ return Math.round(p.x)+','+Math.round(p.y); }).join(' ')+'" fill="none" stroke="'+REP_CORAL+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+
     '<text x="'+pad.left+'" y="16" font-size="12" class="cx-mut">Bars: category spend</text>'+
-    '<text x="'+(pad.left+190)+'" y="16" font-size="12" fill="'+REP_CORAL+'">Line: cumulative share</text>';
+    '<text x="'+(pad.left+Math.ceil(20*(repPhone()?14:7.5))+18)+'" y="16" font-size="12" fill="'+REP_CORAL+'">Line: cumulative share</text>';
   el.innerHTML = '<svg class="rep-svg" viewBox="0 0 '+W+' '+H+'" role="img">'+svg+'</svg>';
   if(onBar){
     var pn = el.querySelectorAll('[data-bar]');
