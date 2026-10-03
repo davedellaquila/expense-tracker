@@ -3333,7 +3333,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030348';
+var APP_VERSION = '202610030351';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -3943,11 +3943,11 @@ function paintBgPresetButtons(){
         class: type==='solid' ? 'solid' : ''
       });
       if(type==='solid'){
-        b.style.background = p.value;
+        b.style.setProperty('background', p.value, 'important');
       }else{
-        b.style.backgroundColor = p.base || DEFAULT_BG;
-        b.style.backgroundImage = p.value;
-        if(p.size) b.style.backgroundSize = p.size;
+        b.style.setProperty('background-color', p.base || DEFAULT_BG, 'important');
+        b.style.setProperty('background-image', p.value, 'important');
+        if(p.size) b.style.setProperty('background-size', p.size, 'important');
       }
       b.addEventListener('click', function(){
         setBgConfig(p.id==='default' ? null : Object.assign({}, p));

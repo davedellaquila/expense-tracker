@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030351
+- Settings: background preset swatches now force their backgrounds with !important to override any theme CSS.
 ### App 202610030348
 - Settings: build stamp now shows just the last 4 digits (HHMM) — the only part that changes during the day.
 ### App 202610030347
