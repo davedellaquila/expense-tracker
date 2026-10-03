@@ -209,8 +209,6 @@ body{
 #cpa-report .cpa-summary{ margin-top:18px; border:2px solid #000; padding:10px 14px; }
 #cpa-report .cpa-summary .rowline{ display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
 #cpa-report .cpa-summary .rowline.grand{ font-weight:bold; font-size:16px; border-top:1px solid #000; margin-top:6px; padding-top:8px; }
-/* off-screen but rendered, so the PDF library can capture it */
-#cpa-report.cpa-render{ position:absolute; left:-9999px; top:0; display:block !important; width:7.5in; }
 @media print{
   .app-header, .tabbar, .toast-wrap, .no-print{ display:none !important; }
   body{ background:#fff; }
@@ -3430,7 +3428,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031505';
+var APP_VERSION = '202610031507';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -16547,6 +16545,7 @@ function renderCpaReport(){
   var node = $('cpa-report');
   node.innerHTML = h;
   node.hidden = false;
+  node.classList.remove('cpa-render');
   // Generate a real PDF file (window.print() silently fails in iOS home-screen web apps).
   var btn = $('tax-cpa');
   var origLabel = btn ? btn.textContent : '';
@@ -16557,7 +16556,9 @@ function renderCpaReport(){
     if(btn){ btn.disabled = false; btn.textContent = origLabel; }
   }
   cpaPdfReady().then(function(){
-    node.classList.add('cpa-render');
+    // Let the browser paint the (now visible) report before capturing it.
+    return new Promise(function(res){ requestAnimationFrame(function(){ setTimeout(res, 60); }); });
+  }).then(function(){
     return window.html2pdf().set({
       margin: 12,
       filename: 'tax-summary-'+y+'.pdf',
