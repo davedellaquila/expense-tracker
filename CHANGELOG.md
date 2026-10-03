@@ -1,6 +1,15 @@
 # Changelog
 
+<!-- Version convention: under each ## date, add ### App YYYYMMDDHHMM (UTC) matching
+     APP_VERSION / version.json for that deploy, newest first. "See what's new" shows
+     every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
+
 ## 2026-10-03
+### App 202610030642
+- Appearance Customize → Color: **Apply** (and tap the hex) uses the swatch’s current color without reopening the picker.
+- Max Headroom Stripes card: angle can **animate continuously** between lower/upper limits (plus period); fixed angle when Animate is off.
+- iPhone: page backgrounds stay **viewport-fixed** while content scrolls (same as desktop) — static fills use a fixed plate; dynamic `#bg-dynamic` no longer uses negative z-index.
+- Max Headroom editor **locks its open height** so layer pills don’t move the top edge; drag the grab handle to see more.
 ### App 202610030437
 - Settings: background preset swatches are now hardcoded HTML (no JS rendering) — they should appear on all devices.
 ### App 202610030433
@@ -44,12 +53,6 @@
 - Budget: the "Prev month" stat now shows last month's budget (not actuals); tapping it copies that budget into the current month.
 ### App 202610022328
 - Bill scan: scanned values only fill blank fields — if you've already typed a name, amount, or changed the due date, the scan won't overwrite them. Re-scanning also won't wipe edits you made to previously scanned values.
-
-<!-- Version convention: under each ## date, add ### App YYYYMMDDHHMM (UTC) matching
-     APP_VERSION / version.json for that deploy, newest first. "See what's new" shows
-     every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
-
-## 2026-10-02
 ### App 202610022351
 - Max Headroom Grid card: plane rotation can **animate continuously** between a **lower** and **upper** limit (plus period). Fixed rotation remains when Animate is off.
 ### App 202610022340
