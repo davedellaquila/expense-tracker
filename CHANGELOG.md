@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031545
+- What's new dialog: type is ~25% larger on iPhone only (body 14.5→18px, headings scaled to match) for readability.
 ### App 202610031539
 - Tax: new **Personal income** card showing personal income by category (with counts and totals), plus its own Download CSV. Category rows and Total drill to Transactions.
 ### App 202610031536

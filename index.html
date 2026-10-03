@@ -1103,6 +1103,11 @@ table.ptable.fit th, table.ptable.fit td{padding-left:4px; padding-right:4px;}
 }
 #updNews .updNews-new{ overflow:visible; }
 #updNews .updNews-body h2{font-size:16px;margin:4px 0 8px;}
+/* iPhone: bump What's-new type ~25%+ for readability */
+html.iphone #updNews .updNews-head h2{font-size:21px;}
+html.iphone #updNews .updNews-sub{font-size:16px;}
+html.iphone #updNews .updNews-body{font-size:18px;line-height:1.45;}
+html.iphone #updNews .updNews-body h2{font-size:20px;}
 #updNews .updNews-body h3{font-size:15px;margin:14px 0 6px;}
 #updNews .updNews-body h4{font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 4px;}
 #updNews .updNews-body ul.info-list{margin:0 0 4px;}
@@ -3438,7 +3443,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031539';
+var APP_VERSION = '202610031545';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
