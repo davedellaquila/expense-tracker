@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030318
+- Settings: background preset swatches are larger (44px) with a visible border in both themes, so the colors/patterns are actually perceptible.
 ### App 202610030316
 - Settings: the Side margins slider now works on iPad/tablet too (was desktop-only).
 ### App 202610030315

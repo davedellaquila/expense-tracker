@@ -1153,10 +1153,10 @@ ul.info-list li{margin:7px 0; font-size:15px; line-height:1.45;}
 }
 .bg-presets{display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-height:36px;}
 .bg-presets button{
-  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  width:44px; height:44px; border-radius:12px; border:1px solid rgba(127,127,127,.45);
   padding:0; cursor:pointer; background-color:var(--track); background-size:cover;
   background-position:center; flex:none; position:relative;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 1px 3px rgba(0,0,0,.18);
   transition: box-shadow .15s ease, border-color .15s ease, transform .12s ease;
 }
 .bg-presets button:hover{transform:translateY(-1px);}
@@ -3324,7 +3324,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030316';
+var APP_VERSION = '202610030318';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
