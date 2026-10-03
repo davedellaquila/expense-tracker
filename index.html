@@ -890,7 +890,7 @@ html.iphone .tabbar{ bottom:0; transition:none; }
 /* ---------- iPhone layout refinements (≤560px) ---------- */
 @media (max-width:560px){
   /* tab bar: 50% bigger icons/text; scroll sideways to reach every tab */
-  :root{--tabbar-h:74px; --tabbar-pad-b:max(24px, env(safe-area-inset-bottom));}
+  :root{--tabbar-h:74px; --tabbar-pad-b:max(12px, calc(env(safe-area-inset-bottom) / 2));}
   .tabbar{overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
   .tabbar::-webkit-scrollbar{display:none;}
   .tabbar button{flex:none; min-width:72px; font-size:16px; gap:4px; padding:4px 0 6px;}
@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031626';
+var APP_VERSION = '202610031630';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */

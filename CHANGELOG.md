@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031630
+- iPhone tab bar bottom padding halved (~17px).
 ### App 202610031626
 - iPhone tab bar: restored bottom clearance (min 24px, or the iPhone's home-indicator zone if larger) so the buttons clear the app-switching bar.
 - Category Bars legend: roomier entry spacing and taller rows — no more scrunched/overlapping labels.
