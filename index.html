@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031604';
+var APP_VERSION = '202610031606';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -11055,8 +11055,8 @@ function openTxnForm(t){
     scanBtn.addEventListener('click', startReceiptScan);
     var scanRow = el('div',{style:'display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap'});
     scanRow.appendChild(scanBtn);
-    sh.appendChild(scanRow);
-    sh.appendChild(scanBox);
+    // scanRow + scanBox are appended at the bottom of the form (before the
+    // action bar), not here at the top.
     renderScanBox();
 
     /* Split parts: if this transaction came from a split, show every part so
@@ -11267,6 +11267,11 @@ function openTxnForm(t){
     });
     refreshCats();
     taxCategoryOptions(inTax, (t&&t.tax_category)||defaultTaxFor(inCat.value));
+
+    // Bottom actions (were at the top): scan, split, bill reminder.
+    sh.appendChild(el('div',{style:'height:6px'}));
+    sh.appendChild(scanRow);
+    sh.appendChild(scanBox);
 
     var row = el('div',{class:'btnrow stickybar'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
