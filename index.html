@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031558';
+var APP_VERSION = '202610031600';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -5820,6 +5820,22 @@ function padStickyBars(sh){
     bar.parentNode.insertBefore(sp, bar.nextSibling);
   });
 }
+/* Pin a dialog's bottom action bar flush to the sheet's bottom edge.
+   Moves the .stickybar/.stickybar-page out of the scrolling body into a
+   .sheet-foot — same treatment as the bulk update dialog. Content scrolls
+   fully above it; nothing shows through behind the buttons. */
+function pinSheetFooter(body){
+  var bar = body.querySelector('.stickybar, .stickybar-page');
+  if(!bar) return;
+  var nx = bar.nextElementSibling;
+  if(nx && nx.className==='stickybar-spacer') nx.remove();
+  bar.classList.remove('stickybar','stickybar-page');
+  var sheet = body.closest('.sheet');
+  if(!sheet) return;
+  var foot = el('div',{class:'sheet-foot'});
+  foot.appendChild(bar);
+  sheet.appendChild(foot);
+}
 /* Drag-to-resize for bottom sheets. Dragging the grab handle changes the
    sheet's height while the bottom edge stays put; the sticky action bar
    remains pinned at the bottom and the sheet's content slides behind it.
@@ -5947,6 +5963,7 @@ function openSheet(build, onDismiss){
   xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
   build(body, close);
   padStickyBars(body);
+  pinSheetFooter(body);
   wireSheetResize(sh);
   applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
@@ -5975,6 +5992,7 @@ function openSheetStacked(build, onDismiss){
   xBtn.addEventListener('click', function(){ roundPressOut(xBtn, function(){ ov._dismiss(); }); });
   build(body, close);
   padStickyBars(body);
+  pinSheetFooter(body);
   wireSheetResize(sh);
   applyKbOffset(); /* sheet opened while the keyboard is already up */
   return close;
@@ -10767,21 +10785,12 @@ function openBulkUpdate(ids){
     sNotes.addEventListener('change', function(){ inNotes.style.display = sNotes.value==='__set__' ? '' : 'none'; });
     changeRow('Notes', sNotes);
     sh.appendChild(inNotes);
-    var row = el('div',{class:'btnrow'});
+    var row = el('div',{class:'btnrow stickybar'});
     var cancel = el('button',{class:'btn ghost',type:'button'},'Cancel');
     cancel.onclick = close;
     var apply = el('button',{class:'btn',type:'button'},'Update '+ids.length);
     row.appendChild(cancel); row.appendChild(apply);
-    // Pin the action bar flush to the sheet's bottom edge, outside the scroll
-    // area — content scrolls fully above it and never shows through behind it.
-    var sheetEl = sh.closest('.sheet');
-    if(sheetEl){
-      var foot = el('div',{class:'sheet-foot'});
-      foot.appendChild(row);
-      sheetEl.appendChild(foot);
-    }else{
-      sh.appendChild(row);
-    }
+    sh.appendChild(row);
     // Focus the Merchant name field on open so typing starts there.
     setTimeout(function(){ try{ inMerch.focus({preventScroll:true}); }catch(e){ try{ inMerch.focus(); }catch(e2){} } },60);
     apply.onclick = async function(){

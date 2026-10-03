@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031600
+- All modal dialogs now pin their bottom action bar flush to the sheet's bottom edge in a dedicated footer (same as the bulk update dialog) — transaction form, bill form, Max Headroom editor, AI background generator, budget copy, etc.
 ### App 202610031558
 - Transactions: in select mode, the filter card and bulk bar now merge into one continuous blue-bordered panel (the bar reads as an extension of the card); tapping Done splits them apart again.
 - Filter card: action row top margin increased to 14px to match the bottom padding.
