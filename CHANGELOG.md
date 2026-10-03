@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030340
+- Settings: collapse button triangle is now 50% smaller (button stays the same size).
 ### App 202610030333
 - Max Headroom wireframe preset now rotates the grid planes (slow oscillation, like the OG) in addition to scrolling.
 ### App 202610030331
