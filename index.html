@@ -3458,7 +3458,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031615';
+var APP_VERSION = '202610031617';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -15658,12 +15658,18 @@ function repHBars(el, items, color, emptyMsg, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
   var PH=repPhone(), W=720, labelW=PH?330:200, rowH=PH?54:36, top=6, bot=6;
   var tMax=PH?20:26;
+  /* Right gutter sized to the longest value label, so the longest bar can
+     never run underneath the value text. */
+  var vMax=0;
+  items.forEach(function(it){ vMax = Math.max(vMax, money(it.value).length); });
+  var gut = Math.ceil(vMax*(PH?26:13)*0.58)+16;
+  var trackW = W-labelW-gut;
   var H = top + items.length*rowH + bot, max = items[0].value || 1, svg='';
   items.forEach(function(it, i){
-    var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*(W-labelW-110));
+    var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*Math.max(10, trackW-6));
     var nm = it.name.length>tMax ? it.name.slice(0,tMax-1)+'…' : it.name;
     svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
-      '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" class="cx-track"/>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+trackW+'" height="20" rx="6" class="cx-track"/>'+
       '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+money(it.value)+'</title></rect>'+
       '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+money(it.value)+'</text></g>';
   });
@@ -15808,13 +15814,19 @@ function repHBarsCount(el, items, color, emptyMsg, onBar){
   if(!items.length){ emptyInto(el,'📊', emptyMsg||'Nothing here yet.'); return; }
   var PH=repPhone(), W=720, labelW=PH?330:200, rowH=PH?54:36, top=6, bot=6;
   var tMax=PH?20:26;
+  /* Right gutter sized to the longest "N txns" label, so the longest bar
+     can never run underneath the count text. */
+  var vMax=0;
+  items.forEach(function(it){ vMax = Math.max(vMax, String(it.value+(it.value===1?' txn':' txns')).length); });
+  var gut = Math.ceil(vMax*(PH?26:13)*0.58)+16;
+  var trackW = W-labelW-gut;
   var H = top + items.length*rowH + bot, max = items[0].value || 1, svg='';
   items.forEach(function(it, i){
-    var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*(W-labelW-110));
+    var y = top + i*rowH + 7, w = Math.max(3, (it.value/max)*Math.max(10, trackW-6));
     var nm = it.name.length>tMax ? it.name.slice(0,tMax-1)+'…' : it.name;
     var vc = it.value + (it.value===1?' txn':' txns');
     svg += '<g><text x="0" y="'+(y+16)+'" font-size="13" class="cx-text">'+esc(nm)+'<title>'+esc(it.name)+'</title></text>'+
-      '<rect x="'+labelW+'" y="'+y+'" width="'+(W-labelW-104)+'" height="20" rx="6" class="cx-track"/>'+
+      '<rect x="'+labelW+'" y="'+y+'" width="'+trackW+'" height="20" rx="6" class="cx-track"/>'+
       '<rect x="'+labelW+'" y="'+y+'" width="'+Math.round(w)+'" height="20" rx="6" fill="'+color+'" opacity="0.9"'+(onBar?' class="rep-click" data-bar="'+i+'"':'')+'><title>'+esc(it.name)+': '+esc(vc)+'</title></rect>'+
       '<text x="'+(W-4)+'" y="'+(y+16)+'" text-anchor="end" font-size="13" font-weight="600" class="cx-text">'+esc(vc)+'</text></g>';
   });

@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031617
+- Category Volume (and similar horizontal-bar charts): the right-side value labels now get a gutter sized to the longest label, so the longest bar can no longer slide underneath the count text.
 ### App 202610031615
 - No-transactions note now suggests trying a different period to see transactions.
 ### App 202610031612
