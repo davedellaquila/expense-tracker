@@ -3333,7 +3333,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610030344';
+var APP_VERSION = '202610030347';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -7084,7 +7084,12 @@ var _copyListRun = 0; // guards the copy-button list against overlapping refresh
 async function syncStoreSettings(){
   var _runId = ++_copyListRun;
   var bs = $('build-stamp');
-  if(bs) bs.textContent = 'Build ' + APP_VERSION;
+  if(bs){
+    /* Format as YYYYMM-DDHHMM for readability. */
+    var v = String(APP_VERSION||'');
+    if(v.length>6) v = v.slice(0,-6) + '-' + v.slice(-6);
+    bs.textContent = 'Build ' + v;
+  }
   var k = storeKind() || 'local';
   document.querySelectorAll('#set-store-seg button').forEach(function(b){
     var bk = b.getAttribute('data-spick');

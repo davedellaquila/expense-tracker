@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-10-03
+### App 202610030347
+- Settings: build stamp now formats the version as YYYYMM-DDHHMM (e.g. 202610-030347).
 ### App 202610030344
 - Settings: the build stamp at the bottom now shows the actual app version number, so you can verify what version you're running.
 ### App 202610030340
