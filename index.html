@@ -199,6 +199,22 @@ body{
   .app-header, .tabbar, .toast-wrap, .no-print{ display:none !important; }
   body{ background:#fff; }
   .card{ box-shadow:none; break-inside:avoid; }
+  /* CPA report: print only the report, nothing else */
+  body.cpa-print > *:not(#cpa-report){ display:none !important; }
+  body.cpa-print #cpa-report{ display:block !important; }
+  #cpa-report{ color:#000; font-family:Georgia,'Times New Roman',serif; max-width:7.5in; margin:0 auto; }
+  #cpa-report h1{ font-size:22px; margin:0 0 4px; }
+  #cpa-report .cpa-sub{ font-size:12px; color:#444; margin:0 0 20px; }
+  #cpa-report h2{ font-size:15px; margin:22px 0 6px; border-bottom:2px solid #000; padding-bottom:4px; }
+  #cpa-report table.cpa-table{ width:100%; border-collapse:collapse; font-size:13px; margin:0 0 6px; }
+  #cpa-report table.cpa-table td{ padding:4px 6px; border-bottom:1px solid #ddd; vertical-align:top; }
+  #cpa-report table.cpa-table td.cpa-amt{ text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  #cpa-report table.cpa-table tfoot td{ font-weight:bold; border-bottom:none; border-top:2px solid #000; }
+  #cpa-report .cpa-n{ color:#666; font-size:11.5px; }
+  #cpa-report .cpa-note{ font-size:11.5px; color:#333; margin:14px 0 0; }
+  #cpa-report .cpa-summary{ margin-top:18px; border:2px solid #000; padding:10px 14px; }
+  #cpa-report .cpa-summary .rowline{ display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
+  #cpa-report .cpa-summary .rowline.grand{ font-weight:bold; font-size:16px; border-top:1px solid #000; margin-top:6px; padding-top:8px; }
 }
 
 /* ---------- report charts (style inspired by capital_one_dashboard) ---------- */
@@ -2887,6 +2903,10 @@ html.bg-paused body::before{
       <div class="card">
         <label class="f" style="margin-top:0" for="tax-year">Tax year</label>
         <input type="number" id="tax-year" min="2000" max="2100" inputmode="numeric">
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn small" id="tax-cpa" type="button">CPA report (PDF)</button>
+        </div>
+        <p class="muted" style="margin:8px 0 0">Prints a summary for your CPA — category totals only. Save as PDF in the print dialog; the CSVs below carry transaction detail.</p>
       </div>
       <div class="card">
         <h2>Business — Schedule C</h2>
@@ -3407,7 +3427,7 @@ var BG_PRESETS = [
    (same stamp as APP_VERSION) with that deploy's bullets, newest first.
    "See what's new" uses these markers to show everything newer than the
    tab's running APP_VERSION (skipped versions grouped together). */
-var APP_VERSION = '202610031406';
+var APP_VERSION = '202610031454';
 
 /* iPhone: sticky bottom action bars misbehave when the keyboard is open (the
    bar can float over the focused field), so sheets use a static button row. */
@@ -16475,6 +16495,65 @@ function renderTax(){
   renderTaxGroup($('tax-biz'), biz, {from:y+'-01', to:y+'-12', bp:'Business', scope:'Business · '+y});
   renderTaxGroup($('tax-per'), per, {from:y+'-01', to:y+'-12', bp:'Personal', scope:'Personal · '+y});
 }
+// --- CPA report: print-optimized summary (category totals, no transaction detail) ---
+function cpaSectionHtml(title, rows, groupKey){
+  var groups = {};
+  rows.forEach(function(t){
+    var k = t[groupKey] || t.category || 'Uncategorized';
+    if(!groups[k]) groups[k]={count:0,total:0};
+    groups[k].count++; groups[k].total += num(t.amount);
+  });
+  var keys = Object.keys(groups).sort();
+  var h = '<h2>'+esc(title)+'</h2>';
+  if(!keys.length){ return {html: h+'<p class="cpa-note" style="margin-top:0">None.</p>', total: 0}; }
+  var grand = 0;
+  h += '<table class="cpa-table"><tbody>';
+  keys.forEach(function(k){
+    grand += groups[k].total;
+    h += '<tr><td>'+esc(k)+' <span class="cpa-n">('+groups[k].count+')</span></td>'+
+         '<td class="cpa-amt">'+money(groups[k].total)+'</td></tr>';
+  });
+  h += '</tbody><tfoot><tr><td>Total</td><td class="cpa-amt">'+money(grand)+'</td></tr></tfoot></table>';
+  return {html: h, total: grand};
+}
+function renderCpaReport(){
+  var y = String($('tax-year').value || new Date().getFullYear());
+  var inY = function(t){ return String(t.date||'').slice(0,4)===y; };
+  var bizInc = state.transactions.filter(function(t){ return inY(t) && t.txn_type==='income' && t.business_personal==='Business'; });
+  var bizExp = state.transactions.filter(function(t){ return inY(t) && t.txn_type==='expense' && t.business_personal==='Business'; });
+  var perInc = state.transactions.filter(function(t){ return inY(t) && t.txn_type==='income' && t.business_personal==='Personal'; });
+  var perExp = state.transactions.filter(function(t){
+    return inY(t) && t.txn_type==='expense' && t.business_personal==='Personal' &&
+      (PERSONAL_DEDUCTION_CATS.indexOf(t.tax_category)!==-1);
+  });
+  var s1 = cpaSectionHtml('Business income', bizInc, 'category');
+  var s2 = cpaSectionHtml('Business deductions — Schedule C', bizExp, 'tax_category');
+  var s3 = cpaSectionHtml('Personal income', perInc, 'category');
+  var s4 = cpaSectionHtml('Personal deductions', perExp, 'tax_category');
+  var totInc = s1.total + s3.total, totDed = s2.total + s4.total;
+  var today = new Date();
+  var h = '<h1>Tax summary — '+esc(y)+'</h1>'+
+    '<p class="cpa-sub">Prepared '+esc(today.toLocaleDateString())+' from Expense Tracker · category totals only; transaction-level detail is in the accompanying CSV files.</p>'+
+    s1.html + s2.html + s3.html + s4.html +
+    '<div class="cpa-summary">'+
+      '<div class="rowline"><span>Total income</span><span>'+money(totInc)+'</span></div>'+
+      '<div class="rowline"><span>Total deductions</span><span>'+money(totDed)+'</span></div>'+
+      '<div class="rowline grand"><span>Net (income − deductions)</span><span>'+money(totInc-totDed)+'</span></div>'+
+    '</div>'+
+    '<p class="cpa-note">Note: deductible business meals are generally only 50% deductible. Amounts above are shown in full — apply the 50% limit on the return.</p>';
+  var node = $('cpa-report');
+  node.innerHTML = h;
+  node.hidden = false;
+  document.body.classList.add('cpa-print');
+  window.print();
+}
+window.addEventListener('afterprint', function(){
+  document.body.classList.remove('cpa-print');
+  var node = $('cpa-report');
+  if(node){ node.hidden = true; }
+});
+$('tax-cpa').addEventListener('click', renderCpaReport);
 </script>
+    <div id="cpa-report" hidden></div>
 </body>
 </html>

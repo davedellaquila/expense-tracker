@@ -5,6 +5,8 @@
      every ### App block newer than the tab's running APP_VERSION (skipped builds grouped). -->
 
 ## 2026-10-03
+### App 202610031454
+- Tax: new **CPA report (PDF)** button — prints a clean summary for your CPA with business/personal income and deductions as category totals (no transaction detail), plus a totals box. Save as PDF in the print dialog; the CSVs still carry transaction detail.
 ### App 202610031406
 - Tax: category amounts are now plain weight; only the Total is bold.
 ### App 202610030642
